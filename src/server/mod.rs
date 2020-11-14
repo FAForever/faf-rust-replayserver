@@ -1,5 +1,5 @@
 mod server;
 
-fn main() {
+pub fn accept_connections() {
     server::accept_connections()
 }
