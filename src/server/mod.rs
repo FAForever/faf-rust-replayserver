@@ -1,5 +1,5 @@
 mod server;
 
-pub fn accept_connections() {
-    server::accept_connections()
+pub async fn accept_connections() {
+    server::accept_connections().await
 }
