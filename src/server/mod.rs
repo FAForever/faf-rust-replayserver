@@ -1,5 +1,2 @@
-mod server;
-
-pub async fn accept_connections() {
-    server::accept_connections().await
-}
+pub mod server;
+pub mod workers;
