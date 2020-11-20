@@ -1,77 +1,93 @@
-use async_channel::Receiver;
-use async_std::io::Result;
-use async_std::net::TcpListener;
-use async_std::net::TcpStream;
-use async_std::prelude::*;
-use crate::server::workers::WorkerThread;
-use futures::executor::LocalPool;
+use crate::server::workers::{ReplayWorkerThread,dummy_work};
+use crate::config::Config;
+use async_std::net::{TcpListener, TcpStream};
+use async_std::stream;
 use futures::stream::StreamExt;
-use futures::task::SpawnExt;
+use stop_token::StopToken;
+use async_channel::Sender;
 use std::cell::RefCell;
 
-pub async fn accept_connections(workers: Vec<WorkerThread<TcpStream>>) {
-    // Listen for incoming TCP connections on localhost port 7878
-    let listener = TcpListener::bind("127.0.0.1:7878").await.unwrap();
-    let nonce : RefCell<usize> = RefCell::new(0);
+use crate::server::connection::Connection;
 
-    async fn send_to_worker(s: Result<TcpStream>, workers: &Vec<WorkerThread<TcpStream>>, nonce: &RefCell<usize>) {
-        let s = s.unwrap();
-        let mut borrowed = nonce.borrow_mut();
-        let count = *borrowed;
-        *borrowed += 1;
-        *borrowed %= workers.len();
-        let channel = &workers[count].channel;
-        channel.send(s).await.unwrap();
+type ChannelRef = RefCell<Vec<Sender<Connection>>>;
+
+pub struct Server
+{
+    replay_workers: Vec<ReplayWorkerThread>,
+    send_channels: ChannelRef,
+    port: String,
+}
+
+struct SelectArgs
+{
+    stream: TcpStream,
+    token: StopToken,
+    channels: ChannelRef,
+}
+
+impl Server {
+    pub fn new(config: &Config) -> Self
+    {
+        let mut threads = Vec::new();
+        let mut channels = Vec::new();
+        for _ in 0..config.worker_threads {
+            let worker = ReplayWorkerThread::new(dummy_work);
+            channels.push(worker.get_channel());
+            threads.push(worker);
+        }
+        Server {
+            replay_workers: threads,
+            send_channels: RefCell::new(channels),
+            port: config.port.clone(),
+        }
     }
-    listener
-        .incoming()
-        .for_each_concurrent(None, |s| {send_to_worker(s, &workers, &nonce)}).await;
-}
 
-macro_rules! page_fmt { () => (r#"
-{}
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Hello!</title>
-  </head>
-  <body>
-    <h1>Hello!</h1>
-    <p>{}</p>
-  </body>
-</html>
-    "#)}
+    /* TODO move accepting elsewhere */
+    pub async fn accept_until(&self, token: StopToken) {
+        let addr = format!("localhost:{}", self.port);
+        Server::_handle_conn_stream(addr, token, self.send_channels.clone()).await;
+    }
 
-pub fn thread_accept_connections(streams: Receiver<TcpStream>)
-{
-    let mut pool = LocalPool::new();
-    pool.spawner().spawn(thread_handle_concurrent_connections(streams)).unwrap();
-    pool.run()
-}
+    async fn _filter_good(item: Result<TcpStream, std::io::Error>) -> Option<TcpStream> {
+        match item {
+            Ok(v) => Some(v),
+            Err(_) => None,     // TODO log
+        }
+    }
 
-async fn thread_handle_concurrent_connections(streams: Receiver<TcpStream>)
-{
-    streams.for_each_concurrent(None, handle_connection).await;
-}
+    async fn _handle_conn_stream(
+            addr: String,
+            token: StopToken,
+            channels: ChannelRef) {
+        let listener = TcpListener::bind(addr).await.unwrap();    /* TODO log */
+        let incoming = listener.incoming();
+        let bound_incoming = token.stop_stream(incoming);
+        let only_good = bound_incoming.filter_map(Server::_filter_good);
 
+        // Some mess to avoid async closures
+        let tokens = stream::once(token).cycle();
+        let channels = stream::once(channels).cycle();
+        let inc_plus_token = only_good.zip(tokens).zip(channels).map(|t| {
+            let ((stream, token), channels) = t;
+            SelectArgs {stream, token, channels}
+        });
+        inc_plus_token.for_each_concurrent(None, Server::handle_connection).await;
+    }
 
-async fn handle_connection(mut stream: TcpStream) {
-    let mut buffer = [0; 1024];
-    stream.read(&mut buffer).await.unwrap();
+    async fn handle_connection(args: SelectArgs)
+    {
+        let SelectArgs {stream, token, channels} = args;
+        drop(token);
+        let connection = Connection::new(stream);
+        // Safe since we're in the same thread. TODO document.
+        let target_thread = &channels.borrow()[0];
+        target_thread.send(connection).await.unwrap();
+    }
 
-    let get = b"GET / HTTP/1.1\r\n";
-
-    // Respond with greetings or a 404,
-    // depending on the data in the request
-    let (status_line, contents) = if buffer.starts_with(get) {
-        ("HTTP/1.1 200 OK\r\n\r\n", "Hello!")
-    } else {
-        ("HTTP/1.1 404 NOT FOUND\r\n\r\n", "Not found!")
-    };
-    // Write response back to the stream,
-    // and flush the stream to ensure the response is sent back to the client
-    let response = format!(page_fmt!(), status_line, contents);
-    stream.write(response.as_bytes()).await.unwrap();
-    stream.flush().await.unwrap();
+    pub fn shutdown(&mut self) {
+        for thread in self.replay_workers.iter_mut() {
+            thread.shutdown();
+        }
+        /* join happens via thread destructors */
+    }
 }

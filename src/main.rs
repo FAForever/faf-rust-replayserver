@@ -1,25 +1,31 @@
-use async_std::net::TcpStream;
-use futures::executor::LocalPool;
-use async_channel::Receiver;
-use futures::task::LocalSpawnExt;
 use std::error::Error;
+use stop_token::StopSource;
+use futures::{
+    task::LocalSpawnExt,
+    executor::LocalPool,
+    join,
+};
 
-mod server;
-use crate::server::workers::{WorkerThread, create_worker_thread};
-use crate::server::server as s;
+pub mod server;
+pub mod config;
 
-fn create_stream_thread_pool(count: u32, work: fn(Receiver<TcpStream>) -> ()) -> Vec<WorkerThread<TcpStream>> {
-    let mut v = Vec::new();
-    for _ in 0..count {
-        v.push(create_worker_thread(work));
-    }
-    v
+use crate::server::server::Server;
+use crate::config::Config;
+use crate::server::signal::hold_until_signal;
+
+async fn run_server() {
+    let config = Config { worker_threads: 4, port: "7878".to_string() };
+    let server = Server::new(&config);
+    let shutdown = StopSource::new();
+    let token = shutdown.stop_token();
+    let f1 = server.accept_until(token);
+    let f2 = hold_until_signal(shutdown);
+    join!(f1, f2);
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut pool = LocalPool::new();
-    let workers = create_stream_thread_pool(4, s::thread_accept_connections);
-    pool.spawner().spawn_local(s::accept_connections(workers))?;
+    pool.spawner().spawn_local(run_server()).unwrap();
     pool.run();
     Ok(())
 }
