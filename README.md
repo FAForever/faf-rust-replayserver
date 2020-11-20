@@ -9,6 +9,7 @@ Roadmap
   handling (Replay).
   * Test threads and accepting by substituting these stubs.
 * Implement config, similar to Python config, but flat this time.
+* Add logging.
 * Investigate how to control backpressure in Rust.
 * Add *real* connection header reading.
 * Add half-stub Replay/Replays classes.
@@ -35,6 +36,7 @@ Roadmap
 * Implement stub replay saving. No DB or json header just yet, only saving on
   disk and compressing in a dedicated thread.
 * Implement reading from DB, single thread, probably using RefCell.
+* Add grafana.
 * Integration tests.
 
 Above all, TESTS TESTS TESTS. Architecture is roughly planned out, so hopefully
