@@ -70,5 +70,6 @@ async fn do_nothing(c: Connection, shutdown_token: StopToken) {
 
 async fn dummy_handle_connection(streams: Receiver<Connection>, shutdown_token: StopToken)
 {
-    streams.for_each_concurrent(None, |c| { do_nothing(c, shutdown_token.clone())} ).await;
+    let bound_streams = shutdown_token.stop_stream(streams);
+    bound_streams.for_each_concurrent(None, |c| { do_nothing(c, shutdown_token.clone())} ).await;
 }

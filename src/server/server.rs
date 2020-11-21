@@ -6,6 +6,7 @@ use futures::stream::StreamExt;
 use stop_token::StopToken;
 use async_channel::Sender;
 use std::cell::RefCell;
+use log::debug;
 
 use crate::server::connection::Connection;
 
@@ -72,6 +73,7 @@ impl Server {
             SelectArgs {stream, token, channels}
         });
         inc_plus_token.for_each_concurrent(None, Server::handle_connection).await;
+        debug!("Connection stream closed.");
     }
 
     async fn handle_connection(args: SelectArgs)
