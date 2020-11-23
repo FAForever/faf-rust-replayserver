@@ -1,4 +1,4 @@
-use async_channel::{unbounded,Sender,Receiver};
+use async_std::sync::{channel, Sender, Receiver};
 use std::thread;
 use std::thread::JoinHandle;
 use crate::server::connection::Connection;
@@ -27,7 +27,7 @@ pub struct ReplayWorkerThread
 
 impl ReplayWorkerThread {
     pub fn new(work: ThreadFn) -> Self {
-        let (s, r) = unbounded::<Connection>();
+        let (s, r) = channel(1);
         let shutdown_token = StopSource::new();
         let stop_token = shutdown_token.stop_token();
         let handle = thread::spawn(move || {

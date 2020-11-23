@@ -6,19 +6,22 @@ use futures::{
     join,
 };
 
-pub mod server;
+pub mod accept;
 pub mod config;
+pub mod server;
 
 use crate::server::server::Server;
 use crate::config::Config;
 use crate::server::signal::hold_until_signal;
+use crate::accept::ConnectionAcceptor;
 
 async fn run_server() {
     let config = Config { worker_threads: 4, port: "7878".to_string() };
-    let mut server = Server::new(&config);
     let shutdown = StopSource::new();
     let token = shutdown.stop_token();
-    let f1 = server.accept_until(token);
+    let (acceptor, connection_stream) = ConnectionAcceptor::new(format!("localhost:{}", config.port), &token);
+    let mut server = Server::new(&config, acceptor, connection_stream);
+    let f1 = server.accept();
     let f2 = hold_until_signal(shutdown);
     join!(f1, f2);
     server.shutdown();

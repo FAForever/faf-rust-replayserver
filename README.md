@@ -45,6 +45,16 @@ we can write tests as we write pieces of the server.
 Random notes
 ------------
 
-* Unit testing. There are mocking frameworks that substitute types via
-  conditional compilation, therefore we don't need to box anything or template
-  template templates. Therefore, no interfaces.
+Unit testing
+============
+There are mocking frameworks that substitute types via conditional compilation,
+therefore we don't need to box anything or template template templates.
+Therefore, no interfaces.
+
+Making replays read-only
+========================
+We want to share the Replay struct between coroutines using RefCell. However,
+after the game is over, we want to send an immutable reference to another
+thread to compress / save it. We don't want to wait for readers to end, as
+replay should be saved immediately, and we can't send a &RefCell, since RefCell
+is not Sync. How to deal with this?
