@@ -1,6 +1,5 @@
 use crate::server::workers::{ReplayWorkerThread,dummy_work};
 use crate::config::Config;
-use async_std::net::TcpStream;
 use async_std::sync::{Sender, Receiver};
 use std::cell::RefCell;
 
@@ -13,14 +12,14 @@ pub struct Server
 {
     replay_workers: Vec<ReplayWorkerThread>,
     acceptor: ConnectionAcceptor,
-    acceptor_channel: Receiver<TcpStream>,
+    acceptor_channel: Receiver<Connection>,
     send_channels: ChannelRef,
 }
 
 impl Server {
     pub fn new(config: &Config,
                acceptor: ConnectionAcceptor,
-               acceptor_channel: Receiver<TcpStream>) -> Self
+               acceptor_channel: Receiver<Connection>) -> Self
     {
         let mut replay_workers = Vec::new();
         let mut channels = Vec::new();

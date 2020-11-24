@@ -9,6 +9,7 @@ use futures::{
 pub mod accept;
 pub mod config;
 pub mod server;
+pub mod replay;
 
 use crate::server::server::Server;
 use crate::config::Config;
