@@ -5,6 +5,9 @@ use stop_token::StopToken;
 use futures::stream::StreamExt;
 
 use crate::server::connection::Connection;
+use crate::error::ConnResult;
+
+use super::header::{read_connection_info, ConnectionInfo};
 
 pub struct ConnectionAcceptor {
     addr: String,
@@ -44,7 +47,8 @@ impl ConnectionAcceptor {
 
     async fn send(args: (TcpStream, &Sender<Connection>)) {
             let (stream, conn_sender) = args;
-            let conn = Connection::new(stream);
+            let mut conn = Connection::new(stream);
+            let data: ConnectionInfo = read_connection_info(&mut conn).await.unwrap();
             conn_sender.send(conn).await;
     }
 }
