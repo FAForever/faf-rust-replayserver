@@ -33,7 +33,3 @@ version = "0.8.2"
 
 [dependencies.thiserror]
 version = "1.0.22"
-
-# TODO remove when try-blocks become stabilized, don't use in hot code
-[dependencies.try-block]
-version = "0.1.0"

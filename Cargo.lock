@@ -245,7 +245,6 @@ dependencies = [
  "signal-hook",
  "stop-token",
  "thiserror",
- "try-block",
 ]
 
 [[package]]
@@ -657,12 +656,6 @@ checksum = "d40c6d1b69745a6ec6fb1ca717914848da4b44ae29d9b3080cbee91d72a69b14"
 dependencies = [
  "lazy_static",
 ]
-
-[[package]]
-name = "try-block"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f568ed684112efae02e996f1320d284bacea7a106e3383a22b3ea198d8f2b11c"
 
 [[package]]
 name = "unicode-xid"
