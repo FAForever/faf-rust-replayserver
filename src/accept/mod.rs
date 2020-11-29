@@ -1,4 +1,7 @@
+mod producer;
 mod acceptor;
-mod header;
+pub mod header;
 
+
+pub use crate::accept::producer::ConnectionProducer;
 pub use crate::accept::acceptor::ConnectionAcceptor;

@@ -33,3 +33,6 @@ version = "0.8.2"
 
 [dependencies.thiserror]
 version = "1.0.22"
+
+[dependencies.async-trait]
+version = "0.1.42"

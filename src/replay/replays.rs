@@ -1,4 +1,5 @@
 use async_std::sync::Receiver;
+use log::info;
 use stop_token::StopToken;
 
 use crate::server::connection::Connection;
@@ -16,6 +17,7 @@ impl Replays {
     }
 
     pub async fn lifetime(&mut self) {
+        info!("TODO handle connections properly");
         while let Ok(conn) = self.connections.recv().await {
             let _ = conn;
         }

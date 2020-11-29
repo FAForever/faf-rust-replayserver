@@ -1,54 +1,48 @@
-use async_std::net::{TcpListener, TcpStream};
-use async_std::stream;
-use async_std::sync::{channel, Sender, Receiver};
 use stop_token::StopToken;
-use futures::stream::StreamExt;
-
-use crate::server::connection::Connection;
+use async_trait::async_trait;
 use crate::error::ConnResult;
-
-use super::header::{read_connection_info, ConnectionInfo};
+use crate::server::connection::Connection;
+use crate::server::workers::ReplayThreadPool;
+use crate::util::Consumer;
+use super::header::ConnectionHeaderReader;
 
 pub struct ConnectionAcceptor {
-    addr: String,
-    conn_sender: Sender<Connection>,
-    shutdown_token: StopToken,
+    header_reader: ConnectionHeaderReader,
+    thread_pool: ReplayThreadPool,
 }
 
 impl ConnectionAcceptor {
-    pub fn new(
-            addr: String,
-            shutdown_token: &StopToken,
-            ) -> (Self, Receiver<Connection>) {
-        let (conn_sender, r) =channel(1);
-        let shutdown_token = shutdown_token.clone();
-        (ConnectionAcceptor {addr, conn_sender, shutdown_token},  r)
+    pub fn new(header_reader: ConnectionHeaderReader,
+               thread_pool: ReplayThreadPool) -> Self {
+        ConnectionAcceptor { header_reader, thread_pool}
     }
 
-    pub async fn accept(&self) -> () {
-        let listener = TcpListener::bind(self.addr.clone());    /* TODO log */
-        let incoming = listener.await.unwrap();
-        let incoming = incoming.incoming();    /* TODO log */
-        let incoming= self.shutdown_token
-            .stop_stream(incoming)
-            .filter_map(ConnectionAcceptor::_filter_good);
-
-        incoming
-            .zip(stream::once(&self.conn_sender).cycle())
-            .for_each_concurrent(None, Self::send).await;
+    pub fn build(thread_pool: ReplayThreadPool,
+                 stop_token: StopToken) -> Self {
+        let header_reader = ConnectionHeaderReader::new(stop_token);
+        ConnectionAcceptor::new(header_reader, thread_pool)
     }
 
-    async fn _filter_good(item: Result<TcpStream, std::io::Error>) -> Option<TcpStream> {
-        match item {
-            Ok(v) => Some(v),
-            Err(_) => None,     // TODO log
+    async fn do_accept(&self, mut c: Connection) -> ConnResult<()> {
+        self.header_reader.read_and_set_connection_header(&mut c).await?;
+        self.thread_pool.assign_connection(c).await;
+        Ok(())
+    }
+
+    pub async fn accept(&self, c: Connection) {
+        if let Err(e) = self.do_accept(c).await {
+            /* The only things acceptor does are reading the header and dispatching to thread.  If
+             * we failed to read the header, then we don't have it. If we succeeded, then dispatch
+             * can't fail. Therefore we never have a header to log.
+             */
+            e.log(None.into());
         }
     }
+}
 
-    async fn send(args: (TcpStream, &Sender<Connection>)) {
-            let (stream, conn_sender) = args;
-            let mut conn = Connection::new(stream);
-            let data: ConnectionInfo = read_connection_info(&mut conn).await.unwrap();
-            conn_sender.send(conn).await;
+#[async_trait(?Send)]
+impl Consumer<Connection, ()> for ConnectionAcceptor {
+    async fn consume(&self, c: Connection) {
+        self.accept(c).await;
     }
 }

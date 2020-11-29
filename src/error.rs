@@ -1,7 +1,10 @@
 use std::num::ParseIntError;
 use std::str::Utf8Error;
 
+use log::info;
 use thiserror::Error;
+
+use crate::accept::header::MaybeConnectionHeader;
 
 #[derive(Error, Debug)]
 pub enum ConnectionError {
@@ -13,12 +16,23 @@ pub enum ConnectionError {
     IO {
         #[from]
         source: std::io::Error,
+    },
+    #[error("Shutting down")]
+    ShuttingDown(),
+}
+
+impl ConnectionError {
+    pub fn log(&self, c: MaybeConnectionHeader) {
+        match self {
+            ConnectionError::BadData(..) | ConnectionError::IO {..} => info!("{} ended: {}", c, self),
+            _ => (),
+        }
     }
 }
 
 pub type ConnResult<T> = Result<T, ConnectionError>;
 
-// Below is some magic for nicer handling of error chains.
+// Below is some magic for nicer handling of errors.
 
 impl From<String> for ConnectionError {
     fn from(s : String) -> Self {
@@ -59,6 +73,18 @@ macro_rules! as_conn_err {
         || -> ConnResult<$t> {
             Ok($e)
         }().context($s)?
+    }
+}
+
+// Shorthand for returning an 'error' if we're shutting down. Safer than implementing conversion
+// from None, since this way we'll never convert accidentally.
+#[macro_export]
+macro_rules! or_conn_shutdown {
+    ($e: expr, $token: expr) => {
+        match $token.stop_future($e).await {
+            Some(e) => e,
+            None => Err(ConnectionError::ShuttingDown())
+        }
     }
 }
 

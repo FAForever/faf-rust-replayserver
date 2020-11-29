@@ -7,36 +7,34 @@ use futures::{
     task::SpawnExt,
 };
 use std::option::Option;
-use stop_token::StopSource;
 
 use crate::server::connection::Connection;
 use crate::replay::Replays;
 
-pub type ThreadFn = fn(Receiver<Connection>, StopToken) -> ();
+type ThreadFn = fn(Receiver<Connection>, StopToken) -> ();
 
 pub struct ReplayWorkerThread
 {
     handle: Option<JoinHandle<()>>,
     channel: Sender<Connection>,
-    shutdown_token: Option<StopSource>,
 }
 
 impl ReplayWorkerThread {
-    pub fn new(work: ThreadFn) -> Self {
+    pub fn new(work: ThreadFn, stop_token: StopToken) -> Self {
         let (s, r) = channel(1);
-        let shutdown_token = StopSource::new();
-        let stop_token = shutdown_token.stop_token();
         let handle = thread::spawn(move || {
             work(r, stop_token)
         });
         ReplayWorkerThread {
             handle: Some(handle),
             channel: s,
-            shutdown_token: Some(shutdown_token)
         }
     }
+    pub async fn dispatch(&self, c: Connection) {
+        self.channel.send(c).await
+    }
+
     pub fn get_channel(&self) -> Sender<Connection> { self.channel.clone() }
-    pub fn shutdown(&mut self) { self.shutdown_token = None}
 }
 
 impl Drop for ReplayWorkerThread {
@@ -57,4 +55,29 @@ async fn do_work(streams: Receiver<Connection>, shutdown_token: StopToken)
 {
     let mut replays = Replays::new(shutdown_token, streams);
     replays.lifetime().await;
+}
+
+
+pub struct ReplayThreadPool
+{
+    replay_workers: Vec<ReplayWorkerThread>,
+}
+
+impl ReplayThreadPool {
+    pub fn new(work: ThreadFn, count: u32, stop_token: StopToken) -> Self {
+        let mut replay_workers = Vec::new();
+        for _ in 0..count {
+            let worker = ReplayWorkerThread::new(work, stop_token.clone());
+            replay_workers.push(worker);
+        }
+        Self { replay_workers }
+    }
+
+    pub async fn assign_connection(&self, conn: Connection) {
+        let conn_info = conn.get_header().as_ref();
+        assert!(conn_info.is_some());
+        let conn_info = conn_info.unwrap();
+        let worker_to_pick = (conn_info.id % self.replay_workers.len() as u64) as usize;
+        self.replay_workers[worker_to_pick].dispatch(conn).await;
+    }
 }
