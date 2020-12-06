@@ -19,6 +19,9 @@ impl Connection {
     pub fn new(stream: TcpStream) -> Self {
         Self { stream: BufReader::new(stream), header: None }
     }
+    /* Unlike in Python, reaching the end without encountering the delimiter is a success.
+     * TODO maybe we should change that.
+     * */
     pub async fn read_exact(&mut self, buf: &mut[u8]) -> ConnResult<()>
     {
         self.stream.read_exact(buf).await.map_err(ConnectionError::from)

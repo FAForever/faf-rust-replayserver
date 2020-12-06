@@ -67,18 +67,17 @@ impl ConnectionHeaderReader {
     {
         let mut line: Vec<u8> = Vec::new();
         conn.read_until(b'\0', &mut line, 1024).await?;
-        let pieces: &Vec<&[u8]> = &line[..].split(|val| {val == &b'/'}).collect();
-        if pieces.len() != 2 {
-            return Err(ConnectionError::BadData(format!("Connection header has wrong number of slashes: {}", pieces.len())));
+        if line[line.len() - 1] != b'\0' {
+            return Err("Connection header is incomplete".into());
         }
-
-        let id_bytes = pieces[0];
-        let name_bytes = pieces[1];
-        let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1];
-        let id = as_conn_err!(u64, from_utf8(id_bytes)?.parse::<u64>()?,
-        "Failed to parse replay ID");
-        let name = as_conn_err!(String, String::from(from_utf8(name_bytes)?),
-        "Failed to decode connection string id");
+        let pieces: Vec<&[u8]> = line[..].splitn(2, |c| c == &b'/').collect();
+        if pieces.len() < 2 {
+            return Err(ConnectionError::BadData(format!("Connection header has too few slashes: {}", pieces.len())));
+        }
+        let (id_bytes, name_bytes) = (pieces[0], pieces[1]);
+        let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1]; // remove trailing '\0'
+        let id = as_conn_err!(u64, from_utf8(id_bytes)?.parse::<u64>()?, "Failed to parse replay ID");
+        let name = as_conn_err!(String, String::from(from_utf8(name_bytes)?), "Failed to decode connection string id");
         Ok((id, name))
     }
 
@@ -112,12 +111,15 @@ impl ConnectionHeaderReader {
 mod test {
     use std::sync::{Arc, Mutex};
     use stop_token::StopSource;
-    use crate::server::connection::{test::TestConnection, Connection};
-    use super::{ConnectionHeaderReader, ConnectionType, ConnectionHeader};
+    use crate::{server::connection::{test::TestConnection, Connection}, error::ConnectionError};
+    use super::{ConnectionHeaderReader, ConnectionType};
     use futures_await_test::async_test;
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
 
     fn setup() -> (Arc<Mutex<TestConnection>>, Connection, StopSource, ConnectionHeaderReader) {
-        env_logger::init();
+        INIT.call_once(env_logger::init);
         let (tc, c) = TestConnection::faux();
         let ss = StopSource::new();
         let reader = ConnectionHeaderReader::new(ss.stop_token());
@@ -129,9 +131,105 @@ mod test {
         let (tc, mut c, _ss, reader) = setup();
         tc.lock().unwrap().append_read_data(b"P/1/foo\0");
         reader.read_and_set_connection_header(&mut c).await.unwrap();
-        assert!(c.get_header() == Some(ConnectionHeader {
-            type_: ConnectionType::WRITER,
-            id: 1,
-            name: "foo".into()}));
+        assert!(c.get_header().unwrap().type_ == ConnectionType::WRITER);
+
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"G/1/foo\0");
+        reader.read_and_set_connection_header(&mut c).await.unwrap();
+        assert!(c.get_header().unwrap().type_ == ConnectionType::READER);
     }
+
+    #[async_test]
+    async fn test_connection_header_invalid_type() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"U/1/foo\0");
+        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        assert!(matches!(err, ConnectionError::BadData(..)));
+    }
+
+    #[async_test]
+    async fn test_connection_header_type_short_data() {
+        for short_data in vec![b"" as &[u8], b"P"] {
+            let (tc, mut c, _ss, reader) = setup();
+            tc.lock().unwrap().append_read_data(short_data);
+            let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+            assert!(matches!(err, ConnectionError::NoData()));
+        }
+    }
+
+    #[async_test]
+    async fn test_connection_header_replay_info() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"G/1/foo\0");
+        reader.read_and_set_connection_header(&mut c).await.unwrap();
+        let h = c.get_header().unwrap();
+        assert!(h.id == 1);
+        assert!(h.name == "foo");
+    }
+
+    #[async_test]
+    async fn test_connection_header_replay_uid_not_int() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"G/bar/foo\0");
+        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        assert!(matches!(err, ConnectionError::BadData(..)));
+    }
+
+    #[async_test]
+    async fn test_connection_header_replay_info_no_null_end() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"G/1/foo");
+        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        assert!(matches!(err, ConnectionError::BadData(..)));
+    }
+
+    #[async_test]
+    async fn test_connection_header_replay_info_no_delimiter() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"G/1\0");
+        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        assert!(matches!(err, ConnectionError::BadData(..)));
+    }
+
+    #[async_test]
+    async fn test_connection_header_replay_info_more_slashes() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"G/1/name/with/slash\0");
+        reader.read_and_set_connection_header(&mut c).await.unwrap();
+        let h = c.get_header().unwrap();
+        assert!(h.id == 1);
+        assert!(h.name == "name/with/slash");
+    }
+
+    #[async_test]
+    async fn test_connection_header_replay_info_invalid_unicode() {
+        let (tc, mut c, _ss, reader) = setup();
+        // Lonely start character is invalid unicode
+        tc.lock().unwrap().append_read_data(b"G/1/foo \xc0 bar\0");
+        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        assert!(matches!(err, ConnectionError::BadData(..)));
+    }
+
+    #[async_test]
+    async fn test_connection_header_replay_info_limit_overrun() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"G/1/");
+        for _ in 0..1024 {
+            tc.lock().unwrap().append_read_data(b"foo ");
+        }
+        tc.lock().unwrap().append_read_data(b"\0");
+        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        assert!(matches!(err, ConnectionError::BadData(..)));
+    }
+
+    #[async_test]
+    async fn test_connection_header_replay_info_negative_id() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"G/-1/foo\0");
+        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        assert!(matches!(err, ConnectionError::BadData(..)));
+    }
+
+    /* TODO test stop token */
+    /* TODO implement read timeout */
 }
