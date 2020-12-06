@@ -9,11 +9,13 @@ use crate::error::ConnectionError;
 use crate::or_conn_shutdown;
 use crate::server::connection::Connection;
 
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum ConnectionType {
     READER = 1,
     WRITER = 2,
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ConnectionHeader {
     pub type_: ConnectionType,
     pub id: u64,
@@ -70,9 +72,12 @@ impl ConnectionHeaderReader {
             return Err(ConnectionError::BadData(format!("Connection header has wrong number of slashes: {}", pieces.len())));
         }
 
-        let id = as_conn_err!(u64, from_utf8(pieces[0])?.parse::<u64>()?,
+        let id_bytes = pieces[0];
+        let name_bytes = pieces[1];
+        let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1];
+        let id = as_conn_err!(u64, from_utf8(id_bytes)?.parse::<u64>()?,
         "Failed to parse replay ID");
-        let name = as_conn_err!(String, String::from(from_utf8(pieces[1])?),
+        let name = as_conn_err!(String, String::from(from_utf8(name_bytes)?),
         "Failed to decode connection string id");
         Ok((id, name))
     }
@@ -100,5 +105,33 @@ impl ConnectionHeaderReader {
     {
         let c_future = Self::do_read_and_set_connection_header(conn);
         or_conn_shutdown!(c_future, self.shutdown_token)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::{Arc, Mutex};
+    use stop_token::StopSource;
+    use crate::server::connection::{test::TestConnection, Connection};
+    use super::{ConnectionHeaderReader, ConnectionType, ConnectionHeader};
+    use futures_await_test::async_test;
+
+    fn setup() -> (Arc<Mutex<TestConnection>>, Connection, StopSource, ConnectionHeaderReader) {
+        env_logger::init();
+        let (tc, c) = TestConnection::faux();
+        let ss = StopSource::new();
+        let reader = ConnectionHeaderReader::new(ss.stop_token());
+        (tc, c, ss, reader)
+    }
+
+    #[async_test]
+    async fn test_connection_header_type() {
+        let (tc, mut c, _ss, reader) = setup();
+        tc.lock().unwrap().append_read_data(b"P/1/foo\0");
+        reader.read_and_set_connection_header(&mut c).await.unwrap();
+        assert!(c.get_header() == Some(ConnectionHeader {
+            type_: ConnectionType::WRITER,
+            id: 1,
+            name: "foo".into()}));
     }
 }

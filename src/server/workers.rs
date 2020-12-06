@@ -74,7 +74,7 @@ impl ReplayThreadPool {
     }
 
     pub async fn assign_connection(&self, conn: Connection) {
-        let conn_info = conn.get_header().as_ref();
+        let conn_info = conn.get_header();
         assert!(conn_info.is_some());
         let conn_info = conn_info.unwrap();
         let worker_to_pick = (conn_info.id % self.replay_workers.len() as u64) as usize;

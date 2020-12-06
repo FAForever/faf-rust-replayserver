@@ -1,3 +1,6 @@
+// For mocktopus
+#![cfg_attr(test, feature(proc_macro_hygiene))]
+
 use std::error::Error;
 use accept::ConnectionProducer;
 use stop_token::StopSource;

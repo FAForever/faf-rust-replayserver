@@ -44,7 +44,7 @@ impl ConnectionProducer {
 
     async fn send(args: (TcpStream, &ConnectionAcceptor)) {
             let (stream, acceptor) = args;
-            let conn = Connection::new(stream);
+            let conn = Connection::new(stream);  /* TODO use a builder */
             acceptor.accept(conn).await
     }
 }
