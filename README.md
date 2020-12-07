@@ -47,14 +47,20 @@ Random notes
 
 Unit testing
 ============
-There are mocking frameworks that substitute types via conditional compilation,
-therefore we don't need to box anything or template template templates.
-Therefore, no interfaces.
+`faux` is amazing.
 
-Making replays read-only
-========================
-We want to share the Replay struct between coroutines using RefCell. However,
-after the game is over, we want to send an immutable reference to another
-thread to compress / save it. We don't want to wait for readers to end, as
-replay should be saved immediately, and we can't send a &RefCell, since RefCell
-is not Sync. How to deal with this?
+Sharing things in worker threads
+================================
+After initially accepting a connection, they stay in their worker thread until
+they die. Same goes for replays, so we don't worry about Send, mutexes and
+other stuff. Maybe we'll share the DB connection.
+
+We don't want to worry about ownership in a single thread, only one task will
+use a thing at a time. Investigate `futures_intrusive::sync::LocalMutex` for
+efficient single-threaded 'mutexes'. It's equivalent to UnsafeCell, but looks
+prettier.
+
+Fake time
+=========
+Investigate a good way to fake fime for tests. Something executor-assisted
+would be nice. If absolutely necessary, roll our own.
