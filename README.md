@@ -64,3 +64,7 @@ Fake time
 =========
 Investigate a good way to fake fime for tests. Something executor-assisted
 would be nice. If absolutely necessary, roll our own.
+
+So, `async-std` uses `Timer` from `async-io`, which runs all timers and i/o
+events on a separate thread with epoll. This doesn't sound mockable at all.
+Maybe switch to tokio?
