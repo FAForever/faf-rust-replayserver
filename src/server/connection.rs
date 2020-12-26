@@ -1,6 +1,7 @@
-use async_std::{io::BufReader, net::TcpStream};
-use async_std::io::prelude::BufReadExt;
-use async_std::io::prelude::ReadExt;
+use tokio::{io::BufReader, net::TcpStream};
+use tokio::io::AsyncBufReadExt;
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::io::AsyncReadExt;
 use crate::error::ConnResult;
 use crate::error::ConnectionError;
 use crate::accept::header::ConnectionHeader;
@@ -10,26 +11,27 @@ use crate::accept::header::ConnectionHeader;
 #[cfg_attr(test, faux::create)]
 pub struct Connection
 {
-    stream: BufReader<TcpStream>,
+    reader: BufReader<OwnedReadHalf>,
+    writer: OwnedWriteHalf,
     header: Option<ConnectionHeader>,
 }
 
 #[cfg_attr(test, faux::methods)]
 impl Connection {
     pub fn new(stream: TcpStream) -> Self {
-        Self { stream: BufReader::new(stream), header: None }
+        let (r, writer) = stream.into_split();
+        let reader = BufReader::new(r);
+        Self {reader, writer, header: None }
     }
-    /* Unlike in Python, reaching the end without encountering the delimiter is a success.
-     * TODO maybe we should change that.
-     * */
+    /* Unlike in Python, reaching the end without encountering the delimiter is a success. */
     pub async fn read_exact(&mut self, buf: &mut[u8]) -> ConnResult<()>
     {
-        self.stream.read_exact(buf).await.map_err(ConnectionError::from)
+        self.reader.read_exact(buf).await.map(|_| ()).map_err(ConnectionError::from)
     }
 
     pub async fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>, limit: u64) -> ConnResult<usize>
     {
-        self.stream.by_ref().take(limit).read_until(byte, buf).await.map_err(ConnectionError::from)
+        (&mut self.reader).take(limit).read_until(byte, buf).await.map_err(ConnectionError::from)
     }
 
     pub fn set_header(&mut self, header: ConnectionHeader)

@@ -1,17 +1,13 @@
-use async_std::sync::{channel, Sender, Receiver};
 use std::thread;
 use std::thread::JoinHandle;
-use stop_token::StopToken;
-use futures::{
-    executor::LocalPool,
-    task::SpawnExt,
-};
+use tokio::sync::mpsc::{Sender, channel, Receiver};
 use std::option::Option;
+use tokio_util::sync::CancellationToken;
 
 use crate::server::connection::Connection;
 use crate::replay::Replays;
 
-type ThreadFn = fn(Receiver<Connection>, StopToken) -> ();
+type ThreadFn = fn(Receiver<Connection>, CancellationToken) -> ();
 
 pub struct ReplayWorkerThread
 {
@@ -20,10 +16,10 @@ pub struct ReplayWorkerThread
 }
 
 impl ReplayWorkerThread {
-    pub fn new(work: ThreadFn, stop_token: StopToken) -> Self {
+    pub fn new(work: ThreadFn, shutdown_token: CancellationToken) -> Self {
         let (s, r) = channel(1);
         let handle = thread::spawn(move || {
-            work(r, stop_token)
+            work(r, shutdown_token)
         });
         ReplayWorkerThread {
             handle: Some(handle),
@@ -31,7 +27,10 @@ impl ReplayWorkerThread {
         }
     }
     pub async fn dispatch(&self, c: Connection) {
-        self.channel.send(c).await
+        match self.channel.send(c).await {
+            Ok(a) => a,
+            _ => panic!("Could not dispatch a connection to a thread. Did it die?"),
+        }
     }
 
     pub fn get_channel(&self) -> Sender<Connection> { self.channel.clone() }
@@ -44,14 +43,13 @@ impl Drop for ReplayWorkerThread {
 }
 
 /* TODO move elsewhere */
-pub fn dummy_work(streams: Receiver<Connection>, shutdown_token: StopToken)
+pub fn dummy_work(streams: Receiver<Connection>, shutdown_token: CancellationToken)
 {
-    let mut pool = LocalPool::new();
-    pool.spawner().spawn(do_work(streams, shutdown_token)).unwrap();
-    pool.run()
+    let local_loop = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    local_loop.block_on(do_work(streams, shutdown_token));
 }
 
-async fn do_work(streams: Receiver<Connection>, shutdown_token: StopToken)
+async fn do_work(streams: Receiver<Connection>, shutdown_token: CancellationToken)
 {
     let mut replays = Replays::new(shutdown_token, streams);
     replays.lifetime().await;
@@ -64,15 +62,16 @@ pub struct ReplayThreadPool
 }
 
 impl ReplayThreadPool {
-    pub fn new(work: ThreadFn, count: u32, stop_token: StopToken) -> Self {
+    pub fn new(work: ThreadFn, count: u32, shutdown_token: CancellationToken) -> Self {
         let mut replay_workers = Vec::new();
         for _ in 0..count {
-            let worker = ReplayWorkerThread::new(work, stop_token.clone());
+            let worker = ReplayWorkerThread::new(work, shutdown_token.clone());
             replay_workers.push(worker);
         }
         Self { replay_workers }
     }
 
+    /* Cancellable. */
     pub async fn assign_connection(&self, conn: Connection) {
         let conn_info = conn.get_header();
         assert!(conn_info.is_some());

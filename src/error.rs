@@ -66,7 +66,7 @@ impl<T> AddContext<&str> for ConnResult<T> {
     }
 }
 
-// A hacky substitute for try-blocks. Don't use in hot code.
+// A hacky substitute for try-blocks.
 #[macro_export]
 macro_rules! as_conn_err {
     ( $t: ty, $e: expr, $s: expr) => {

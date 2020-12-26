@@ -1,16 +1,16 @@
-use async_std::sync::Receiver;
 use log::info;
-use stop_token::StopToken;
+use tokio::sync::mpsc::Receiver;
+use tokio_util::sync::CancellationToken;
 
 use crate::server::connection::Connection;
 
 pub struct Replays {
-    shutdown_token: StopToken,
+    shutdown_token: CancellationToken,
     connections: Receiver<Connection>,
 }
 
 impl Replays {
-    pub fn new(shutdown_token: StopToken,
+    pub fn new(shutdown_token: CancellationToken,
                connections: Receiver<Connection>) -> Self
     {
         Replays {shutdown_token, connections}
@@ -18,7 +18,7 @@ impl Replays {
 
     pub async fn lifetime(&mut self) {
         info!("TODO handle connections properly");
-        while let Ok(conn) = self.connections.recv().await {
+        while let Some(conn) = self.connections.recv().await {
             let _ = conn;
         }
     }
