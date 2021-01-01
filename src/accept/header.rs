@@ -2,7 +2,9 @@ use std::fmt::Formatter;
 use std::io::ErrorKind;
 use std::str::from_utf8;
 
-use crate::as_conn_err;
+use tokio::io::{AsyncReadExt, AsyncBufReadExt};
+
+use crate::{with_context, server::connection::read_until_exact};
 use crate::error::{ConnResult,AddContext};
 use crate::error::ConnectionError;
 use crate::server::connection::Connection;
@@ -62,19 +64,21 @@ impl ConnectionHeaderReader {
 
     async fn read_game_data(conn: &mut Connection) -> ConnResult<(u64, String)>
     {
-        let mut line: Vec<u8> = Vec::new();
-        conn.read_until(b'\0', &mut line, 1024).await?;
+        let mut line = Vec::<u8>::new();
+        read_until_exact(&mut conn.take(1024), b'\0', &mut line).await?;
         if line[line.len() - 1] != b'\0' {
             return Err("Connection header is incomplete".into());
         }
+
         let pieces: Vec<&[u8]> = line[..].splitn(2, |c| c == &b'/').collect();
         if pieces.len() < 2 {
-            return Err(ConnectionError::BadData(format!("Connection header has too few slashes: {}", pieces.len())));
+            return Err(format!("Connection header has too few slashes: {}", pieces.len()).into());
         }
         let (id_bytes, name_bytes) = (pieces[0], pieces[1]);
         let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1]; // remove trailing '\0'
-        let id = as_conn_err!(u64, from_utf8(id_bytes)?.parse::<u64>()?, "Failed to parse replay ID");
-        let name = as_conn_err!(String, String::from(from_utf8(name_bytes)?), "Failed to decode connection string id");
+
+        let id = with_context!(from_utf8(id_bytes)?.parse::<u64>()?, "Failed to parse replay ID")?;
+        let name = with_context!(String::from(from_utf8(name_bytes)?), "Failed to decode connection string id")?;
         Ok((id, name))
     }
 
@@ -82,7 +86,7 @@ impl ConnectionHeaderReader {
     {
         let type_ = Self::read_type(conn).await.map_err(|e| {
             match e {
-                ConnectionError::IO{source: e} if e.kind() == ErrorKind::UnexpectedEof => ConnectionError::NoData(),
+                ConnectionError::IO{source: e, ..} if e.kind() == ErrorKind::UnexpectedEof => ConnectionError::NoData(),
                 e => e,
             }
         })?;
@@ -99,7 +103,7 @@ impl ConnectionHeaderReader {
     }
 }
 
-#[cfg(test)]
+#[cfg(soon)]
 mod test {
     use std::sync::{Arc, Mutex};
     use crate::{server::connection::{test::TestConnection, Connection}, error::ConnectionError};
@@ -218,7 +222,5 @@ mod test {
         let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
-
-    /* TODO test stop token */
     /* TODO implement read timeout */
 }

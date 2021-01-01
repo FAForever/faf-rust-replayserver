@@ -12,31 +12,19 @@ pub enum ConnectionError {
     NoData(),
     #[error("Bad data: {0}")]
     BadData(String),
-    #[error("IO error: {source}")]
+    #[error("IO error: {context}, {source}")]
     IO {
-        #[from]
         source: std::io::Error,
+        context: String,
     },
     #[error("Shutting down")]
     ShuttingDown(),
 }
 
-impl ConnectionError {
-    pub fn log(&self, c: MaybeConnectionHeader) {
-        match self {
-            ConnectionError::BadData(..) | ConnectionError::IO {..} => info!("{} ended: {}", c, self),
-            _ => (),
-        }
-    }
-}
-
-pub type ConnResult<T> = Result<T, ConnectionError>;
-
-// Below is some magic for nicer handling of errors.
-
+// Usually we want to throw BadData.
 impl From<String> for ConnectionError {
     fn from(s : String) -> Self {
-        Self::BadData(s)    // That's the most common error type
+        Self::BadData(s)
     }
 }
 
@@ -46,6 +34,32 @@ impl From<&str> for ConnectionError {
     }
 }
 
+impl From<std::io::Error> for ConnectionError {
+    fn from(source: std::io::Error) -> ConnectionError {
+        ConnectionError::IO {source, context: String::new()}
+    }
+}
+
+impl ConnectionError {
+    pub fn log(&self, c: MaybeConnectionHeader) {
+        match self {
+            Self::BadData(..) | Self::IO {..} => info!("{} ended: {}", c, self),
+            _ => (),
+        }
+    }
+    pub fn context(self, s: String) -> Self {
+        match self {
+            Self::BadData(_) => Self::BadData(s),
+            Self::IO {source, ..} => Self::IO {source, context: s},
+            other => other,
+        }
+    }
+}
+
+pub type ConnResult<T> = Result<T, ConnectionError>;
+
+// Below is some magic for nicer handling of errors.
+
 // Add string context to errors.
 pub trait AddContext<T> {
     fn context(self, c: T) -> Self;
@@ -54,8 +68,8 @@ pub trait AddContext<T> {
 impl<T> AddContext<String> for ConnResult<T> {
     fn context(self, s: String) -> Self {
         match self {
-            Err(ConnectionError::BadData(_)) => Err(ConnectionError::BadData(s)),
-            e => e,
+            Err(e) => Err(e.context(s)),
+            ok => ok,
         }
     }
 }
@@ -66,25 +80,11 @@ impl<T> AddContext<&str> for ConnResult<T> {
     }
 }
 
-// A hacky substitute for try-blocks.
+// Convert all errors in expr to ConnectionError.
 #[macro_export]
-macro_rules! as_conn_err {
-    ( $t: ty, $e: expr, $s: expr) => {
-        || -> ConnResult<$t> {
-            Ok($e)
-        }().context($s)?
-    }
-}
-
-// Shorthand for returning an 'error' if we're shutting down. Safer than implementing conversion
-// from None, since this way we'll never convert accidentally.
-#[macro_export]
-macro_rules! or_conn_shutdown {
-    ($e: expr, $token: expr) => {
-        match $token.stop_future($e).await {
-            Some(e) => e,
-            None => Err(ConnectionError::ShuttingDown())
-        }
+macro_rules! with_context {
+    ($e: expr, $s: expr) => {
+        (|| Ok($e))().context($s)
     }
 }
 

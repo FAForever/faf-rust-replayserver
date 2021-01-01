@@ -1,0 +1,2 @@
+* By default a panic only exits one thread. Set a panic hook
+  (std::panic::set_hook) to exit the whole process on panic.

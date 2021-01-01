@@ -51,8 +51,8 @@ pub fn dummy_work(streams: Receiver<Connection>, shutdown_token: CancellationTok
 
 async fn do_work(streams: Receiver<Connection>, shutdown_token: CancellationToken)
 {
-    let mut replays = Replays::new(shutdown_token, streams);
-    replays.lifetime().await;
+    let mut replays = Replays::new(shutdown_token);
+    replays.handle_connections(streams).await;
 }
 
 

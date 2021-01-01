@@ -1,14 +1,10 @@
-use tokio::{io::BufReader, net::TcpStream};
-use tokio::io::AsyncBufReadExt;
+use tokio::{io::BufReader, net::TcpStream, io::AsyncRead, io::AsyncBufRead, io::AsyncWrite, io::AsyncBufReadExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::io::AsyncReadExt;
-use crate::error::ConnResult;
-use crate::error::ConnectionError;
 use crate::accept::header::ConnectionHeader;
 
 // TODO support writing
 
-#[cfg_attr(test, faux::create)]
+#[cfg_attr(soon, faux::create)]
 pub struct Connection
 {
     reader: BufReader<OwnedReadHalf>,
@@ -16,24 +12,13 @@ pub struct Connection
     header: Option<ConnectionHeader>,
 }
 
-#[cfg_attr(test, faux::methods)]
+#[cfg_attr(soon, faux::methods)]
 impl Connection {
     pub fn new(stream: TcpStream) -> Self {
         let (r, writer) = stream.into_split();
         let reader = BufReader::new(r);
         Self {reader, writer, header: None }
     }
-    /* Unlike in Python, reaching the end without encountering the delimiter is a success. */
-    pub async fn read_exact(&mut self, buf: &mut[u8]) -> ConnResult<()>
-    {
-        self.reader.read_exact(buf).await.map(|_| ()).map_err(ConnectionError::from)
-    }
-
-    pub async fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>, limit: u64) -> ConnResult<usize>
-    {
-        (&mut self.reader).take(limit).read_until(byte, buf).await.map_err(ConnectionError::from)
-    }
-
     pub fn set_header(&mut self, header: ConnectionHeader)
     {
         self.header = Some(header);
@@ -45,7 +30,62 @@ impl Connection {
     }
 }
 
-#[cfg(test)]
+impl AsyncRead for Connection {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let r = unsafe {std::pin::Pin::new_unchecked( self.get_unchecked_mut()) };
+        AsyncRead::poll_read(r, cx, buf)
+    }
+}
+
+impl AsyncBufRead for Connection {
+    fn poll_fill_buf(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<&[u8]>> {
+        let r = unsafe {std::pin::Pin::new_unchecked( self.get_unchecked_mut()) };
+        AsyncBufRead::poll_fill_buf(r, cx)
+    }
+
+    fn consume(self: std::pin::Pin<&mut Self>, amt: usize) {
+        let r = unsafe {std::pin::Pin::new_unchecked( self.get_unchecked_mut()) };
+        AsyncBufRead::consume(r, amt)
+    }
+}
+
+impl AsyncWrite for Connection {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<Result<usize, std::io::Error>> {
+        let r = unsafe {std::pin::Pin::new_unchecked( self.get_unchecked_mut()) };
+        AsyncWrite::poll_write(r, cx, buf)
+    }
+
+    fn poll_flush(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), std::io::Error>> {
+        let r = unsafe {std::pin::Pin::new_unchecked( self.get_unchecked_mut()) };
+        AsyncWrite::poll_flush(r, cx)
+    }
+
+    fn poll_shutdown(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), std::io::Error>> {
+        let r = unsafe {std::pin::Pin::new_unchecked( self.get_unchecked_mut()) };
+        AsyncWrite::poll_shutdown(r, cx)
+    }
+}
+
+// FIXME should be a trait at some point
+pub async fn read_until_exact<T: AsyncBufRead + Unpin>(r: &mut T, byte: u8, buf: &mut Vec<u8>) -> std::io::Result<usize>
+{
+    let result = r.read_until(byte, buf).await?;
+    if buf[buf.len() - 1] != byte {
+        Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, format!("Reached end of stream while reading until '{}'", byte)))
+    } else {
+        Ok(result)
+    }
+}
+
+#[cfg(soon)]
 pub mod test {
     use std::{io::{Cursor, Read, BufRead}, sync::Arc, sync::Mutex, io::Write, io::Seek, io::SeekFrom};
     use crate::{error::{ConnResult, ConnectionError}, accept::header::ConnectionHeader};

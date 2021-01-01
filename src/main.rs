@@ -5,6 +5,7 @@ pub mod accept;
 pub mod config;
 pub mod server;
 pub mod replay;
+pub mod async_utils;
 #[macro_use] pub mod error;
 
 use crate::server::server::Server;
