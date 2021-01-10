@@ -57,6 +57,7 @@ mod private {
         }
     }
 }
+
 use private::Inner;
 
 // Connection counter for writer connections.
@@ -151,7 +152,7 @@ impl Future for WaitForEmptyFuture {
 
 #[cfg(test)]
 mod test {
-        use std::{cell::RefCell, rc::Rc};
+        use std::{cell::RefCell, rc::Rc, cell::Cell};
 
 use futures::Future;
     use tokio::{time::sleep, join, time::Instant, time::Duration};
@@ -176,18 +177,18 @@ use futures::Future;
     async fn test_empty_counter_one_waiter() {
         timeout(300, async {
             let counter  = EmptyCounter::new();
-            let awakened = Rc::new(RefCell::new(false));
+            let awakened = Cell::new(false);
             let wait_empty = async {
                 let before = Instant::now();
                 counter.wait_until_empty_for(Duration::from_millis(100)).await;
-                *awakened.borrow_mut() = true;
+                awakened.set(true);
                 let after = Instant::now();
                 assert!(after - before > Duration::from_millis(120));
                 assert!(after - before < Duration::from_millis(200));
             };
             let keep_counter = async {
                     hold_counter(&counter, 20, 70).await;
-                    assert!(!*awakened.borrow());
+                    assert!(!awakened.get());
             };
             join! {
                 keep_counter,
@@ -221,30 +222,30 @@ use futures::Future;
         // 0     50          120           220       300    350       420  450        500       600
         timeout(1000, async {
             let counter  = EmptyCounter::new();
-            let awakened = Rc::new(RefCell::new(false));
+            let awakened = Cell::new(false);
             let wait_empty = async {
                 let before = Instant::now();
                 counter.wait_until_empty_for(Duration::from_millis(100)).await;
-                *awakened.borrow_mut() = true;
+                awakened.set(true);
                 let after = Instant::now();
                 assert!(after - before > Duration::from_millis(420));
                 assert!(after - before < Duration::from_millis(500));
             };
             let counter_1 = async {
                     hold_counter(&counter, 0, 50).await;
-                    assert!(!*awakened.borrow());
+                    assert!(!awakened.get());
             };
             let counter_2 = async {
                     hold_counter(&counter, 120, 220).await;
-                    assert!(!*awakened.borrow());
+                    assert!(!awakened.get());
             };
             let counter_3 = async {
                     hold_counter(&counter, 300, 350).await;
-                    assert!(!*awakened.borrow());
+                    assert!(!awakened.get());
             };
             let counter_4 = async {
                     hold_counter(&counter, 500, 600).await;
-                    assert!(*awakened.borrow());
+                    assert!(awakened.get());
             };
             join! {
                 counter_1,
@@ -262,30 +263,30 @@ use futures::Future;
         // 0     50          120           220       300 320   350       420
         timeout(1000, async {
             let counter  = EmptyCounter::new();
-            let awakened = Rc::new(RefCell::new(false));
+            let awakened = Cell::new(false);
             let wait_empty = async {
                 let before = Instant::now();
                 counter.wait_until_empty_for(Duration::from_millis(100)).await;
-                *awakened.borrow_mut() = true;
+                awakened.set(true);
                 let after = Instant::now();
                 assert!(after - before > Duration::from_millis(300));
                 assert!(after - before < Duration::from_millis(350));
             };
             let counter_1 = async {
                     hold_counter(&counter, 0, 120).await;
-                    assert!(!*awakened.borrow());
+                    assert!(!awakened.get());
             };
             let counter_2 = async {
                     hold_counter(&counter, 50, 220).await;
-                    assert!(!*awakened.borrow());
+                    assert!(!awakened.get());
             };
             let counter_3 = async {
                     hold_counter(&counter, 350, 420).await;
-                    assert!(*awakened.borrow());
+                    assert!(awakened.get());
             };
             let counter_4 = async {
                     hold_counter(&counter, 350, 420).await;
-                    assert!(*awakened.borrow());
+                    assert!(awakened.get());
             };
             join! {
                 counter_1,

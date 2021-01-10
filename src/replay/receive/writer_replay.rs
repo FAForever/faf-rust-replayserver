@@ -63,45 +63,33 @@ impl ReadAt for WriterReplay {
     }
 }
 
-pub struct ReplayFromConnection {
-    inner: Rc<RefCell<WriterReplay>>,
+pub async fn read_from_connection(me: Rc<RefCell<WriterReplay>>, c: &mut Connection, shutdown_token: CancellationToken) {
+    select! {
+        // Ignore connection errors. We only need the data.
+        _ = do_read_from_connection(&me, c) => {}
+        _ = shutdown_token.cancelled() => {},
+    }
+    me.borrow_mut().finish();
 }
 
-
-impl ReplayFromConnection {
-    pub fn new() -> Self {
-        Self { inner: Rc::new(RefCell::new(WriterReplay::new()))}
+async fn do_read_from_connection(me: &Rc<RefCell<WriterReplay>>, mut c: &mut Connection) -> ConnResult<()> {
+    // TODO dep injection?
+    let header = ReplayHeader::from_connection(&mut c).await?;
+    {
+        me.borrow_mut().add_header(header);
     }
-
-    // TODO handle shutdown
-    pub async fn read_from_connection(&self, c: Connection, shutdown_token: CancellationToken) {
-        select! {
-            // Ignore connection errors. We only need the data.
-            _ = self.do_read_from_connection(c) => {}
-            _ = shutdown_token.cancelled() => {},
+    /* We can't modify inner.data in-place, merging might use it in the meantime
+     * Maybe we could use a different structure? Can't be bothered rn
+     * */
+    let mut buf: Box<[u8]> = Box::new([0; 4096]);
+    loop {
+        let read = c.read(&mut *buf).await?;
+        if read == 0 {
+            break
         }
-        self.inner.borrow_mut().finish();
-    }
-
-    async fn do_read_from_connection(&self, mut c: Connection) -> ConnResult<()> {
-        // TODO dep injection?
-        let header = ReplayHeader::from_connection(&mut c).await?;
         {
-            self.inner.borrow_mut().add_header(header);
+            me.borrow_mut().add_data(&buf[0..read]);
         }
-        /* We can't modify inner.data in-place, merging might use it in the meantime
-         * Maybe we could use a different structure? Can't be bothered rn
-         * */
-        let mut buf: Box<[u8]> = Box::new([0; 4096]);
-        loop {
-            let read = c.read(&mut *buf).await?;
-            if read == 0 {
-                break
-            }
-            {
-                self.inner.borrow_mut().add_data(&buf[0..read]);
-            }
-        }
-        Ok(())
     }
+    Ok(())
 }
