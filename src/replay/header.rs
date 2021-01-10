@@ -2,18 +2,17 @@ use tokio::io::{AsyncBufRead, AsyncReadExt};
 
 use crate::{server::connection::Connection, error::ConnResult, server::connection::read_until_exact};
 
-struct ReplayHeader {
-    data: Vec<u8>,
+pub struct ReplayHeader {
+    pub data: Vec<u8>,
 }
 
 impl ReplayHeader {
-    pub async fn from_connection(mut c: Connection) -> ConnResult<Self> {
+    pub async fn from_connection(c: &mut Connection) -> ConnResult<Self> {
         let max_size = 1024 * 1024;
-        let limited = (&mut c).take(max_size);
+        let limited = c.take(max_size);
         Self::do_from_connection(limited).await.map_err(|x| x.into())
     }
 
-    /* FIXME - make it a trait one day */
     async fn skip<T: AsyncBufRead + Unpin>(r: &mut T, count: u64, buf: &mut Vec<u8>) -> std::io::Result<()> {
         let read = r.take(count).read_to_end(buf).await?;
         if read < count as usize {

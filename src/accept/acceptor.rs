@@ -1,6 +1,5 @@
-use crate::error::ConnResult;
+use crate::{error::ConnResult, worker_threads::ReplayThreadPool};
 use crate::server::connection::Connection;
-use crate::server::workers::ReplayThreadPool;
 use super::header::ConnectionHeaderReader;
 
 pub struct ConnectionAcceptor {

@@ -28,7 +28,7 @@ version = "0.3.0"
 
 [dependencies.tokio]
 version = "1.0.1"
-features = ["sync", "net", "io-util", "rt", "macros"]
+features = ["sync", "net", "io-util", "rt", "macros", "test-util", "time"]
 
 [dependencies.tokio-util]
 version = "0.6.0"

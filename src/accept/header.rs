@@ -2,7 +2,7 @@ use std::fmt::Formatter;
 use std::io::ErrorKind;
 use std::str::from_utf8;
 
-use tokio::io::{AsyncReadExt, AsyncBufReadExt};
+use tokio::io::AsyncReadExt;
 
 use crate::{with_context, server::connection::read_until_exact};
 use crate::error::{ConnResult,AddContext};
@@ -48,6 +48,7 @@ impl std::fmt::Display for MaybeConnectionHeader {
 pub struct ConnectionHeaderReader {
 }
 
+/* TODO implement read timeout */
 impl ConnectionHeaderReader {
     pub fn new() -> Self { Self { } }
 
@@ -103,6 +104,7 @@ impl ConnectionHeaderReader {
     }
 }
 
+
 #[cfg(soon)]
 mod test {
     use std::sync::{Arc, Mutex};
@@ -124,12 +126,12 @@ mod test {
         let (tc, mut c, reader) = setup();
         tc.lock().unwrap().append_read_data(b"P/1/foo\0");
         reader.read_and_set_connection_header(&mut c).await.unwrap();
-        assert!(c.get_header().unwrap().type_ == ConnectionType::WRITER);
+        assert!(c.get_header().type_ == ConnectionType::WRITER);
 
         let (tc, mut c, reader) = setup();
         tc.lock().unwrap().append_read_data(b"G/1/foo\0");
         reader.read_and_set_connection_header(&mut c).await.unwrap();
-        assert!(c.get_header().unwrap().type_ == ConnectionType::READER);
+        assert!(c.get_header().type_ == ConnectionType::READER);
     }
 
     #[tokio::test]
@@ -155,7 +157,7 @@ mod test {
         let (tc, mut c, reader) = setup();
         tc.lock().unwrap().append_read_data(b"G/1/foo\0");
         reader.read_and_set_connection_header(&mut c).await.unwrap();
-        let h = c.get_header().unwrap();
+        let h = c.get_header();
         assert!(h.id == 1);
         assert!(h.name == "foo");
     }
@@ -189,7 +191,7 @@ mod test {
         let (tc, mut c, reader) = setup();
         tc.lock().unwrap().append_read_data(b"G/1/name/with/slash\0");
         reader.read_and_set_connection_header(&mut c).await.unwrap();
-        let h = c.get_header().unwrap();
+        let h = c.get_header();
         assert!(h.id == 1);
         assert!(h.name == "name/with/slash");
     }
@@ -222,5 +224,4 @@ mod test {
         let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
-    /* TODO implement read timeout */
 }

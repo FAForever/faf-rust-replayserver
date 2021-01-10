@@ -18,15 +18,15 @@ impl ConnectionProducer {
     pub async fn connections(&self) -> impl Stream<Item = Connection> {
         let listener = TcpListener::bind(self.addr.clone()).await.unwrap();
         stream! {
-                loop {
-                    match listener.accept().await {
-                        Err(_) => (),    /* log? */
-                        Ok((socket, _addr)) => {
-                            /* Tight coupling. That's okay. */
-                            yield Connection::new(socket);
-                        }
+            loop {
+                match listener.accept().await {
+                    Err(_) => (),    /* log? */
+                    Ok((socket, _addr)) => {
+                        /* Tight coupling. That's okay. */
+                        yield Connection::new(socket);
                     }
                 }
+            }
         }
     }
 }

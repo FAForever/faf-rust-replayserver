@@ -1,2 +1,2 @@
-mod position;
+pub mod position;
 mod replay;

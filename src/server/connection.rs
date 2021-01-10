@@ -2,8 +2,6 @@ use tokio::{io::BufReader, net::TcpStream, io::AsyncRead, io::AsyncBufRead, io::
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use crate::accept::header::ConnectionHeader;
 
-// TODO support writing
-
 #[cfg_attr(soon, faux::create)]
 pub struct Connection
 {
@@ -24,12 +22,14 @@ impl Connection {
         self.header = Some(header);
     }
 
-    pub fn get_header(&self) -> Option<ConnectionHeader>
+    pub fn get_header(&self) -> ConnectionHeader
     {
-        self.header.clone()
+        // We always unwrap anyway
+        self.header.clone().unwrap()
     }
 }
 
+// Boilerplate impls start
 impl AsyncRead for Connection {
     fn poll_read(
         self: std::pin::Pin<&mut Self>,
@@ -73,6 +73,7 @@ impl AsyncWrite for Connection {
         AsyncWrite::poll_shutdown(r, cx)
     }
 }
+// Boilerplate impls start
 
 // FIXME should be a trait at some point
 pub async fn read_until_exact<T: AsyncBufRead + Unpin>(r: &mut T, byte: u8, buf: &mut Vec<u8>) -> std::io::Result<usize>
@@ -117,9 +118,9 @@ pub mod test {
             self.header = Some(header);
         }
 
-        pub fn get_header(&self) -> Option<ConnectionHeader>
+        pub fn get_header(&self) -> ConnectionHeader
         {
-            self.header.clone()
+            self.header.unwrap()
         }
 
         pub fn append_read_data(&mut self, buf: &[u8])

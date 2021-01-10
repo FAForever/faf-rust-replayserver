@@ -116,10 +116,10 @@ impl<T: ProgressKey> ProgressTracker<T> {
         }
     }
     pub fn wait(&self, until: T) -> WaitProgressFuture<T> {
-            WaitProgressFuture::new(self.inner.clone(), until)
+        WaitProgressFuture::new(self.inner.clone(), until)
     }
 
-    pub fn advance(&self, next: T) {
+    pub fn advance(&mut self, next: T) {
         self.inner.borrow_mut().advance(next)
     }
 

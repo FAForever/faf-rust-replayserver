@@ -1,16 +1,18 @@
 use accept::ConnectionProducer;
 use futures::join;
 
-pub mod accept;
 pub mod config;
-pub mod server;
-pub mod replay;
 pub mod async_utils;
+pub mod server;
+pub mod worker_threads;
+pub mod accept;
+pub mod replay;
+
 #[macro_use] pub mod error;
 
 use crate::server::server::Server;
 use crate::config::Config;
-use crate::server::signal::hold_until_signal;
+use crate::server::signal::cancel_at_sigint;
 use tokio_util::sync::CancellationToken;
 
 async fn run_server() {
@@ -19,7 +21,7 @@ async fn run_server() {
     let producer = ConnectionProducer::new(format!("localhost:{}", config.port));
     let server = Server::new(&config, producer, shutdown_token.clone());
     let f1 = server.accept();
-    let f2 = hold_until_signal(shutdown_token);
+    let f2 = cancel_at_sigint(shutdown_token);
     join!(f1, f2);
     /* Worker threads are joined once we drop the server. */
 }

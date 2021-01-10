@@ -7,6 +7,7 @@ use weak_table::WeakValueHashMap;
 use tokio_util::sync::CancellationToken;
 
 use crate::server::connection::Connection;
+use crate::accept::header::ConnectionType;
 
 use super::Replay;
 
@@ -17,11 +18,15 @@ fn replays_and_connections(mut s: Receiver<Connection>,
     let mut replays = WeakValueHashMap::<u64, Weak<Replay>>::new();
     stream! {
         while let Some(conn) = s.recv().await {
-            let rid = conn.get_header().unwrap().id;
+            let rid = conn.get_header().id;
             let replay = match replays.get(&rid) {
                 Some(r) => r,
                 None => {
-                    let r = Rc::new(replay_builder(rid));     /* TODO builder */
+                    if conn.get_header().type_ == ConnectionType::READER {
+                        log::debug!("Reader connection does not have a matching replay (id {})", rid);
+                        continue;
+                    }
+                    let r = Rc::new(replay_builder(rid));
                     replays.insert(rid, r.clone());
                     yield Either::Left(r.clone());
                     r

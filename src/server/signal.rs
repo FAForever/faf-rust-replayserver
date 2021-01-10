@@ -4,7 +4,7 @@ use tokio::net::UnixStream as AsyncUnixStream;
 use tokio::io::AsyncReadExt;
 use tokio_util::sync::CancellationToken;
 
-pub async fn hold_until_signal(token: CancellationToken) {
+pub async fn cancel_at_sigint(token: CancellationToken) {
     let (r, w) = UnixStream::pair().unwrap();  /* FIXME log */
     r.set_nonblocking(true).unwrap();
     let mut async_read = AsyncUnixStream::from_std(r).unwrap();
