@@ -11,13 +11,13 @@ const CHUNK_SIZE: usize = 4096;
  * * Each chunk is aligned to CHUNK_SIZE bytes.
  * * There are no empty chunks.
  * */
-pub struct BufList {
+pub struct BufDeque {
     chunks: VecDeque<Box<[u8; CHUNK_SIZE]>>,
     discard_start: usize,
     end: usize,
 }
 
-impl BufList {
+impl BufDeque {
     pub fn new() -> Self {
         Self {
             chunks: VecDeque::new(),
@@ -49,7 +49,7 @@ impl BufList {
     }
 }
 
-impl BufWithDiscard for BufList {
+impl BufWithDiscard for BufDeque {
     fn discard_start(&self) -> usize {
         self.discard_start
     }
@@ -107,11 +107,11 @@ impl BufWithDiscard for BufList {
 
 #[cfg(test)]
 mod test {
-    use super::{BufList, CHUNK_SIZE, BufWithDiscard};
+    use super::{BufDeque, CHUNK_SIZE, BufWithDiscard};
 
     fn append_at(offset: usize) {
         let off: Box<[u8]> = vec![0 as u8;offset].into();
-        let mut bl = BufList::new();
+        let mut bl = BufDeque::new();
         let data = [0, 1, 2, 3, 4, 5, 6, 7];
         let total_len = offset + data.len();
         bl.append(&*off);
@@ -139,7 +139,7 @@ mod test {
 
     #[test]
     fn simple_test() {
-        let mut bl = BufList::new();
+        let mut bl = BufDeque::new();
         let data = [0, 1, 2, 3, 4, 5, 6, 7];
         for i in 0..(CHUNK_SIZE * 3) {
             bl.append(&data);
@@ -158,7 +158,7 @@ mod test {
 
     #[test]
     fn test_remove_immediately() {
-        let mut bl = BufList::new();
+        let mut bl = BufDeque::new();
         let data = [0, 1, 2, 3, 4, 5, 6, 7];
         let mut cursor = 0;
         for i in 0..(CHUNK_SIZE * 3) {

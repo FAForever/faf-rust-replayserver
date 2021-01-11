@@ -4,7 +4,7 @@ use futures::Future;
 use tokio::{io::AsyncReadExt, select};
 use tokio_util::sync::CancellationToken;
 
-use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buflist::BufList, async_utils::buf_with_discard::BufWithDiscard, async_utils::buf_with_discard::ReadAt};
+use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buf_deque::BufDeque, async_utils::buf_with_discard::BufWithDiscard, async_utils::buf_with_discard::ReadAt};
 
 enum MaybeHeader {
     None,
@@ -14,7 +14,7 @@ enum MaybeHeader {
 
 pub struct WriterReplay {
     header: MaybeHeader,
-    data: BufList,
+    data: BufDeque,
     progress: PositionTracker,
 }
 
@@ -22,7 +22,7 @@ impl WriterReplay {
     pub fn new() -> Self {
         Self {
             header: MaybeHeader::None,
-            data: BufList::new(),
+            data: BufDeque::new(),
             progress: PositionTracker::new(),
         }
     }
