@@ -33,12 +33,15 @@ impl WriterReplay {
     }
 
     pub fn take_header(&mut self) -> ReplayHeader {
-        let h = match self.header {
-            MaybeHeader::Some(h) => h,
+        let data_len = match &self.header {
+            MaybeHeader::Some(h) => h.data.len(),
             _ => panic!("Cannot take header"),
         };
-        self.header = MaybeHeader::Discarded(h.data.len());
-        h
+        if let MaybeHeader::Some(h) = std::mem::replace(&mut self.header, MaybeHeader::Discarded(data_len)) {
+            return h;
+        } else {
+            panic!("Cannot take header");
+        }
     }
 
     pub fn add_data(&mut self, buf: &[u8]) {
