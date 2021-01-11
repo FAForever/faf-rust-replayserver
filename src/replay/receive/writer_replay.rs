@@ -4,7 +4,7 @@ use futures::Future;
 use tokio::{io::AsyncReadExt, select};
 use tokio_util::sync::CancellationToken;
 
-use crate::{replay::{header::ReplayHeader, streams::position::StreamPosition}, server::connection::Connection, replay::streams::position::PositionTracker, error::ConnResult, async_utils::buflist::BufList, async_utils::buf_with_discard::BufWithDiscard, async_utils::buf_with_discard::ReadAt};
+use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buflist::BufList, async_utils::buf_with_discard::BufWithDiscard, async_utils::buf_with_discard::ReadAt};
 
 enum MaybeHeader {
     None,

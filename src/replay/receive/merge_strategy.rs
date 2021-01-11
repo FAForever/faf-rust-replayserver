@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::StreamExt;
 
-use crate::replay::streams::position::StreamPosition;
+use crate::replay::position::StreamPosition;
 
 use super::{writer_replay::WriterReplay, replay_delay::StreamDelay};
 

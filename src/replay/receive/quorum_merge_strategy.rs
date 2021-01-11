@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, collections::HashMap, collections::HashSet};
 
-use crate::replay::streams::position::StreamPosition;
+use crate::replay::position::StreamPosition;
 
 use super::{writer_replay::WriterReplay, merge_strategy::MergeStrategy};
 
