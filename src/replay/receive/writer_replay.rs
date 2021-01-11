@@ -38,7 +38,7 @@ impl WriterReplay {
         self.progress.advance(StreamPosition::FINISHED(final_len));
     }
 
-    pub fn wait(&self, until: StreamPosition) -> impl Future<Output = ()> {
+    pub fn wait(&self, until: StreamPosition) -> impl Future<Output = StreamPosition> {
         self.progress.wait(until)
     }
 

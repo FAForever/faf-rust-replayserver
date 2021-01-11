@@ -8,16 +8,19 @@ use crate::async_utils::progress::{ProgressKey, ProgressTracker};
 #[derive(Clone, Copy)]
 pub enum StreamPosition {
     START,
-    DATA(usize),    // DATA(0) means header is present
+    // HEADER is distinct from DATA(0). The earlier happens once ("header has arrived"), the latter
+    // might happen multiple times ("still at zero data after the header").
+    HEADER,
+    DATA(usize),
     FINISHED(usize),    // Final size, not used for cmp / sort
 }
 
 impl StreamPosition {
     pub fn len(&self) -> usize {
         match *self {
-            Self::START => 0,
             Self::DATA(s) => s,
-            Self::FINISHED(s) => s
+            Self::FINISHED(s) => s,
+            Self::START | Self::HEADER=> 0,
         }
     }
 }
@@ -26,6 +29,7 @@ impl PartialEq for StreamPosition {
     fn eq(&self, other: &Self) -> bool {
         match (*self, *other) {
             (Self::START, Self::START) => true,
+            (Self::HEADER, Self::HEADER) => true,
             (Self::FINISHED(..), Self::FINISHED(..)) => true,
             (Self::DATA(u), Self::DATA(v)) => u == v,
             _ => false
@@ -41,13 +45,19 @@ impl PartialOrd for StreamPosition {
 impl Ord for StreamPosition {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (*self, *other) {
-            (Self::DATA(u), Self::DATA(v)) => u.cmp(&v),
-            (Self::DATA(..), Self::START) => std::cmp::Ordering::Greater,
-            (Self::DATA(..), Self::FINISHED(..)) => std::cmp::Ordering::Less,
             (Self::START, Self::START) => std::cmp::Ordering::Equal,
             (Self::START, _) => std::cmp::Ordering::Less,
+            (_, Self::START) => std::cmp::Ordering::Greater,
+
+            (Self::HEADER, Self::HEADER) => std::cmp::Ordering::Equal,
+            (Self::HEADER, _) => std::cmp::Ordering::Less,
+            (_, Self::HEADER) => std::cmp::Ordering::Greater,
+
+            (Self::DATA(u), Self::DATA(v)) => u.cmp(&v),
+            (Self::DATA(..), _) => std::cmp::Ordering::Less,
+            (_, Self::DATA(..)) => std::cmp::Ordering::Greater,
+
             (Self::FINISHED(..), Self::FINISHED(..)) => std::cmp::Ordering::Equal,
-            (Self::FINISHED(..), _) => std::cmp::Ordering::Greater,
         }
     }
 }

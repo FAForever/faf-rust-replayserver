@@ -97,11 +97,11 @@ impl<T: ProgressKey> WaitProgressFuture<T> {
 }
 
 impl<T: ProgressKey> Future for WaitProgressFuture<T> {
-    type Output = ();
+    type Output = T;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut inner = self.inner.borrow_mut();
         if inner.was_reached(self.until) {
-            return Poll::Ready(())
+            return Poll::Ready(inner.position)
         }
         let token = WakerToken { pos: self.until, waker: cx.waker().clone() };
         inner.insert(token);
@@ -115,6 +115,8 @@ impl<T: ProgressKey> ProgressTracker<T> {
             inner: Rc::new(RefCell::new(Inner::new())),
         }
     }
+
+    // Returns current progress (potentially further than waited for).
     pub fn wait(&self, until: T) -> WaitProgressFuture<T> {
         WaitProgressFuture::new(self.inner.clone(), until)
     }
