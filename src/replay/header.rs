@@ -2,6 +2,7 @@ use tokio::io::{AsyncBufRead, AsyncReadExt};
 
 use crate::{server::connection::Connection, error::ConnResult, server::connection::read_until_exact};
 
+#[derive(Clone)]
 pub struct ReplayHeader {
     pub data: Vec<u8>,
 }
