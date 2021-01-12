@@ -1,6 +1,5 @@
-use std::io::{Read, Write};
-
-use super::buf_with_discard::ReadAt;
+use std::io::Write;
+use super::buf_traits::DiscontiguousBuf;
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -18,16 +17,6 @@ impl BufList {
             len: 0
         }
     }
-    fn chunk_at(&self, start: usize) -> &[u8] {
-        let (i, o, e) = self.chunk(start);
-        &self.chunks[i][o..e]
-    }
-    
-    fn mut_chunk_at(&mut self, start: usize) -> &mut [u8] {
-        let (i, o, e) = self.chunk(start);
-        &mut self.chunks[i][o..e]
-    }
-
     fn chunk(&self, start: usize) -> (usize, usize, usize) {
         let chunk_idx = start / CHUNK_SIZE;
         let offset = start % CHUNK_SIZE;
@@ -36,12 +25,19 @@ impl BufList {
     }
 }
 
-impl ReadAt for BufList {
-    fn read_at(&self, start: usize, buf: &mut [u8]) -> std::io::Result<usize> {
-        if start >= self.len {
-            return Ok(0);
-        }
-        self.chunk_at(start).read(buf)
+impl DiscontiguousBuf for BufList {
+    fn get_chunk(&self, start: usize) -> &[u8] {
+        let (i, o, e) = self.chunk(start);
+        &self.chunks[i][o..e]
+    }
+
+    fn get_mut_chunk(&mut self, start: usize) -> &mut [u8] {
+        let (i, o, e) = self.chunk(start);
+        &mut self.chunks[i][o..e]
+    }
+
+    fn len(&self) -> usize {
+        self.len
     }
 }
 
@@ -50,7 +46,7 @@ impl Write for BufList {
         if self.len % CHUNK_SIZE == 0 {
             self.chunks.push(Box::new([0; CHUNK_SIZE]));
         }
-        let written = self.mut_chunk_at(self.len).write(buf)?;
+        let written = self.get_mut_chunk(self.len).write(buf)?;
         self.len += written;
         Ok(written)
     }

@@ -15,7 +15,7 @@ pub struct StreamPositions {
 }
 
 impl StreamPositions {
-    fn new(delayed: StreamPosition, current: StreamPosition) -> Self {
+    pub fn new(delayed: StreamPosition, current: StreamPosition) -> Self {
         Self { delayed, current }
     }
 }

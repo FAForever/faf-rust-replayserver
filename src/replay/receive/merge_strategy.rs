@@ -53,7 +53,6 @@ pub async fn track_replay(s: &RefCell<impl MergeStrategy>, delay: &StreamDelay, 
             st.replay_header_added(token);
         } else if matches!(positions.current, StreamPosition::FINISHED(_)) {
             st.replay_removed(token);
-            return
         } else {
             let delayed_len = positions.delayed.len();
             st.replay_new_data(token);

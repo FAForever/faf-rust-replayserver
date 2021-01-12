@@ -1,10 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, io::Write};
 
 use futures::Future;
 use tokio::{io::AsyncReadExt, select};
 use tokio_util::sync::CancellationToken;
 
-use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buf_deque::BufDeque, async_utils::buf_with_discard::BufWithDiscard};
+use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buf_deque::BufDeque};
 
 enum MaybeHeader {
     None,
@@ -47,12 +47,8 @@ impl WriterReplay {
     pub fn add_data(&mut self, buf: &[u8]) {
         debug_assert!(self.position() >= StreamPosition::DATA(0));
         debug_assert!(self.position() < StreamPosition::FINISHED(0));
-        self.data.append(buf);
+        self.data.write_all(buf).unwrap();
         self.progress.advance(self.position() + buf.len());
-    }
-
-    pub fn get_mut_data(&mut self) -> &mut impl BufWithDiscard {
-        &mut self.data
     }
 
     pub fn finish(&mut self) {
