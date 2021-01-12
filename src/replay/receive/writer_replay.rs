@@ -4,7 +4,7 @@ use futures::Future;
 use tokio::{io::AsyncReadExt, select};
 use tokio_util::sync::CancellationToken;
 
-use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buf_deque::BufDeque, async_utils::buf_with_discard::BufWithDiscard, async_utils::buf_with_discard::ReadAt};
+use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buf_deque::BufDeque, async_utils::buf_with_discard::BufWithDiscard};
 
 enum MaybeHeader {
     None,
@@ -66,26 +66,6 @@ impl WriterReplay {
 
     pub fn position(&self) -> StreamPosition {
         self.progress.position()
-    }
-}
-
-impl ReadAt for WriterReplay {
-    fn read_at(&self, start: usize, buf: &mut [u8]) -> std::io::Result<usize> {
-        // Unused. Merged replay will have a data structure that doesn't discard.
-        todo!()
-/*
-        match &self.header {
-            None => return Ok(0),
-            Some(h) => {
-                if start >= h.data.len() {
-                    self.data.read_at(start - h.data.len(), buf)
-                } else {
-                    let mut hb = &h.data[start..];
-                    <&[u8] as Read>::read(&mut hb, buf)
-                }
-            }
-        }
-*/
     }
 }
 
