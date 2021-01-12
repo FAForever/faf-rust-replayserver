@@ -68,6 +68,7 @@ impl<T: ProgressKey> Inner<T> {
     }
 
     pub fn advance(&mut self, next: T) {
+        debug_assert!(next >= self.position);
         self.position = next;
         self.check_tokens()
     }
