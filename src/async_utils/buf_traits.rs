@@ -10,6 +10,28 @@ pub trait DiscontiguousBuf {
     fn len(&self) -> usize;
 }
 
+pub trait DiscontiguousBufExt : DiscontiguousBuf {
+    // Compare with another buf from position start. Position end is the first position at which
+    // the two streams differ (or end of one of the streams).
+    //
+    // TODO: this compiles to byte-by-byte comparison loop. Pretty good, but maybe we can do better
+    // by comparing words or even SIMD. Profile.
+    fn common_prefix_from(&self, other: &impl DiscontiguousBuf, start: usize) -> usize {
+        let mut end = start;
+        loop {
+            let my_chunk = self.get_chunk(end);
+            let other_chunk = other.get_chunk(end);
+            if my_chunk.is_empty() || other_chunk.is_empty() {
+                return end;
+            }
+            let eq_len = my_chunk.iter().zip(other_chunk).take_while(|(a, b)| a == b).count();
+            end += eq_len;
+            if eq_len < std::cmp::min(my_chunk.len(), other_chunk.len()) {
+                return end;
+            }
+        }
+    }
+}
 /* For merging incoming replays we want a data structure that we can append bytes to and discard
  * bytes from front whenever we want. We accept responsibility to never read data we already
  * discarded.

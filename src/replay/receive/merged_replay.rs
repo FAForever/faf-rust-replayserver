@@ -44,6 +44,10 @@ impl MergedReplay {
         self.delayed_progress.advance(self.position() + buf.len());
     }
 
+    pub fn get_data(&self) -> &impl DiscontiguousBuf {
+        &self.data
+    }
+
     pub fn advance_delayed_data(&mut self, len: usize) {
         debug_assert!(len <= self.data.len());
         let pos = StreamPosition::DATA(len);
