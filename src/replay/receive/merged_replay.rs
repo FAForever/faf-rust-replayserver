@@ -8,7 +8,7 @@ use crate::{async_utils::buf_list::BufList, replay::position::PositionTracker, r
 // FIXME there's some overlap between this and WriterReplay. Then again, both are used somewhat
 // differently, making them share code would probably be worse.
 
-struct MergedReplay {
+pub struct MergedReplay {
     data: BufList,
     header: Option<ReplayHeader>,
     delayed_progress: PositionTracker,

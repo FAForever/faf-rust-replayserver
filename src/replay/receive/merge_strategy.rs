@@ -4,7 +4,7 @@ use futures::StreamExt;
 
 use crate::replay::position::StreamPosition;
 
-use super::{writer_replay::WriterReplay, replay_delay::StreamDelay};
+use super::{writer_replay::WriterReplay, replay_delay::StreamDelay, merged_replay::MergedReplay};
 
 type ReplayRef = Rc<RefCell<WriterReplay>>;
 
@@ -15,7 +15,7 @@ pub trait MergeStrategy {
     fn replay_header_added(&mut self, id: u64);
     fn replay_new_data(&mut self, id: u64);
     fn replay_new_delayed_data(&mut self, id: u64, data_len: usize);
-    fn get_merged_replay(&mut self) -> Rc<RefCell<WriterReplay>>;   // FIXME change return type?
+    fn get_merged_replay(&self) -> Rc<RefCell<MergedReplay>>;   // FIXME change return type?
 }
 
 // TODO
@@ -39,8 +39,8 @@ impl MergeStrategy for NullMergeStrategy {
     fn replay_new_delayed_data(&mut self, id: u64, data_len: usize) {
     }
 
-    fn get_merged_replay(&mut self) -> ReplayRef {
-        Rc::new(RefCell::new(WriterReplay::new()))
+    fn get_merged_replay(&self) -> Rc<RefCell<MergedReplay>> {
+        todo!()
     }
 }
 
