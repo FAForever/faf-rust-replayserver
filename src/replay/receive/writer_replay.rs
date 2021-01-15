@@ -4,7 +4,7 @@ use futures::Future;
 use tokio::{io::AsyncReadExt, select};
 use tokio_util::sync::CancellationToken;
 
-use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buf_deque::BufDeque, async_utils::buf_traits::DiscontiguousBuf};
+use crate::{replay::{header::ReplayHeader, position::StreamPosition}, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, async_utils::buf_deque::BufDeque, async_utils::buf_traits::DiscontiguousBuf, async_utils::buf_traits::BufWithDiscard};
 
 enum MaybeHeader {
     None,
@@ -55,6 +55,15 @@ impl WriterReplay {
         &self.data
     }
 
+    // TODO annoying wrapper.
+    pub fn discard(&mut self, until: usize) {
+        self.data.discard(until);
+    }
+
+    pub fn discard_all(&mut self) {
+        self.data.discard(usize::MAX);
+    }
+
     pub fn finish(&mut self) {
         let final_len = self.position().len();
         self.progress.advance(StreamPosition::FINISHED(final_len));
@@ -66,6 +75,10 @@ impl WriterReplay {
 
     pub fn position(&self) -> StreamPosition {
         self.progress.position()
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.progress.position() >= StreamPosition::FINISHED(0)
     }
 }
 

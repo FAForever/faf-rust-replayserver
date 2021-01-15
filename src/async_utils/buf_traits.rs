@@ -4,13 +4,20 @@ use std::{cell::RefCell, rc::Rc, io::Read};
 
 // We slighly break rules for buffers we can discard from. Trying to access data that was already
 // discarded causes a panic.
+//
+// TODO split into mut / nonmut variants?
 pub trait DiscontiguousBuf {
     fn get_chunk(&self, start: usize) -> &[u8];
     fn get_mut_chunk(&mut self, start: usize) -> &mut [u8];
     fn len(&self) -> usize;
 }
 
-pub trait DiscontiguousBufExt : DiscontiguousBuf {
+pub trait DiscontiguousBufExt {
+    fn common_prefix_from(&self, other: &impl DiscontiguousBuf, start: usize) -> usize;
+    fn at(&self, pos: usize) -> u8;
+}
+
+impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
     // Compare with another buf from position start. Position end is the first position at which
     // the two streams differ (or end of one of the streams).
     //
@@ -31,7 +38,13 @@ pub trait DiscontiguousBufExt : DiscontiguousBuf {
             }
         }
     }
+
+    /* Can't implement Index for generic trait :( */
+    fn at(&self, pos: usize) -> u8 {
+        self.get_chunk(pos)[0]
+    }
 }
+
 /* For merging incoming replays we want a data structure that we can append bytes to and discard
  * bytes from front whenever we want. We accept responsibility to never read data we already
  * discarded.
