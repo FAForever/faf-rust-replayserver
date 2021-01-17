@@ -1,7 +1,7 @@
 Third take on the FAF replay server, this time in Rust.
 
-Roadmap
--------
+Roadmap (obsolete, irrelevant)
+------------------------------
 
 * Implement + test connection accepting and passing them to worker threads. (IN PROGRESS)
   * Test graceful shutdown.
@@ -51,20 +51,10 @@ Unit testing
 
 Sharing things in worker threads
 ================================
-After initially accepting a connection, they stay in their worker thread until
-they die. Same goes for replays, so we don't worry about Send, mutexes and
-other stuff. Maybe we'll share the DB connection.
 
-We don't want to worry about ownership in a single thread, only one task will
-use a thing at a time. Investigate `futures_intrusive::sync::LocalMutex` for
-efficient single-threaded 'mutexes'. It's equivalent to UnsafeCell, but looks
-prettier.
+Use `RefCell`, never borrow across an await.
 
 Fake time
 =========
-Investigate a good way to fake fime for tests. Something executor-assisted
-would be nice. If absolutely necessary, roll our own.
 
-So, `async-std` uses `Timer` from `async-io`, which runs all timers and i/o
-events on a separate thread with epoll. This doesn't sound mockable at all.
-Maybe switch to tokio?
+`tokio::time::pause()` does everything automagically.
