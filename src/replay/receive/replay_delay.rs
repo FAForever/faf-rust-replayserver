@@ -77,16 +77,19 @@ impl StreamDelay {
     }
 
     fn end_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamPositions> + 'a {
-        async move {
+        stream! {
             // Don't borrow across an await
             let f = replay.borrow().wait(StreamPosition::FINISHED(0));
             let finish = f.await;
-            StreamPositions::new(finish, finish)
-        }.into_stream()
+            let final_data = StreamPosition::DATA(finish.len());
+            yield StreamPositions::new(final_data, final_data);
+            yield StreamPositions::new(finish, finish);
+        }
     }
 
     // INVARIANTS:
     // * The stream always ends with a single pair of FINISHED values.
+    // * Before that pair, there is always a pair of DATA values with matching length.
     // * If HEADER values appear, they appear once, first and as a pair of HEADER values.
     // * All other values are pairs of DATA values.
     pub fn delayed_progress<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamPositions> + 'a {

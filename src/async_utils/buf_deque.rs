@@ -76,14 +76,12 @@ impl DiscontiguousBuf for BufDeque {
     /* We slightly break contract here and panic if discarded data is accessed. */
     fn get_chunk(&self, start: usize) -> &[u8] {
         let (idx, start, end) = self.chunk(start);
-        assert!(self.discard_start <= start && start < self.end);
         let chunk = &**self.chunks.get(idx).unwrap();
         &chunk[start..end]
     }
 
     fn get_mut_chunk(&mut self, start: usize) -> &mut [u8] {
         let (idx, start, end) = self.chunk(start);
-        assert!(self.discard_start <= start && start < self.end);
         let chunk = &mut **self.chunks.get_mut(idx).unwrap();
         &mut chunk[start..end]
     }

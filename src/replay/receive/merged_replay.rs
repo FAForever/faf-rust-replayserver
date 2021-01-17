@@ -5,6 +5,8 @@ use futures::Future;
 
 use crate::{async_utils::buf_list::BufList, replay::position::PositionTracker, replay::header::ReplayHeader, replay::position::StreamPosition, async_utils::buf_traits::DiscontiguousBuf, async_utils::buf_traits::ReadAt};
 
+use super::writer_replay::WriterReplay;
+
 // FIXME there's some overlap between this and WriterReplay. Then again, both are used somewhat
 // differently, making them share code would probably be worse.
 
@@ -29,7 +31,7 @@ impl MergedReplay {
         self.delayed_progress.advance(StreamPosition::DATA(0));
     }
 
-    pub fn wait(&self, until: StreamPosition) -> impl Future<Output = StreamPosition> {
+    pub fn delayed_wait(&self, until: StreamPosition) -> impl Future<Output = StreamPosition> {
         self.delayed_progress.wait(until)
     }
 
@@ -37,11 +39,22 @@ impl MergedReplay {
         self.delayed_progress.position()
     }
 
-    pub fn add_data(&mut self, buf: &[u8]) {
+    // FIXME this might fit better among buffer traits?
+    pub fn add_data(&mut self, writer: &WriterReplay, until: usize) {
         debug_assert!(self.position() >= StreamPosition::DATA(0));
         debug_assert!(self.position() < StreamPosition::FINISHED(0));
-        self.data.write_all(buf).unwrap();
-        self.delayed_progress.advance(self.position() + buf.len());
+        debug_assert!(until <= writer.get_data().len());
+
+        let writer_data = writer.get_data();
+        let mut cursor = self.data.len();
+        while cursor < until {
+            let mut chunk = writer_data.get_chunk(cursor);
+            if chunk.len() > until - cursor {
+                chunk = &chunk[..until - cursor];
+            }
+            self.data.write_all(chunk).unwrap();
+            cursor += chunk.len();
+        }
     }
 
     pub fn get_data(&self) -> &impl DiscontiguousBuf {
@@ -50,8 +63,15 @@ impl MergedReplay {
 
     pub fn advance_delayed_data(&mut self, len: usize) {
         debug_assert!(len <= self.data.len());
+        debug_assert!(self.position() >= StreamPosition::DATA(0));
+        debug_assert!(self.position() < StreamPosition::FINISHED(0));
         let pos = StreamPosition::DATA(len);
         self.delayed_progress.advance(pos);
+    }
+
+    pub fn finish(&mut self) {
+        let final_len = self.position().len();
+        self.delayed_progress.advance(StreamPosition::FINISHED(final_len));
     }
 }
 

@@ -7,6 +7,7 @@ use std::{cell::RefCell, rc::Rc, io::Read};
 //
 // TODO split into mut / nonmut variants?
 pub trait DiscontiguousBuf {
+    // Get a contiguous chunk starting from start. Panics if start >= len.
     fn get_chunk(&self, start: usize) -> &[u8];
     fn get_mut_chunk(&mut self, start: usize) -> &mut [u8];
     fn len(&self) -> usize;
@@ -24,19 +25,18 @@ impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
     // TODO: this compiles to byte-by-byte comparison loop. Pretty good, but maybe we can do better
     // by comparing words or even SIMD. Profile.
     fn common_prefix_from(&self, other: &impl DiscontiguousBuf, start: usize) -> usize {
-        let mut end = start;
-        loop {
-            let my_chunk = self.get_chunk(end);
-            let other_chunk = other.get_chunk(end);
-            if my_chunk.is_empty() || other_chunk.is_empty() {
-                return end;
-            }
+        let mut at = start;
+        let max_cmp = std::cmp::min(self.len(), other.len());
+        while at < max_cmp {
+            let my_chunk = self.get_chunk(at);
+            let other_chunk = other.get_chunk(at);
             let eq_len = my_chunk.iter().zip(other_chunk).take_while(|(a, b)| a == b).count();
-            end += eq_len;
+            at += eq_len;
             if eq_len < std::cmp::min(my_chunk.len(), other_chunk.len()) {
-                return end;
+                return at;
             }
         }
+        at
     }
 
     /* Can't implement Index for generic trait :( */

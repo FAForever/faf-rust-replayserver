@@ -18,6 +18,7 @@ impl BufList {
         }
     }
     fn chunk(&self, start: usize) -> (usize, usize, usize) {
+        assert!(start < self.len());
         let chunk_idx = start / CHUNK_SIZE;
         let offset = start % CHUNK_SIZE;
         let end = std::cmp::min(CHUNK_SIZE, self.len - (chunk_idx * CHUNK_SIZE));
@@ -31,13 +32,13 @@ impl DiscontiguousBuf for BufList {
         &self.chunks[i][o..e]
     }
 
+    fn len(&self) -> usize {
+        self.len
+    }
+
     fn get_mut_chunk(&mut self, start: usize) -> &mut [u8] {
         let (i, o, e) = self.chunk(start);
         &mut self.chunks[i][o..e]
-    }
-
-    fn len(&self) -> usize {
-        self.len
     }
 }
 
