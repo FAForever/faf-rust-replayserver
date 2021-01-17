@@ -410,7 +410,7 @@ struct MergeQuorumState {
 //   * Q has at most target_quorum_size members.
 //   * All replays in Q match C.
 //   * C's delayed position is equal to a minimum of:
-//     * A maximum of delayed positions of replays in Q,
+//     * A minimum of delayed positions of replays in Q,
 //     * Its own data length.
 //   * If C's delayed position is equal to its data length, then C equals the greatest common
 //     prefix of replays in Q.
@@ -449,26 +449,40 @@ impl MergeQuorumState {
         me
     }
 
-    fn add_replay(&mut self, r: WReplayRef) -> u64 {
+    pub fn add_replay(&mut self, r: WReplayRef) -> u64 {
         let token = self.s.add_replay(r);
         self.reserve.insert(token);
         token
     }
 
-    fn replay_new_data(&mut self, _id: u64) {
+    // We chose minimum rather than maximum due to delayed position behaviour. When a replay ends,
+    // its delayed position immediately jumps to end of data, removing the 5 minute delay, so we
+    // can deliver a finished replay immediately. If we used max, this could cause rapid switches
+    // between quorum and stalemate: for a finished / unfinished replay pair, stalemate would
+    // immediately return it while quorum would merge a bit of data, then transition to stalemate
+    // as the finished replay's delayed position points to the end of data. With a minimum, we'd
+    // only move the delayed position to the end once all quorum replays finish.
+    // Using a minimum here is fine anyway. Delayed data always catches up with normal data, even
+    // if a replay stalls, so at the very least we'll switch to a stalemate in a reasonable amount
+    // of time.
+    fn quorum_delayed_position(&self) -> usize {
+        self.quorum.iter().map(|id| self.s.get_replay(*id).delayed_data).min().unwrap_or(0)
+    }
+
+    pub fn replay_new_data(&mut self, _id: u64) {
         // pass, we merge lazily
     }
 
-    fn replay_new_delayed_data(&mut self, id: u64, data_len: usize) {
+    pub fn replay_new_delayed_data(&mut self, id: u64, _data_len: usize) {
         if self.quorum.contains(&id) {
-            self.s.update_merged_position(data_len);
+            self.update_delayed_position();
             if self.need_to_merge_more_data() && self.can_merge_more_data() {
                 self.merge_more_data();
             }
         }
     }
 
-    fn replay_ended(&mut self, _id: u64) {
+    pub fn replay_ended(&mut self, _id: u64) {
         // pass, we don't care
     }
 
@@ -530,13 +544,12 @@ impl MergeQuorumState {
         for id in self.quorum.iter() {
             self.s.get_mut_replay(*id).explicitly_set_matching();
         }
-        self.update_send_point_after_merge();
+        self.update_delayed_position();
+        // We already merged, so there's no extra data to be gained.
     }
 
-    fn update_send_point_after_merge(&mut self) {
-        let max_delayed_quorum_len = self.quorum.iter().map(|id| self.s.get_replay(*id).delayed_data).max().unwrap();
-        self.s.update_merged_position(max_delayed_quorum_len);
-        // We already merged, so there's no extra data to be gained.
+    fn update_delayed_position(&mut self) {
+        self.s.update_merged_position(self.quorum_delayed_position());
     }
 }
 
@@ -628,8 +641,8 @@ impl MergeStrategy for QuorumMergeStrategy {
     fn finish(&mut self) {
         // We know that delayed position for all replays is at the end of their data.
         // If we were in a quorum state, then delayed position of merged replay would equal its
-        // data length (by virtue of max delayed position in quorum being equal to maximum data
-        // length in quorum).
+        // data length (as its data can't be longer than minimum data length in quorum, which equals
+        // minimum delayed data length in quorum).
         // Then, should_change_state() would return true, but we always end calls with it being
         // false. Therefore, we're in a stalemate.
         match self {
@@ -693,7 +706,16 @@ impl MergeStrategy for QuorumMergeStrategy {
 //   b) Calls to MergeStrategy trait methods are throttled to once per second per replay, so the
 //      worst case scenario is switching a few times a second, which is not *horrible*.
 //
-// Fifth claim is (no) resilience to replays that stop sending data, but don't *finish* because TCP
+// Fifth claim is memory usage. We always discard any data that's stream_cmp_distance behind canon.
+// In a quorum, we wait with merging until delayed data catches up, so we keep at most last N
+// minutes of data in each replay. It's fine, potentially could be improved if we merge more
+// eagerly?
+// In a stalemate, there could be pathological conditions where a replay stalls data (see below),
+// stopping stalemate resolution for the rest of the replay IF there is otherwise no quorum. That
+// would accumulate data until end of the replay. This should happen very rarely, and maybe there
+// are ways to mitigate that? See below.
+//
+// Sixth claim is (no) resilience to replays that stop sending data, but don't *finish* because TCP
 // connection is kept open. We can't time out replays quickly, because long pauses in the game
 // (e.g. connectivity issues) happen sometimes. Replays are timed out *eventually*, so everything
 // *eventually* works out, but if we wait for such a bad replay, a replay watcher could get
