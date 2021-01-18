@@ -741,7 +741,7 @@ impl MergeStrategy for QuorumMergeStrategy {
 #[cfg(test)]
 mod tests {
     use std::{cell::RefCell, rc::Rc};
-    use crate::{replay::receive::{writer_replay::WriterReplay, merge_strategy::MergeStrategy}, async_utils::buf_traits::DiscontiguousBuf};
+    use crate::{replay::receive::{writer_replay::WriterReplay, merge_strategy::MergeStrategy}, async_utils::buf_traits::DiscontiguousBuf, replay::header::ReplayHeader};
     use super::QuorumMergeStrategy;
 
     #[test]
@@ -757,5 +757,27 @@ mod tests {
         let out_stream = out_stream_ref.borrow();
         assert!(out_stream.get_header().is_none());
         assert_eq!(out_stream.get_data().len(), 0);
+    }
+
+    #[test]
+    fn test_strategy_picks_at_least_one_header() {
+        let mut strat = QuorumMergeStrategy::new();
+        let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
+        let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
+        stream2.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
+
+        let token1 = strat.replay_added(stream1.clone());
+        let token2 = strat.replay_added(stream2.clone());
+        strat.replay_header_added(token2);
+
+        stream1.borrow_mut().finish();
+        stream2.borrow_mut().finish();
+        strat.replay_removed(token1);
+        strat.replay_removed(token2);
+        strat.finish();
+
+        let out_stream_ref = strat.get_merged_replay();
+        let out_stream = out_stream_ref.borrow();
+        assert!(out_stream.get_header().unwrap().data == vec!(1, 3, 3, 7));
     }
 }
