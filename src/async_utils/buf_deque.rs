@@ -36,7 +36,7 @@ impl BufDeque {
     }
 
     fn no_space_in_last_chunk(&self) -> bool {
-        self.end % CHUNK_SIZE == 0 || self.discard_start >= self.end
+        self.end % CHUNK_SIZE == 0 || self.chunks.is_empty()
     }
 
     fn chunk(&self, start: usize) -> (usize, usize, usize) {
@@ -96,7 +96,8 @@ impl BufWithDiscard for BufDeque {
 
         let until_chunk_idx = until / CHUNK_SIZE;
         let mut first_chunk_idx = self.discard_start / CHUNK_SIZE;
-        while !self.chunks.is_empty() && first_chunk_idx < until_chunk_idx {
+        // Always keep at least one chunk.
+        while self.chunks.len() > 1 && first_chunk_idx < until_chunk_idx {
             self.chunks.pop_front();
             first_chunk_idx += 1;
         }
@@ -164,9 +165,10 @@ mod test {
         let mut cursor = 0;
         for i in 0..(CHUNK_SIZE * 3) {
             bl.write_all(&data).unwrap();
-            while cursor < (i + 1) * data.len() {
+            let end = (i + 1) * data.len();
+            while cursor < end {
                 let chunk = bl.get_chunk(cursor);
-                for j in 0..chunk.len() {
+                for j in 0..std::cmp::min(chunk.len(), end - cursor) {
                     assert_eq!(chunk[j], data[(cursor + j) % data.len()]);
                 }
                 cursor += chunk.len();

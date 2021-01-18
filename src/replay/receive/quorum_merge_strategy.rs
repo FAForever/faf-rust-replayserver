@@ -59,7 +59,7 @@ struct ReplayState {
 // stuff) here. Proving correctness is not hard and left to the reader.
 
 impl ReplayState {
-    pub fn new(replay: WReplayRef, canon_replay: MReplayRef, stream_cmp_distance: usize) -> Self {
+    fn new(replay: WReplayRef, canon_replay: MReplayRef, stream_cmp_distance: usize) -> Self {
         Self {
             replay,
             canon_replay,
@@ -69,7 +69,7 @@ impl ReplayState {
             diverges: false,
         }
     }
-    pub fn data_len(&self) -> usize {
+    fn data_len(&self) -> usize {
         self.replay.borrow().get_data().len()
     }
 
@@ -81,15 +81,15 @@ impl ReplayState {
         self.replay.borrow().is_finished()
     }
 
-    pub fn common_prefix_from(&self, other: &ReplayState, start: usize) -> usize {
+    fn common_prefix_from(&self, other: &ReplayState, start: usize) -> usize {
         self.replay.borrow().get_data().common_prefix_from(other.replay.borrow().get_data(), start)
     }
 
-    pub fn falls_behind_canon(&self) -> bool {
+    fn falls_behind_canon(&self) -> bool {
         self.data_len() < self.canon_len() && !self.is_finished()
     }
 
-    pub fn matches_canon(&mut self) -> bool {
+    fn matches_canon(&mut self) -> bool {
         if self.falls_behind_canon() {
             false
         } else {
@@ -98,7 +98,7 @@ impl ReplayState {
         }
     }
 
-    pub fn diverges_from_canon(&mut self) -> bool {
+    fn diverges_from_canon(&mut self) -> bool {
         if self.falls_behind_canon() {
             false
         } else {
@@ -148,7 +148,7 @@ impl ReplayState {
     // To save memory, we discard data beyond canon_match_start(), or all data if we diverged.
     // It is an error to access replay data from before canonical replay's length, and it's an
     // error to access any data of a diverged replay.
-    pub fn discard_unneeded_data(&mut self) {
+    fn discard_unneeded_data(&mut self) {
         // If we diverged, we already discarded everything
         if !self.diverges {
             self.replay.borrow_mut().discard(self.canon_match_start());
@@ -156,7 +156,7 @@ impl ReplayState {
     }
 
     // For when we *know* the replay matches.
-    pub fn explicitly_set_matching(&mut self) {
+    fn explicitly_set_matching(&mut self) {
         debug_assert!(!self.diverges);
         debug_assert!(self.data_len() >= self.canon_len());
         self.data_matching_canon = self.canon_len();
@@ -164,7 +164,7 @@ impl ReplayState {
     }
 
     // For when we *know* the replay does not match.
-    pub fn explicitly_set_diverged(&mut self) {
+    fn explicitly_set_diverged(&mut self) {
         self.set_diverged();
     }
 }
@@ -176,13 +176,13 @@ struct SharedState {
     token: u64,
     stream_cmp_distance: usize,
     delayed_data_started: bool,
-    pub target_quorum_size: usize,
-    pub replays: HashMap<u64, ReplayState>,
-    pub canonical_stream: MReplayRef,     // FIXME
+    target_quorum_size: usize,
+    replays: HashMap<u64, ReplayState>,
+    canonical_stream: MReplayRef,     // FIXME
 }
 
 impl SharedState {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             token: 0,
             stream_cmp_distance: 4096, /* TODO configure */
@@ -193,7 +193,7 @@ impl SharedState {
         }
     }
 
-    pub fn add_replay(&mut self, r: WReplayRef) -> u64 {
+    fn add_replay(&mut self, r: WReplayRef) -> u64 {
         let token = self.token;
         let replay = ReplayState::new(r, self.canonical_stream.clone(), self.stream_cmp_distance);
         self.replays.insert(token, replay);
@@ -201,23 +201,23 @@ impl SharedState {
         token
     }
 
-    pub fn get_replay(&self, token: u64) -> &ReplayState {
+    fn get_replay(&self, token: u64) -> &ReplayState {
         self.replays.get(&token).unwrap()
     }
 
-    pub fn get_mut_replay(&mut self, token: u64) -> &mut ReplayState {
+    fn get_mut_replay(&mut self, token: u64) -> &mut ReplayState {
         self.replays.get_mut(&token).unwrap()
     }
 
-    pub fn data_merged(&self) -> usize {
+    fn data_merged(&self) -> usize {
         self.canonical_stream.borrow().get_data().len()
     }
 
-    pub fn merged_position(&self) -> usize {
+    fn merged_position(&self) -> usize {
         self.canonical_stream.borrow().position().len()
     }
 
-    pub fn append_canon_data(&mut self, id: u64, to: usize) {
+    fn append_canon_data(&mut self, id: u64, to: usize) {
         {
             let mut canon_replay = self.canonical_stream.borrow_mut();
             let source_replay = self.get_replay(id).replay.borrow();
@@ -228,7 +228,7 @@ impl SharedState {
         }
     }
 
-    pub fn update_merged_position(&mut self, mut hint: usize) {
+    fn update_merged_position(&mut self, mut hint: usize) {
         hint = std::cmp::min(hint, self.data_merged());
         if hint <= self.merged_position() {
             return;
@@ -250,8 +250,8 @@ impl SharedState {
 // Find a subset of replays that matches C and agrees on the next byte. Once found, advance the
 // stream by that byte and transition to quorum.
 
-struct MergeStalemateState {
-    pub s: SharedState,
+pub struct MergeStalemateState {
+    s: SharedState,
     candidates: HashMap<u8, Vec<u64>>,
     reserve: HashSet<u64>,
 }
@@ -280,7 +280,7 @@ struct MergeStalemateState {
 //   * G and Res are given to quorum constructor.
 
 impl MergeStalemateState {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             s: SharedState::new(),
             candidates: HashMap::new(),
@@ -288,7 +288,7 @@ impl MergeStalemateState {
         }
     }
 
-    pub fn from_quorum(shared: SharedState, reserve: HashSet<u64>) -> Self {
+    fn from_quorum(shared: SharedState, reserve: HashSet<u64>) -> Self {
         let mut me = Self {
             s: shared,
             candidates: HashMap::new(),
@@ -351,7 +351,7 @@ impl MergeStalemateState {
         }
     }
 
-    pub fn can_exit_stalemate(&self) -> bool {
+    fn can_exit_stalemate(&self) -> bool {
         if !self.s.delayed_data_started {
             false
         } else if self.candidates.is_empty() {
@@ -363,7 +363,7 @@ impl MergeStalemateState {
         }
     }
 
-    pub fn exit_stalemate(mut self) -> MergeQuorumState {
+    fn exit_stalemate(mut self) -> MergeQuorumState {
         debug_assert!(!self.candidates.is_empty());
 
         // Sort by stream count, then by longest stream.
@@ -398,8 +398,8 @@ impl MergeStalemateState {
 // in Q and add more data to C. When a merge like this does not produce data beyond C's delayed
 // position, enter a stalemate.
 
-struct MergeQuorumState {
-    pub s: SharedState,
+pub struct MergeQuorumState {
+    s: SharedState,
     quorum: HashSet<u64>,
     reserve: HashSet<u64>,
     quorum_diverges_at: Option<usize>,
@@ -427,7 +427,7 @@ struct MergeQuorumState {
 //   * Stalemate is constructed with Res.
 
 impl MergeQuorumState {
-    pub fn from_stalemate(shared: SharedState, mut good_replays: Vec<u64>, mut reserve: HashSet<u64>) -> Self {
+    fn from_stalemate(shared: SharedState, mut good_replays: Vec<u64>, mut reserve: HashSet<u64>) -> Self {
         debug_assert!(!good_replays.is_empty());
 
         // Take longest replays
@@ -449,7 +449,7 @@ impl MergeQuorumState {
         me
     }
 
-    pub fn add_replay(&mut self, r: WReplayRef) -> u64 {
+    fn add_replay(&mut self, r: WReplayRef) -> u64 {
         let token = self.s.add_replay(r);
         self.reserve.insert(token);
         token
@@ -469,11 +469,11 @@ impl MergeQuorumState {
         self.quorum.iter().map(|id| self.s.get_replay(*id).delayed_data).min().unwrap_or(0)
     }
 
-    pub fn replay_new_data(&mut self, _id: u64) {
+    fn replay_new_data(&mut self, _id: u64) {
         // pass, we merge lazily
     }
 
-    pub fn replay_new_delayed_data(&mut self, id: u64, _data_len: usize) {
+    fn replay_new_delayed_data(&mut self, id: u64, _data_len: usize) {
         if self.quorum.contains(&id) {
             self.update_delayed_position();
             if self.need_to_merge_more_data() && self.can_merge_more_data() {
@@ -482,7 +482,7 @@ impl MergeQuorumState {
         }
     }
 
-    pub fn replay_ended(&mut self, _id: u64) {
+    fn replay_ended(&mut self, _id: u64) {
         // pass, we don't care
     }
 
@@ -499,11 +499,11 @@ impl MergeQuorumState {
     }
 
     /* CAVEAT - only correct in-between calls! Never call from inside! */
-    pub fn has_to_enter_stalemate(&self) -> bool {
+    fn has_to_enter_stalemate(&self) -> bool {
         self.need_to_merge_more_data()
     }
 
-    pub fn enter_stalemate(self) -> MergeStalemateState {
+    fn enter_stalemate(self) -> MergeStalemateState {
         let mut s = self.s;
         let mut reserve: HashSet<u64> = self.reserve.into_iter().filter(|id| {
             let r = s.get_mut_replay(*id);
@@ -535,7 +535,7 @@ impl MergeQuorumState {
         common_prefix
     }
 
-    pub fn merge_more_data(&mut self) {
+    fn merge_more_data(&mut self) {
         debug_assert!(self.can_merge_more_data());
 
         let common_prefix = self.calculate_quorum_prefix();
@@ -555,7 +555,7 @@ impl MergeQuorumState {
 
 // Now the merge strategy interface.
 
-enum QuorumMergeStrategy {
+pub enum QuorumMergeStrategy {
     Quorum(MergeQuorumState),
     Stalemate(MergeStalemateState),
     Swapping,   // Dummy value so we can swap between quorum and stalemate. Never used otherwise.
@@ -734,3 +734,28 @@ impl MergeStrategy for QuorumMergeStrategy {
 //
 // This should still create consistent replays at a cost of rarely or never producing worse
 // quorums. Don't implement this unless you verify that the issue exists and that this fixes it.
+//
+
+
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::RefCell, rc::Rc};
+    use crate::{replay::receive::{writer_replay::WriterReplay, merge_strategy::MergeStrategy}, async_utils::buf_traits::DiscontiguousBuf};
+    use super::QuorumMergeStrategy;
+
+    #[test]
+    fn test_strategy_ends_stream_when_finalized() {
+        let mut strat = QuorumMergeStrategy::new();
+        let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
+        let token1 = strat.replay_added(stream1.clone());
+        stream1.borrow_mut().finish();
+        strat.replay_removed(token1);
+        strat.finish();
+
+        let out_stream_ref = strat.get_merged_replay();
+        let out_stream = out_stream_ref.borrow();
+        assert!(out_stream.get_header().is_none());
+        assert_eq!(out_stream.get_data().len(), 0);
+    }
+}

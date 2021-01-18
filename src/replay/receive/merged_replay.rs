@@ -31,6 +31,10 @@ impl MergedReplay {
         self.delayed_progress.advance(StreamPosition::DATA(0));
     }
 
+    pub fn get_header(&self) -> Option<&ReplayHeader> {
+        self.header.as_ref()
+    }
+
     pub fn delayed_wait(&self, until: StreamPosition) -> impl Future<Output = StreamPosition> {
         self.delayed_progress.wait(until)
     }
