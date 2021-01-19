@@ -2,9 +2,9 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::StreamExt;
 
-use crate::replay::position::StreamPosition;
+use crate::replay::{position::StreamPosition, streams::WriterReplay, streams::MergedReplay};
 
-use super::{writer_replay::WriterReplay, replay_delay::StreamDelay, merged_replay::MergedReplay};
+use super::replay_delay::StreamDelay;
 
 type ReplayRef = Rc<RefCell<WriterReplay>>;
 

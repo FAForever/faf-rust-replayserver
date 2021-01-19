@@ -1,8 +1,8 @@
 use std::{cell::RefCell, rc::Rc, collections::HashMap, collections::HashSet};
 
-use crate::{replay::position::StreamPosition, async_utils::buf_traits::DiscontiguousBuf, async_utils::buf_traits::DiscontiguousBufExt};
+use crate::{replay::{position::StreamPosition, streams::WriterReplay, streams::MergedReplay}, async_utils::buf_traits::DiscontiguousBuf, async_utils::buf_traits::DiscontiguousBufExt};
 
-use super::{writer_replay::WriterReplay, merge_strategy::MergeStrategy, merged_replay::MergedReplay};
+use super::merge_strategy::MergeStrategy;
 
 type WReplayRef = Rc<RefCell<WriterReplay>>;
 type MReplayRef = Rc<RefCell<MergedReplay>>;
@@ -741,7 +741,7 @@ impl MergeStrategy for QuorumMergeStrategy {
 #[cfg(test)]
 mod tests {
     use std::{cell::RefCell, rc::Rc};
-    use crate::{replay::receive::{writer_replay::WriterReplay, merge_strategy::MergeStrategy}, async_utils::buf_traits::DiscontiguousBuf, replay::header::ReplayHeader};
+    use crate::{replay::receive::merge_strategy::MergeStrategy, async_utils::buf_traits::DiscontiguousBuf, replay::streams::WriterReplay, replay::streams::ReplayHeader};
     use super::QuorumMergeStrategy;
 
     #[test]

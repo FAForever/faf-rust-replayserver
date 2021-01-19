@@ -3,9 +3,9 @@ use std::io::Read;
 
 use futures::Future;
 
-use crate::{async_utils::buf_list::BufList, replay::position::PositionTracker, replay::header::ReplayHeader, replay::position::StreamPosition, async_utils::buf_traits::DiscontiguousBuf, async_utils::buf_traits::ReadAt};
+use crate::{async_utils::buf_list::BufList, replay::position::PositionTracker, replay::position::StreamPosition, async_utils::buf_traits::DiscontiguousBuf, async_utils::buf_traits::ReadAt};
 
-use super::writer_replay::WriterReplay;
+use super::{writer_replay::WriterReplay, ReplayHeader};
 
 // FIXME there's some overlap between this and WriterReplay. Then again, both are used somewhat
 // differently, making them share code would probably be worse.

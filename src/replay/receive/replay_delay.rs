@@ -3,9 +3,8 @@ use async_stream::stream;
 use futures::{Stream, FutureExt};
 use futures::stream::StreamExt;
 
-use crate::replay::position::StreamPosition;
+use crate::replay::{position::StreamPosition, streams::WriterReplay};
 
-use super::writer_replay::WriterReplay;
 use tokio::time::{sleep, Duration};
 
 #[derive(Clone, Copy)]

@@ -3,9 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 use tokio::join;
 use tokio_util::sync::CancellationToken;
 
-use crate::server::connection::Connection;
+use crate::{server::connection::Connection, replay::streams::read_from_connection, replay::streams::WriterReplay};
 
-use super::{writer_replay::{WriterReplay, read_from_connection}, merge_strategy::NullMergeStrategy, merge_strategy::track_replay, replay_delay::StreamDelay};
+use super::{merge_strategy::NullMergeStrategy, merge_strategy::track_replay, replay_delay::StreamDelay};
 
 pub struct ReplayMerger {
     shutdown_token: CancellationToken,
