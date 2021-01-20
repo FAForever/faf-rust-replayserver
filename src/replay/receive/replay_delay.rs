@@ -8,15 +8,10 @@ use crate::replay::{position::StreamPosition, streams::WriterReplay};
 use tokio::time::{sleep, Duration};
 
 #[derive(Clone, Copy)]
-pub struct StreamPositions {
-    pub delayed: StreamPosition,
-    pub current: StreamPosition,
-}
-
-impl StreamPositions {
-    pub fn new(delayed: StreamPosition, current: StreamPosition) -> Self {
-        Self { delayed, current }
-    }
+pub enum StreamUpdates {
+    NewHeader,
+    DataUpdate,
+    Finished,
 }
 
 pub struct StreamDelay {
@@ -42,21 +37,23 @@ impl StreamDelay {
         (div + rd_up + 1) as usize
     }
 
-    fn header_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamPositions> + 'a {
+    fn header_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamUpdates> + 'a {
         async move {
             // This guarantees that we emit HEADER positions exactly once.
             let at_header = StreamPosition::DATA(0);
             // Don't borrow across an await
             let f = replay.borrow().wait(at_header);
             f.await;
-            StreamPositions::new(StreamPosition::HEADER, StreamPosition::HEADER)
+            StreamUpdates::NewHeader
         }.into_stream()
     }
 
-    fn data_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamPositions> + 'a {
+    fn data_update_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamUpdates> + 'a {
         let mut position_history: VecDeque<StreamPosition> = VecDeque::new();
         let history_size = self.history_size();
         let sleep_time = Duration::from_millis(self.sleep_ms);
+        let mut prev_current = StreamPosition::START;
+        let mut prev_delayed = StreamPosition::START;
         stream! {
             loop {
                 let current = replay.borrow().position();
@@ -66,34 +63,41 @@ impl StreamDelay {
                 }
                 let delayed = *position_history.front().unwrap();
 
-                // Sanity check
-                if matches!((current, delayed), (StreamPosition::DATA(_), StreamPosition::DATA(_))) {
-                    yield StreamPositions::new(delayed, current);
+                if current == prev_current || delayed == prev_delayed {
+                    continue;
                 }
+                if !matches!(current, StreamPosition::DATA(..)) {   // Sanity check
+                    continue;
+                }
+                prev_current = current;
+                prev_delayed = delayed;
+                replay.borrow_mut().set_delayed_data_progress(delayed.len());
+                yield StreamUpdates::DataUpdate;
                 sleep(sleep_time).await;
             }
         }
     }
 
-    fn end_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamPositions> + 'a {
+    fn end_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamUpdates> + 'a {
         stream! {
             // Don't borrow across an await
             let f = replay.borrow().wait(StreamPosition::FINISHED(0));
             let finish = f.await;
-            let final_data = StreamPosition::DATA(finish.len());
-            yield StreamPositions::new(final_data, final_data);
-            yield StreamPositions::new(finish, finish);
+            replay.borrow_mut().set_delayed_data_progress(finish.len());
+            yield StreamUpdates::DataUpdate;
+            yield StreamUpdates::Finished;
         }
     }
 
-    // INVARIANTS:
-    // * The stream always ends with a single pair of FINISHED values.
-    // * Before that pair, there is always a pair of DATA values with matching length.
-    // * If HEADER values appear, they appear once, first and as a pair of HEADER values.
-    // * All other values are pairs of DATA values.
-    pub fn delayed_progress<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamPositions> + 'a {
+    // Value order:
+    // * At most one NewHeader,
+    // * Any number of DataUpdate,
+    // * One DataUpdate after data reached final length,
+    // * One Finished.
+    // * NOTE: this modifies the delayed data position of the writer replay.
+    pub fn track_delayed_progress<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamUpdates> + 'a {
         let header_stream = self.header_stream(replay);
-        let data_stream = self.data_stream(replay);
+        let data_stream = self.data_update_stream(replay);
         let end_stream = self.end_stream(replay);
 
         let header_and_data_stream = header_stream.chain(data_stream);

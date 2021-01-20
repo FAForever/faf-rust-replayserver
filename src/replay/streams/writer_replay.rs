@@ -18,6 +18,7 @@ pub struct WriterReplay {
     header: MaybeHeader,
     data: BufDeque,
     progress: PositionTracker,
+    delayed_data_progress: usize,
 }
 
 impl WriterReplay {
@@ -26,6 +27,7 @@ impl WriterReplay {
             header: MaybeHeader::None,
             data: BufDeque::new(),
             progress: PositionTracker::new(),
+            delayed_data_progress: 0,
         }
     }
     pub fn add_header(&mut self, h: ReplayHeader) {
@@ -55,6 +57,15 @@ impl WriterReplay {
 
     pub fn get_data(&self) -> &impl DiscontiguousBuf {
         &self.data
+    }
+
+    pub fn set_delayed_data_progress(&mut self, new: usize) {
+        debug_assert!(self.delayed_data_progress <= new);
+        self.delayed_data_progress = new;
+    }
+
+    pub fn get_delayed_data_progress(&self) -> usize {
+        self.delayed_data_progress
     }
 
     // TODO annoying wrapper.

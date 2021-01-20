@@ -48,7 +48,6 @@ struct ReplayState {
     replay: WReplayRef,             // Writer replay, updated from connection in another task.
     canon_replay: MReplayRef,       // Canonical replay C.
     stream_cmp_distance: usize,     // As defined above.
-    delayed_data: usize,            // Delayed position in the replay. See merge_strategy.rs.
 
     // Fields used to lazily check relation of r towards C.
     data_matching_canon: usize,
@@ -64,13 +63,16 @@ impl ReplayState {
             replay,
             canon_replay,
             stream_cmp_distance,
-            delayed_data: 0,
             data_matching_canon: 0,
             diverges: false,
         }
     }
     fn data_len(&self) -> usize {
         self.replay.borrow().get_data().len()
+    }
+
+    fn delayed_data_len(&self) -> usize {
+        self.replay.borrow().get_delayed_data_progress()
     }
 
     fn canon_len(&self) -> usize {
@@ -209,11 +211,11 @@ impl SharedState {
         self.replays.get_mut(&token).unwrap()
     }
 
-    fn data_merged(&self) -> usize {
+    fn merged_data_len(&self) -> usize {
         self.canonical_stream.borrow().get_data().len()
     }
 
-    fn merged_position(&self) -> usize {
+    fn merged_delayed_position(&self) -> usize {
         self.canonical_stream.borrow().position().len()
     }
 
@@ -228,9 +230,9 @@ impl SharedState {
         }
     }
 
-    fn update_merged_position(&mut self, mut hint: usize) {
-        hint = std::cmp::min(hint, self.data_merged());
-        if hint <= self.merged_position() {
+    fn update_merged_delayed_position(&mut self, mut hint: usize) {
+        hint = std::cmp::min(hint, self.merged_data_len());
+        if hint <= self.merged_delayed_position() {
             return;
         }
         self.canonical_stream.borrow_mut().advance_delayed_data(hint);
@@ -303,7 +305,7 @@ impl MergeStalemateState {
     fn try_move_replay_to_candidates(&mut self, id: u64) {
         {
             let replay = self.s.get_replay(id).replay.borrow();
-            if replay.get_data().len() <= self.s.data_merged() {
+            if replay.get_data().len() <= self.s.merged_data_len() {
                 if replay.is_finished() {
                     self.reserve.remove(&id);                                       // Replay finished short.
                 }
@@ -318,7 +320,7 @@ impl MergeStalemateState {
         }
         {
             let replay = self.s.get_replay(id).replay.borrow();                     // Replay matches and can become a candidate.
-            let next_byte = replay.get_data().at(self.s.data_merged());
+            let next_byte = replay.get_data().at(self.s.merged_data_len());
             if self.candidates.get(&next_byte).is_none() {
                 self.candidates.insert(next_byte, Vec::new());
             }
@@ -333,14 +335,16 @@ impl MergeStalemateState {
         token
     }
 
-    fn replay_new_data(&mut self, id: u64) {
+    fn replay_data_updated(&mut self, id: u64) {
         // Replay may have advanced from a stalemate.
         if self.reserve.contains(&id) {
             self.try_move_replay_to_candidates(id);
         }
-    }
 
-    fn replay_new_delayed_data(&mut self, _id: u64, _data_len: usize) {
+        // Delayed data check.
+        if self.s.delayed_data_started || self.s.get_replay(id).delayed_data_len() == 0 {
+            return;
+        }
         self.s.delayed_data_started = true;
     }
 
@@ -376,7 +380,7 @@ impl MergeStalemateState {
 
         // Advance replay by 1 byte
         let good_replay = *good_replays.iter().next().unwrap();
-        let byte_pos = self.s.data_merged();
+        let byte_pos = self.s.merged_data_len();
         self.s.append_canon_data(good_replay, byte_pos + 1);
         for id in good_replays.iter() {
             self.s.get_mut_replay(*id).explicitly_set_matching();
@@ -393,7 +397,7 @@ impl MergeStalemateState {
 }
 
 // QUORUM:
-// Have a set of replays Q that matches C. Update C's delayed position as a maximum of Q's replays'
+// Have a set of replays Q that matches C. Update C's delayed position as a minimum of Q's replays'
 // delayed positions. Whenever C's delayed position reaches end of its data, lazily merge replays
 // in Q and add more data to C. When a merge like this does not produce data beyond C's delayed
 // position, enter a stalemate.
@@ -412,8 +416,8 @@ pub struct MergeQuorumState {
 //   * C's delayed position is equal to a minimum of:
 //     * A minimum of delayed positions of replays in Q,
 //     * Its own data length.
-//   * If C's delayed position is equal to its data length, then C equals the greatest common
-//     prefix of replays in Q.
+//   * Whenever C's delayed position is equal to its data length, C is the greatest common prefix
+//     of replays in Q.
 // * A quorum is constructed with a (non-empty) set of "good replays" G that match C and a reserve
 //   set Res. Q is populated with replays from G. Remaining replays in G are added into Res.
 // * A quorum can perform a "merging step" that adds data to C. In a merging step, replays in Q are
@@ -466,14 +470,10 @@ impl MergeQuorumState {
     // if a replay stalls, so at the very least we'll switch to a stalemate in a reasonable amount
     // of time.
     fn quorum_delayed_position(&self) -> usize {
-        self.quorum.iter().map(|id| self.s.get_replay(*id).delayed_data).min().unwrap_or(0)
+        self.quorum.iter().map(|id| self.s.get_replay(*id).delayed_data_len()).min().unwrap_or(0)
     }
 
-    fn replay_new_data(&mut self, _id: u64) {
-        // pass, we merge lazily
-    }
-
-    fn replay_new_delayed_data(&mut self, id: u64, _data_len: usize) {
+    fn replay_data_updated(&mut self, id: u64) {
         if self.quorum.contains(&id) {
             self.update_delayed_position();
             if self.need_to_merge_more_data() && self.can_merge_more_data() {
@@ -487,7 +487,7 @@ impl MergeQuorumState {
     }
 
     fn need_to_merge_more_data(&self) -> bool {
-        self.s.merged_position() >= self.s.data_merged()
+        self.s.merged_delayed_position() >= self.s.merged_data_len()
     }
 
     fn can_merge_more_data(&self) -> bool {
@@ -495,7 +495,7 @@ impl MergeQuorumState {
             return false
         }
         // Do all quorum streams have some more data?
-        self.quorum.iter().map(|id| self.s.get_replay(*id).data_len()).min().unwrap() > self.s.data_merged()
+        self.quorum.iter().map(|id| self.s.get_replay(*id).data_len()).min().unwrap() > self.s.merged_data_len()
     }
 
     /* CAVEAT - only correct in-between calls! Never call from inside! */
@@ -519,7 +519,7 @@ impl MergeQuorumState {
         let shortest_id = *self.quorum.iter().min_by_key(|id| self.s.get_replay(**id).data_len()).unwrap();
         let shortest = self.s.get_replay(shortest_id);
 
-        let cmp_start = std::cmp::max(shortest.data_len() - self.s.stream_cmp_distance, self.s.data_merged());
+        let cmp_start = std::cmp::max(shortest.data_len() - self.s.stream_cmp_distance, self.s.merged_data_len());
         let mut common_prefix = shortest.data_len();
 
         for id in self.quorum.iter() {
@@ -549,7 +549,7 @@ impl MergeQuorumState {
     }
 
     fn update_delayed_position(&mut self) {
-        self.s.update_merged_position(self.quorum_delayed_position());
+        self.s.update_merged_delayed_position(self.quorum_delayed_position());
     }
 }
 
@@ -621,16 +621,8 @@ impl MergeStrategy for QuorumMergeStrategy {
         }
     }
 
-    fn replay_new_data(&mut self, id: u64) {
-        both!(self, s => s.replay_new_data(id));
-        self.work_state_until_stable();
-    }
-
-    fn replay_new_delayed_data(&mut self, id: u64, data_len: usize) {
-        // Save delayed data value first.
-        both!(self, s => { s.s.get_mut_replay(id).delayed_data = data_len });
-
-        both!(self, s => { s.replay_new_delayed_data(id, data_len) });
+    fn replay_data_updated(&mut self, id: u64) {
+        both!(self, s => s.replay_data_updated(id));
         self.work_state_until_stable();
     }
 
@@ -650,8 +642,8 @@ impl MergeStrategy for QuorumMergeStrategy {
             Self::Quorum(..) => panic!("Expected to finish merge strategy in a stalemate"),
             Self::Stalemate(s) => {
                 // Not in a quorum. Merged replay position must be equal to its merged data.
-                let data_len = s.s.data_merged();
-                let position = s.s.merged_position();
+                let data_len = s.s.merged_data_len();
+                let position = s.s.merged_delayed_position();
                 debug_assert_eq!(data_len, position);
                 // All replays are finished, so Res is empty.
                 debug_assert!(s.reserve.is_empty());
@@ -737,7 +729,7 @@ impl MergeStrategy for QuorumMergeStrategy {
 //
 
 
-
+// TODO - parametrize with stream cutoff and quorum once we make them configurable.
 #[cfg(test)]
 mod tests {
     use std::{cell::RefCell, rc::Rc};
@@ -781,3 +773,276 @@ mod tests {
         assert!(out_stream.get_header().unwrap().data == vec!(1, 3, 3, 7));
     }
 }
+
+// TODO convert these python server tests to rust.
+/*
+@pytest.mark.parametrize("trimming", [None, 2])
+def test_strategy_gets_all_data_of_one(trimming, outside_source_stream):
+    conf = MockStrategyConfig()
+    conf.stream_comparison_cutoff = trimming
+    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
+    stream1 = MockStream()
+    stream1._header = "Header"
+
+    strat.stream_added(stream1)
+    strat.new_header(stream1)
+    stream1._add_data(b"Best f")
+    strat.new_data(stream1)
+    stream1._add_data(b"r")
+    strat.new_data(stream1)
+    stream1._add_data(b"iends")
+    strat.new_data(stream1)
+    strat.stream_removed(stream1)
+    strat.finalize()
+
+    assert outside_source_stream.header == "Header"
+    assert outside_source_stream.data.bytes() == b"Best friends"
+
+
+@pytest.mark.parametrize("trimming", [None, 3])
+def test_strategy_gets_common_prefix_of_all(trimming, outside_source_stream):
+    conf = MockStrategyConfig()
+    conf.stream_comparison_cutoff = trimming
+    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
+    stream1 = MockStream()
+    stream2 = MockStream()
+    stream2._header = "Header"
+
+    strat.stream_added(stream1)
+    strat.stream_added(stream2)
+    strat.new_header(stream2)
+
+    stream1._add_data(b"Best f")
+    strat.new_data(stream1)
+    stream2._add_data(b"Best")
+    strat.new_data(stream2)
+    stream1._add_data(b"r")
+    strat.new_data(stream1)
+    stream2._add_data(b" pals")
+    strat.new_data(stream2)
+    stream1._add_data(b"iends")
+    strat.new_data(stream1)
+
+    strat.stream_removed(stream2)
+    strat.stream_removed(stream1)
+    strat.finalize()
+    assert outside_source_stream.data.bytes().startswith(b"Best ")
+
+
+@pytest.mark.parametrize("trimming", [None, 3])
+def test_strategy_later_has_more_data(trimming,
+                                      outside_source_stream):
+    conf = MockStrategyConfig()
+    conf.stream_comparison_cutoff = trimming
+    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
+    stream1 = MockStream()
+    stream2 = MockStream()
+    stream2._header = "Header"
+
+    strat.stream_added(stream1)
+    strat.stream_added(stream2)
+    strat.new_header(stream2)
+
+    stream1._add_data(b"Data")
+    strat.new_data(stream1)
+    stream2._add_data(b"Data and stuff")
+    strat.new_data(stream2)
+
+    strat.stream_removed(stream2)
+    strat.stream_removed(stream1)
+    strat.finalize()
+    assert outside_source_stream.data.bytes() == b"Data and stuff"
+
+
+# TODO - extend this one
+@pytest.mark.parametrize("trimming", [None, 3])
+def test_strategy_tracked_stream_diverges(
+        trimming, outside_source_stream):
+    conf = MockStrategyConfig()
+    conf.stream_comparison_cutoff = trimming
+    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
+    stream1 = MockStream()
+    stream2 = MockStream()
+    stream2._header = "Header"
+
+    strat.stream_added(stream1)
+    strat.stream_added(stream2)
+    strat.new_header(stream2)
+
+    stream1._add_data(b"Data and stuff")
+    strat.new_data(stream1)
+    strat.stream_removed(stream1)
+    stream2._add_data(b"Data and smeg and blahblah")
+    strat.new_data(stream2)
+    strat.stream_removed(stream2)
+    strat.finalize()
+    assert outside_source_stream.data.bytes() in [
+        b"Data and stuff",
+        b"Data and smeg and blahblah"
+    ]
+
+
+# TODO - add tests with stalling connections
+
+@pytest.mark.parametrize("trimming", [None, 3])
+def test_strategy_quorum_newly_arrived_quorum(
+        trimming, outside_source_stream):
+    conf = MockStrategyConfig()
+    conf.stream_comparison_cutoff = trimming
+    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
+    stream1 = MockStream()
+    stream2 = MockStream()
+    stream3 = MockStream()
+    stream1._header = "Header"
+    stream2._header = "Header"
+    stream3._header = "Header"
+
+    strat.stream_added(stream1)
+    strat.stream_added(stream2)
+    strat.stream_added(stream3)
+
+    strat.new_header(stream1)
+    stream1._add_data(b"Data and stuff")
+    strat.new_data(stream1)
+    strat.stream_removed(stream1)
+
+    stream2._add_data(b"Data and smeg and blahblah")
+    strat.new_data(stream2)
+    stream3._add_data(b"Data and smeg and blahblah")
+    strat.new_data(stream3)
+    strat.stream_removed(stream2)
+    strat.stream_removed(stream3)
+    strat.finalize()
+    assert outside_source_stream.data.bytes() == b"Data and smeg and blahblah"
+
+
+@pytest.mark.parametrize("trimming", [None, 2])
+def test_quorum_strategy_uses_future_data(trimming, outside_source_stream):
+    conf = MockStrategyConfig()
+    conf.stream_comparison_cutoff = trimming
+    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
+    stream1 = MockStream(True)
+    stream2 = MockStream(True)
+    stream3 = MockStream(True)
+    stream1._header = "Header"
+    stream2._header = "Header"
+    stream3._header = "Header"
+
+    strat.stream_added(stream1)
+    strat.stream_added(stream2)
+    strat.stream_added(stream3)
+
+    stream1._future_data += b"foo"
+    stream2._future_data += b"foo"
+    stream1._add_data(b"f")
+    stream2._add_data(b"fo")
+
+    # First check calculating quorum point.
+    # We expect to send f, since 2 future data items confirm it.
+    # Note that we only react to streams when new_data is called, future_data
+    # is strictly for comparison purposes.
+    strat.new_data(stream1)
+    strat.new_data(stream2)
+    assert outside_source_stream.data.bytes() == b"fo"
+    stream1._add_data(b"oo")
+    strat.new_data(stream1)
+    assert outside_source_stream.data.bytes() == b"foo"
+
+    # And now stalemate resolution.
+    # After resolution, we should have confirmed "foo aaaaa", so sending some
+    # "a"s should come through.
+    stream3._future_data += b"foo aaaaa"
+    stream1._future_data += b" bbbbb"
+    stream2._future_data += b" aaaaa"
+    stream1._add_data(b" bbbbb")
+    stream2._add_data(b"o aaa")
+    stream3._add_data(b"foo")
+    strat.new_data(stream1)
+    strat.new_data(stream2)
+    strat.new_data(stream3)
+    assert outside_source_stream.data.bytes() == b"foo aaa"
+
+
+# This one kind of relies on internals? Maybe we should allow querying what
+# role a stream has?
+@pytest.mark.parametrize("trimming", [None, 3])
+def test_quorum_strategy_immediate_stalemate_resolve(trimming,
+                                                     outside_source_stream):
+    conf = MockStrategyConfig()
+    conf.stream_comparison_cutoff = trimming
+    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
+    stream1 = MockStream(True)
+    stream2 = MockStream(True)
+    stream3 = MockStream(True)
+    stream1._header = "Header"
+    stream2._header = "Header"
+    stream3._header = "Header"
+
+    strat.stream_added(stream1)
+    strat.stream_added(stream2)
+    strat.stream_added(stream3)
+
+    stream1._future_data += b"foo"
+    stream2._future_data += b"foo"
+    stream1._add_data(b"f")
+    stream2._add_data(b"f")
+
+    strat.new_data(stream1)
+    strat.new_data(stream2)
+
+    # Streams 1 and 2 should make a quorum now.
+    assert outside_source_stream.data.bytes() == b"f"
+
+    stream1._future_data += b"aaa"
+    stream2._future_data += b"bbb"
+    stream3._future_data += b"fooaaa"
+    stream1._add_data(b"ooaaa")
+    stream2._add_data(b"oobbb")
+    stream3._add_data(b"fooaaa")
+
+    strat.new_data(stream3)     # This one's not tracked
+    assert outside_source_stream.data.bytes() == b"f"
+    strat.new_data(stream2)
+    # Now we should've entered a stalemate, then resolved it with stream 3.
+    assert outside_source_stream.data.bytes() == b"fooaaa"
+
+
+def test_quorum_strategy_accepts_cutoff(outside_source_stream):
+    config = MockStrategyConfig()
+    config.stream_comparison_cutoff = 4
+    strat = QuorumMergeStrategy.build(outside_source_stream,
+                                      MockStrategyConfig())
+
+    stream1 = MockStream(True)
+    stream2 = MockStream(True)
+    stream3 = MockStream(True)
+    stream1._header = "Header"
+    stream2._header = "Header"
+    stream3._header = "Header"
+    strat.stream_added(stream1)
+    strat.stream_added(stream2)
+    strat.stream_added(stream3)
+
+    # No verification, just check if nothing breaks
+
+    stream1._future_data += b"abcdefg"
+    stream1._add_data(b"abcdefg")
+    strat.new_data(stream1)
+    stream2._future_data += b"abcdefg"
+    stream2._add_data(b"abcdefg")
+    strat.new_data(stream2)
+    assert outside_source_stream.data.bytes() == b"abcdefg"
+
+    stream1._future_data += b"h"
+    stream1._add_data(b"h")
+    stream2._future_data += b"i"
+    stream2._add_data(b"i")
+    strat.new_data(stream1)
+    strat.new_data(stream2)
+
+    # Check cutoff side effects, just to be sure it's enabled
+    stream3._future_data += b"aaadefgh"
+    stream3._add_data(b"aaadefgh")
+    strat.new_data(stream3)
+    assert outside_source_stream.data.bytes() == b"abcdefgh"
+*/
