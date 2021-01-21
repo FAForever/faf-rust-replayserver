@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, cmp::min};
 use std::io::Write;
 
-use super::buf_traits::{BufWithDiscard, DiscontiguousBuf};
+use super::buf_traits::{BufWithDiscard, DiscontiguousBuf, DiscontiguousBufExt};
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -38,34 +38,6 @@ impl BufDeque {
     fn no_space_in_last_chunk(&self) -> bool {
         self.end % CHUNK_SIZE == 0 || self.chunks.is_empty()
     }
-
-    fn chunk(&self, start: usize) -> (usize, usize, usize) {
-        assert!(self.discard_start <= start && start < self.end);
-
-        let first_chunk_idx = self.discard_start / CHUNK_SIZE;
-        let target_chunk_idx = start / CHUNK_SIZE;
-        let rel_idx = target_chunk_idx - first_chunk_idx;
-
-        let chunk_start = start % CHUNK_SIZE;
-        let chunk_end = min(CHUNK_SIZE, self.end - (target_chunk_idx * CHUNK_SIZE));
-
-        (rel_idx, chunk_start, chunk_end)
-    }
-}
-
-impl Write for BufDeque {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let offset = self.end % CHUNK_SIZE;
-        let mut chunk: &mut [u8] = self.get_last_chunk();
-        chunk = &mut chunk[offset..];
-        let written = chunk.write(buf).unwrap();
-        self.end += written;
-        Ok(written)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
 }
 
 impl DiscontiguousBuf for BufDeque {
@@ -75,17 +47,39 @@ impl DiscontiguousBuf for BufDeque {
 
     /* We slightly break contract here and panic if discarded data is accessed. */
     fn get_chunk(&self, start: usize) -> &[u8] {
-        let (idx, start, end) = self.chunk(start);
-        let chunk = &**self.chunks.get(idx).unwrap();
-        &chunk[start..end]
+        assert!(self.discard_start <= start && start < self.end);
+
+        let first_chunk_idx = self.discard_start / CHUNK_SIZE;
+        let target_chunk_idx = start / CHUNK_SIZE;
+        let rel_idx = target_chunk_idx - first_chunk_idx;
+        let chunk_start = start % CHUNK_SIZE;
+        let chunk_end = min(CHUNK_SIZE, self.end - (target_chunk_idx * CHUNK_SIZE));
+
+        let chunk = &**self.chunks.get(rel_idx).unwrap();
+        &chunk[chunk_start..chunk_end]
     }
 
-    fn get_mut_chunk(&mut self, start: usize) -> &mut [u8] {
-        let (idx, start, end) = self.chunk(start);
-        let chunk = &mut **self.chunks.get_mut(idx).unwrap();
-        &mut chunk[start..end]
+    fn append_some(&mut self, buf: &[u8]) -> usize {
+        let offset = self.end % CHUNK_SIZE;
+        let mut chunk: &mut [u8] = self.get_last_chunk();
+        chunk = &mut chunk[offset..];
+        let written = chunk.write(buf).unwrap();
+        self.end += written;
+        written
     }
 }
+
+impl Write for BufDeque {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.append(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 
 impl BufWithDiscard for BufDeque {
     /* TODO - shrink_to_fit on vecdeque? It'll never be large anyway */

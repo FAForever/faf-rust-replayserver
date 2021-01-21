@@ -422,6 +422,7 @@ pub struct MergeQuorumState {
 //   set Res. Q is populated with replays from G. Remaining replays in G are added into Res.
 // * A quorum can perform a "merging step" that adds data to C. In a merging step, replays in Q are
 //   compared from the end of C and their common prefix is appended to C.
+// 
 // * Whenever C's delayed position reaches its data length, a merging step is performed.
 // * If, between calls, C's delayed position equals its data length, quorum should transition to a
 //   stalemate.
@@ -513,13 +514,16 @@ impl MergeQuorumState {
         MergeStalemateState::from_quorum(s, reserve)
     }
 
+    // Note: we *could* use stream_cmp_distance to shorten comparisons in the optimistic case. I'm
+    // not sure if it's worth it, it might happen not even half the time and it's extra complexity
+    // if it fails.
     fn calculate_quorum_prefix(&mut self) -> usize {
         debug_assert!(!self.quorum.is_empty());
 
         let shortest_id = *self.quorum.iter().min_by_key(|id| self.s.get_replay(**id).data_len()).unwrap();
         let shortest = self.s.get_replay(shortest_id);
 
-        let cmp_start = std::cmp::max(shortest.data_len() - self.s.stream_cmp_distance, self.s.merged_data_len());
+        let cmp_start = self.s.merged_data_len();
         let mut common_prefix = shortest.data_len();
 
         for id in self.quorum.iter() {
@@ -732,9 +736,10 @@ impl MergeStrategy for QuorumMergeStrategy {
 // TODO - parametrize with stream cutoff and quorum once we make them configurable.
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
+    use std::{cell::RefCell, rc::Rc, io::Read};
     use crate::{replay::receive::merge_strategy::MergeStrategy, async_utils::buf_traits::DiscontiguousBuf, replay::streams::WriterReplay, replay::streams::ReplayHeader};
     use super::QuorumMergeStrategy;
+    use crate::async_utils::buf_traits::ReadAtExt;
 
     #[test]
     fn test_strategy_ends_stream_when_finalized() {
@@ -772,33 +777,44 @@ mod tests {
         let out_stream = out_stream_ref.borrow();
         assert!(out_stream.get_header().unwrap().data == vec!(1, 3, 3, 7));
     }
+
+    #[test]
+    fn test_strategy_gets_all_data_of_one() {
+        let mut strat = QuorumMergeStrategy::new();
+        let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
+        stream1.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
+
+        let token1 = strat.replay_added(stream1.clone());
+        strat.replay_header_added(token1);
+
+        stream1.borrow_mut().add_data(&[1, 2, 3, 4]);
+        strat.replay_data_updated(token1);
+        stream1.borrow_mut().set_delayed_data_progress(4);
+        strat.replay_data_updated(token1);
+        stream1.borrow_mut().add_data(&[5, 6]);
+        stream1.borrow_mut().set_delayed_data_progress(5);
+        strat.replay_data_updated(token1);
+        stream1.borrow_mut().add_data(&[7, 8]);
+        stream1.borrow_mut().set_delayed_data_progress(8);
+        strat.replay_data_updated(token1);
+
+        stream1.borrow_mut().finish();
+        strat.replay_removed(token1);
+        strat.finish();
+
+        let out_stream_ref = strat.get_merged_replay();
+        let out_stream = out_stream_ref.borrow();
+        let out_data = out_stream.get_data();
+
+        assert!(out_data.len() == 8);
+        let out_buf: &mut [u8] = &mut [0; 8];
+        out_data.reader().read(out_buf).unwrap();
+        assert_eq!(out_buf, &[1, 2, 3, 4, 5, 6, 7, 8]);
+    }
 }
 
 // TODO convert these python server tests to rust.
 /*
-@pytest.mark.parametrize("trimming", [None, 2])
-def test_strategy_gets_all_data_of_one(trimming, outside_source_stream):
-    conf = MockStrategyConfig()
-    conf.stream_comparison_cutoff = trimming
-    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
-    stream1 = MockStream()
-    stream1._header = "Header"
-
-    strat.stream_added(stream1)
-    strat.new_header(stream1)
-    stream1._add_data(b"Best f")
-    strat.new_data(stream1)
-    stream1._add_data(b"r")
-    strat.new_data(stream1)
-    stream1._add_data(b"iends")
-    strat.new_data(stream1)
-    strat.stream_removed(stream1)
-    strat.finalize()
-
-    assert outside_source_stream.header == "Header"
-    assert outside_source_stream.data.bytes() == b"Best friends"
-
-
 @pytest.mark.parametrize("trimming", [None, 3])
 def test_strategy_gets_common_prefix_of_all(trimming, outside_source_stream):
     conf = MockStrategyConfig()
