@@ -57,6 +57,7 @@ struct ReplayState {
 // And we check its diverge status (along with a helper functions for comparing streams and other
 // stuff) here. Proving correctness is not hard and left to the reader.
 
+// TODO test this in isolation.
 impl ReplayState {
     fn new(replay: WReplayRef, canon_replay: MReplayRef, stream_cmp_distance: usize) -> Self {
         Self {
@@ -811,40 +812,64 @@ mod tests {
         out_data.reader().read(out_buf).unwrap();
         assert_eq!(out_buf, &[1, 2, 3, 4, 5, 6, 7, 8]);
     }
+
+    #[test]
+    fn test_strategy_gets_common_prefix_of_all() {
+        let mut strat = QuorumMergeStrategy::new();
+        let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
+        let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
+
+        stream1.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
+        stream2.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
+        let token1 = strat.replay_added(stream1.clone());
+        let token2 = strat.replay_added(stream2.clone());
+        strat.replay_header_added(token1);
+        strat.replay_header_added(token2);
+
+        stream1.borrow_mut().add_data(&[1, 2, 3, 4]);
+        stream1.borrow_mut().set_delayed_data_progress(4);
+        strat.replay_data_updated(token1);
+
+        stream2.borrow_mut().add_data(&[1, 2]);
+        stream2.borrow_mut().set_delayed_data_progress(2);
+        strat.replay_data_updated(token2);
+
+        stream1.borrow_mut().add_data(&[5, 6]);
+        stream1.borrow_mut().set_delayed_data_progress(6);
+        strat.replay_data_updated(token1);
+
+        stream2.borrow_mut().add_data(&[3, 20, 21, 22, 23]);
+        stream2.borrow_mut().set_delayed_data_progress(7);
+        strat.replay_data_updated(token2);
+
+        stream1.borrow_mut().add_data(&[7, 8]);
+        stream1.borrow_mut().set_delayed_data_progress(8);
+        strat.replay_data_updated(token1);
+
+        stream1.borrow_mut().finish();
+        stream2.borrow_mut().finish();
+        strat.replay_removed(token1);
+        strat.replay_removed(token2);
+        strat.finish();
+
+        let out_stream_ref = strat.get_merged_replay();
+        let out_stream = out_stream_ref.borrow();
+        let out_data = out_stream.get_data();
+
+        assert!(out_data.len() == 7 || out_data.len() == 8);
+        let out_buf: &mut [u8] = &mut [0; 8];
+        out_data.reader().read(out_buf).unwrap();
+        assert_eq!(out_buf[..3], [1, 2, 3]);
+        if out_data.len() == 7 {
+            assert_eq!(out_buf[3..7], [20, 21, 22, 23]);
+        } else {
+            assert_eq!(out_buf[3..8], [4, 5, 6, 7, 8]);
+        }
+    }
 }
 
 // TODO convert these python server tests to rust.
 /*
-@pytest.mark.parametrize("trimming", [None, 3])
-def test_strategy_gets_common_prefix_of_all(trimming, outside_source_stream):
-    conf = MockStrategyConfig()
-    conf.stream_comparison_cutoff = trimming
-    strat = QuorumMergeStrategy.build(outside_source_stream, conf)
-    stream1 = MockStream()
-    stream2 = MockStream()
-    stream2._header = "Header"
-
-    strat.stream_added(stream1)
-    strat.stream_added(stream2)
-    strat.new_header(stream2)
-
-    stream1._add_data(b"Best f")
-    strat.new_data(stream1)
-    stream2._add_data(b"Best")
-    strat.new_data(stream2)
-    stream1._add_data(b"r")
-    strat.new_data(stream1)
-    stream2._add_data(b" pals")
-    strat.new_data(stream2)
-    stream1._add_data(b"iends")
-    strat.new_data(stream1)
-
-    strat.stream_removed(stream2)
-    strat.stream_removed(stream1)
-    strat.finalize()
-    assert outside_source_stream.data.bytes().startswith(b"Best ")
-
-
 @pytest.mark.parametrize("trimming", [None, 3])
 def test_strategy_later_has_more_data(trimming,
                                       outside_source_stream):
