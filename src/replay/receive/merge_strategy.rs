@@ -6,7 +6,8 @@ use crate::replay::{streams::WriterReplay, streams::MergedReplay};
 
 use super::replay_delay::{StreamDelay, StreamUpdates};
 
-type ReplayRef = Rc<RefCell<WriterReplay>>;
+pub type WReplayRef = Rc<RefCell<WriterReplay>>;
+pub type MReplayRef = Rc<RefCell<MergedReplay>>;
 
 // This represents a way to merge replays into one canonical replay. We define:
 // * A set of replays R.
@@ -36,12 +37,12 @@ type ReplayRef = Rc<RefCell<WriterReplay>>;
 //    second to avoid some (very rare) pathological performance issues. Don't change that too much.
 pub trait MergeStrategy {
     /* We use IDs to identify replays for simplicity, */
-    fn replay_added(&mut self, w: Rc<RefCell<WriterReplay>>) -> u64;
+    fn replay_added(&mut self, w: WReplayRef) -> u64;
     fn replay_removed(&mut self, id: u64);
     fn replay_header_added(&mut self, id: u64);
     fn replay_data_updated(&mut self, id: u64);
     fn finish(&mut self);
-    fn get_merged_replay(&self) -> Rc<RefCell<MergedReplay>>;   // FIXME change return type?
+    fn get_merged_replay(&self) -> MReplayRef;   // FIXME change return type?
 }
 
 // TODO
@@ -49,7 +50,7 @@ pub struct NullMergeStrategy {
 }
 
 impl MergeStrategy for NullMergeStrategy {
-    fn replay_added(&mut self, w: ReplayRef) -> u64 {
+    fn replay_added(&mut self, w: WReplayRef) -> u64 {
         0
     }
 
@@ -62,7 +63,7 @@ impl MergeStrategy for NullMergeStrategy {
     fn replay_data_updated(&mut self, id: u64) {
     }
 
-    fn get_merged_replay(&self) -> Rc<RefCell<MergedReplay>> {
+    fn get_merged_replay(&self) -> MReplayRef {
         todo!()
     }
     fn finish(&mut self) {
@@ -70,7 +71,7 @@ impl MergeStrategy for NullMergeStrategy {
     }
 }
 
-pub async fn track_replay(s: &RefCell<impl MergeStrategy>, delay: &StreamDelay, r: ReplayRef) {
+pub async fn track_replay(s: &RefCell<impl MergeStrategy>, delay: &StreamDelay, r: WReplayRef) {
     let token = s.borrow_mut().replay_added(r.clone());
     delay.track_delayed_progress(&*r).for_each( |p| async move {
         let mut st = s.borrow_mut();

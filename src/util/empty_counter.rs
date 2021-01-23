@@ -152,9 +152,8 @@ impl Future for WaitForEmptyFuture {
 
 #[cfg(test)]
 mod test {
-        use std::{cell::RefCell, rc::Rc, cell::Cell};
-
-use futures::Future;
+    use std::{cell::RefCell, rc::Rc, cell::Cell};
+    use futures::Future;
     use tokio::{time::sleep, join, time::Instant, time::Duration};
     use super::EmptyCounter;
 

@@ -1,11 +1,8 @@
 use std::{cell::RefCell, rc::Rc, collections::HashMap, collections::HashSet};
 
-use crate::{replay::{position::StreamPosition, streams::WriterReplay, streams::MergedReplay}, util::buf_traits::DiscontiguousBuf, util::buf_traits::DiscontiguousBufExt};
+use crate::{replay::position::StreamPosition, util::buf_traits::DiscontiguousBuf, util::buf_traits::DiscontiguousBufExt};
 
-use super::merge_strategy::MergeStrategy;
-
-type WReplayRef = Rc<RefCell<WriterReplay>>;
-type MReplayRef = Rc<RefCell<MergedReplay>>;
+use super::merge_strategy::{MergeStrategy, WReplayRef, MReplayRef};
 
 // This merge strategy tries to merge replays in such a way that at least N replays agree on the
 // merged data. To do that, it selects a subset of N replays called a quorum and compares their
