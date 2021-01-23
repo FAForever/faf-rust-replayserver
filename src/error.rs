@@ -1,6 +1,3 @@
-use std::num::ParseIntError;
-use std::str::Utf8Error;
-
 use log::info;
 use thiserror::Error;
 
@@ -21,6 +18,11 @@ pub enum ConnectionError {
     ShuttingDown(),
 }
 
+impl ConnectionError {
+    pub fn bad_data(what: impl Into<String>) -> Self {
+        Self::BadData(what.into())
+    }
+}
 // Usually we want to throw BadData.
 impl From<String> for ConnectionError {
     fn from(s : String) -> Self {
@@ -80,23 +82,19 @@ impl<T> AddContext<&str> for ConnResult<T> {
     }
 }
 
-// Convert all errors in expr to ConnectionError.
+// Below code lets us handle errors we don't need the type of.
+pub struct SomeError {
+}
+
+impl<T: std::error::Error> From<T> for SomeError {
+    fn from(_: T) -> Self {
+        Self {}
+    }
+}
+
 #[macro_export]
-macro_rules! with_context {
-    ($e: expr, $s: expr) => {
-        (|| Ok($e))().context($s)
-    }
-}
-
-// Typical conversions.
-impl From<Utf8Error> for ConnectionError {
-    fn from(_ :Utf8Error) -> Self {
-        "UTF decode error".into()
-    }
-}
-
-impl From<ParseIntError> for ConnectionError {
-    fn from(_ :ParseIntError) -> Self {
-        "Int parse error".into()
+macro_rules! some_error {
+    ($e: expr) => {
+        (|| -> std::result::Result<_, SomeError> {Ok($e) })()
     }
 }
