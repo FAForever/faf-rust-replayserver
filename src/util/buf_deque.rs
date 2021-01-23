@@ -102,7 +102,7 @@ impl BufWithDiscard for BufDeque {
 #[cfg(test)]
 mod test {
     use std::io::Write;
-    use crate::async_utils::buf_traits::{DiscontiguousBuf, BufWithDiscard};
+    use crate::util::buf_traits::{DiscontiguousBuf, BufWithDiscard};
     use super::{BufDeque, CHUNK_SIZE};
 
     fn append_at(offset: usize) {

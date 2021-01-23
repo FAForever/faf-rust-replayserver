@@ -1,6 +1,6 @@
 use std::ops::Add;
 
-use crate::async_utils::progress::{ProgressKey, ProgressTracker};
+use crate::util::progress::{ProgressKey, ProgressTracker};
 
 /* Tracking replay stream position.
  */

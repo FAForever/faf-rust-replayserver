@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, collections::HashMap, collections::HashSet};
 
-use crate::{replay::{position::StreamPosition, streams::WriterReplay, streams::MergedReplay}, async_utils::buf_traits::DiscontiguousBuf, async_utils::buf_traits::DiscontiguousBufExt};
+use crate::{replay::{position::StreamPosition, streams::WriterReplay, streams::MergedReplay}, util::buf_traits::DiscontiguousBuf, util::buf_traits::DiscontiguousBufExt};
 
 use super::merge_strategy::MergeStrategy;
 
@@ -738,9 +738,9 @@ impl MergeStrategy for QuorumMergeStrategy {
 #[cfg(test)]
 mod tests {
     use std::{cell::RefCell, rc::Rc, io::Read};
-    use crate::{replay::receive::merge_strategy::MergeStrategy, async_utils::buf_traits::DiscontiguousBuf, replay::streams::WriterReplay, replay::streams::ReplayHeader};
+    use crate::{replay::receive::merge_strategy::MergeStrategy, util::buf_traits::DiscontiguousBuf, replay::streams::WriterReplay, replay::streams::ReplayHeader};
     use super::QuorumMergeStrategy;
-    use crate::async_utils::buf_traits::ReadAtExt;
+    use crate::util::buf_traits::ReadAtExt;
 
     #[test]
     fn test_strategy_ends_stream_when_finalized() {

@@ -3,7 +3,7 @@ use std::io::Read;
 
 use futures::Future;
 
-use crate::{async_utils::buf_list::BufList, replay::position::PositionTracker, replay::position::StreamPosition, async_utils::buf_traits::DiscontiguousBuf, async_utils::buf_traits::ReadAt};
+use crate::{util::buf_list::BufList, replay::position::PositionTracker, replay::position::StreamPosition, util::buf_traits::DiscontiguousBuf, util::buf_traits::ReadAt};
 
 use super::{writer_replay::WriterReplay, ReplayHeader};
 

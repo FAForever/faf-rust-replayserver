@@ -2,7 +2,7 @@ use accept::ConnectionProducer;
 use futures::join;
 
 pub mod config;
-pub mod async_utils;
+pub mod util;
 pub mod server;
 pub mod worker_threads;
 pub mod accept;
