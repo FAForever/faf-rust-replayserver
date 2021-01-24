@@ -1,8 +1,8 @@
 use std::{cell::RefCell, rc::Rc, collections::HashMap, collections::HashSet};
 
-use crate::{replay::position::StreamPosition, util::buf_traits::DiscontiguousBuf, util::buf_traits::DiscontiguousBufExt};
+use crate::{replay::position::StreamPosition, util::buf_traits::DiscontiguousBuf, util::buf_traits::DiscontiguousBufExt, replay::streams::WReplayRef, replay::streams::MReplayRef, replay::streams::MergedReplay};
 
-use super::merge_strategy::{MergeStrategy, WReplayRef, MReplayRef};
+use super::merge_strategy::MergeStrategy;
 
 // This merge strategy tries to merge replays in such a way that at least N replays agree on the
 // merged data. To do that, it selects a subset of N replays called a quorum and compares their
@@ -693,12 +693,11 @@ impl MergeStrategy for QuorumMergeStrategy {
 //
 // Our fourth claim talks about performance. Worst case scenario is quorum never advancing its data
 // and stalemate having to work for every single byte. Why does it not happen?
-// * Well, we cheat our way out here. In pathologic conditions (e.g. one stream consistently 5
-//   minutes behind another), we *can* end up immediately switching from quorum to stalemate all the
-//   time. However:
-//   a) It should almost never happen (ha ha?),
-//   b) Calls to MergeStrategy trait methods are throttled to once per second per replay, so the
-//      worst case scenario is switching a few times a second, which is not *horrible*.
+// * We can assume quorum ends due to diverging data very few times, since every time it does, we
+//   discard at least one replay.
+// * Otherwise, the quorum ends because the delayed position caught up with the data for every
+//   replay. This can happen at most once per N minutes per replay, so on average we stay in the
+//   quorum ((N minutes * quorum size) / # of replays).
 //
 // Fifth claim is memory usage. We always discard any data that's stream_cmp_distance behind canon.
 // In a quorum, we wait with merging until delayed data catches up, so we keep at most last N

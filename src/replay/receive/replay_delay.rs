@@ -3,9 +3,11 @@ use async_stream::stream;
 use futures::{Stream, FutureExt};
 use futures::stream::StreamExt;
 
-use crate::replay::{position::StreamPosition, streams::WriterReplay};
+use crate::replay::{position::StreamPosition, streams::WReplayRef};
 
 use tokio::time::{sleep, Duration};
+
+use super::merge_strategy::MergeStrategy;
 
 #[derive(Clone, Copy)]
 pub enum StreamUpdates {
@@ -19,6 +21,13 @@ pub struct StreamDelay {
     sleep_ms: u64,
 }
 
+// This does two things:
+// * Sets writer stream's delayed data position. The position is updated roughly each sleep_ms
+//   miliseconds and is set to data position delay_s seconds ago. Once the replay ends, the delayed
+//   position is set to real data position (since we don't need to anti-spoiler a replay that
+//   already ended).
+// * Produces an async stream of status updates on the replay used to drive the replay merge
+//   strategy.
 impl StreamDelay {
     pub fn new(delay_s: u64, sleep_ms: u64) -> Self {
         Self { delay_s, sleep_ms }
@@ -33,11 +42,12 @@ impl StreamDelay {
          *
          */
         let div = (self.delay_s * 1000) / self.sleep_ms;
-        let rd_up: u64 = ((self.delay_s * 1000) % self.sleep_ms != 0).into();
-        (div + rd_up + 1) as usize
+        let should_round_up = (self.delay_s * 1000) % self.sleep_ms != 0;
+        let round_up: u64 = should_round_up.into();
+        (div + round_up + 1) as usize
     }
 
-    fn header_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamUpdates> + 'a {
+    fn header_stream(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
         async move {
             // This guarantees that we emit HEADER positions exactly once.
             let at_header = StreamPosition::DATA(0);
@@ -48,7 +58,7 @@ impl StreamDelay {
         }.into_stream()
     }
 
-    fn data_update_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamUpdates> + 'a {
+    fn data_update_stream(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
         let mut position_history: VecDeque<StreamPosition> = VecDeque::new();
         let history_size = self.history_size();
         let sleep_time = Duration::from_millis(self.sleep_ms);
@@ -78,7 +88,7 @@ impl StreamDelay {
         }
     }
 
-    fn end_stream<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamUpdates> + 'a {
+    fn end_stream(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
         stream! {
             // Don't borrow across an await
             let f = replay.borrow().wait(StreamPosition::FINISHED(0));
@@ -95,14 +105,28 @@ impl StreamDelay {
     // * One DataUpdate after data reached final length,
     // * One Finished.
     // * NOTE: this modifies the delayed data position of the writer replay.
-    pub fn track_delayed_progress<'a>(&self, replay: &'a RefCell<WriterReplay>) -> impl Stream<Item = StreamUpdates> + 'a {
-        let header_stream = self.header_stream(replay);
-        let data_stream = self.data_update_stream(replay);
-        let end_stream = self.end_stream(replay);
+    fn track_delayed_progress(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
+        let header_stream = self.header_stream(replay.clone());
+        let data_stream = self.data_update_stream(replay.clone());
+        let end_stream = self.end_stream(replay.clone());
 
         let header_and_data_stream = header_stream.chain(data_stream);
         let replay_end = replay.borrow().wait(StreamPosition::FINISHED(0));
         let capped_stream = header_and_data_stream.take_until(replay_end);
         capped_stream.chain(end_stream)
+    }
+
+    pub async fn update_delayed_data_and_drive_merge_strategy(
+        &self, replay: WReplayRef, strategy: &RefCell<impl MergeStrategy>)
+    {
+        let token = strategy.borrow_mut().replay_added(replay.clone());
+        self.track_delayed_progress(replay).for_each( |p| async move {
+            let mut s = strategy.borrow_mut();
+            match p {
+                StreamUpdates::NewHeader => s.replay_header_added(token),
+                StreamUpdates::DataUpdate => s.replay_data_updated(token),
+                StreamUpdates::Finished => s.replay_removed(token),
+            }
+        }).await;
     }
 }

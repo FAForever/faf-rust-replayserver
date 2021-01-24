@@ -125,3 +125,5 @@ async fn do_read_from_connection(me: &Rc<RefCell<WriterReplay>>, mut c: &mut Con
     }
     Ok(())
 }
+
+pub type WReplayRef = Rc<RefCell<WriterReplay>>;

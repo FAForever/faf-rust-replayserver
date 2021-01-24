@@ -1,39 +1,32 @@
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{cell::RefCell, rc::Rc};
 
 use tokio::join;
 use tokio_util::sync::CancellationToken;
 
-use crate::{server::connection::Connection, replay::streams::read_from_connection, replay::streams::WriterReplay, util::empty_counter::EmptyCounter};
+use crate::{server::connection::Connection, replay::streams::read_from_connection, replay::streams::WriterReplay, replay::streams::MReplayRef};
 
-use super::{merge_strategy::NullMergeStrategy, merge_strategy::track_replay, replay_delay::StreamDelay, merge_strategy::MReplayRef, merge_strategy::MergeStrategy};
+use super::{replay_delay::StreamDelay, merge_strategy::MergeStrategy, quorum_merge_strategy::QuorumMergeStrategy};
 
 pub struct ReplayMerger {
     shutdown_token: CancellationToken,
     // Will be a boxed trait if ever needed.
-    merge_strategy: RefCell<NullMergeStrategy>,
+    merge_strategy: RefCell<QuorumMergeStrategy>,
     stream_delay: StreamDelay,
-    no_connections_counter: EmptyCounter,
 }
 
 impl ReplayMerger {
     pub fn new(shutdown_token: CancellationToken) -> Self {
         // FIXME configure / inject
         let stream_delay = StreamDelay::new(300, 1000);
-        let merge_strategy = RefCell::new(NullMergeStrategy {});
-        let no_connections_counter = EmptyCounter::new();
-        Self {shutdown_token, merge_strategy, stream_delay, no_connections_counter }
-    }
-    pub async fn lifetime(&self) {
-        // FIXME make configurable
-        self.no_connections_counter.wait_until_empty_for(Duration::from_secs(30)).await;
+        let merge_strategy = RefCell::new(QuorumMergeStrategy::new());
+        Self {shutdown_token, merge_strategy, stream_delay }
     }
 
     pub async fn handle_connection(&self, c: &mut Connection) {
-        let _guard = self.no_connections_counter.guard();
         let replay = Rc::new(RefCell::new(WriterReplay::new()));
         join! {
             read_from_connection(replay.clone(), c, self.shutdown_token.clone()),
-            track_replay(&self.merge_strategy, &self.stream_delay, replay),
+            self.stream_delay.update_delayed_data_and_drive_merge_strategy(replay, &self.merge_strategy),
         };
     }
 

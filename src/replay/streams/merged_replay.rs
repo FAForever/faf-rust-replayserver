@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{io::Write, rc::Rc, cell::RefCell};
 use std::io::Read;
 
 use futures::Future;
@@ -94,3 +94,5 @@ impl ReadAt for MergedReplay {
         }
     }
 }
+
+pub type MReplayRef = Rc<RefCell<MergedReplay>>;

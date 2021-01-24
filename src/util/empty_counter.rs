@@ -69,34 +69,26 @@ impl EmptyCounter {
     pub fn new() -> Self {
         Self {inner: Rc::new(RefCell::new(Inner::new())) }
     }
-    pub fn guard(&self) -> CounterRef {
-        CounterRef::new(self.inner.clone())
+
+    pub fn inc(&self) {
+        self.inner.borrow_mut().inc();
+    }
+
+    pub fn dec(&self) {
+        self.inner.borrow_mut().dec();
     }
 
     pub fn wait_until_empty_for(&self, timeout: Duration) -> WaitForEmptyFuture {
         return WaitForEmptyFuture::new(self.inner.clone(), timeout)
     }
+
+    pub fn wait_until_empty(&self) -> WaitForEmptyFuture {
+        return WaitForEmptyFuture::new(self.inner.clone(), Duration::from_secs(0))
+    }
 }
 
 pub struct EmptyCounter {
     inner: Rc<RefCell<Inner>>,
-}
-
-pub struct CounterRef {
-    inner: Rc<RefCell<Inner>>,
-}
-
-impl CounterRef {
-    pub fn new(inner: Rc<RefCell<Inner>>) -> Self {
-        inner.borrow_mut().inc();
-        Self { inner }
-    }
-}
-
-impl Drop for CounterRef {
-    fn drop(&mut self) {
-        self.inner.borrow_mut().dec();
-    }
 }
 
 pub struct WaitForEmptyFuture {
@@ -159,8 +151,9 @@ mod test {
 
     async fn hold_counter(c: &EmptyCounter, wait_ms: u64, hold_end_ms: u64) {
         sleep(Duration::from_millis(wait_ms)).await;
-        let _guard = c.guard();
+        c.inc();
         sleep(Duration::from_millis(hold_end_ms - wait_ms)).await;
+        c.dec();
     }
 
     // CAVEAT: tokio automagically advances the clock when time is paused. No need to manually
