@@ -6,6 +6,7 @@ use log::debug;
 use tokio::{select, sync::mpsc::Receiver};
 use tokio_util::sync::CancellationToken;
 use futures::stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 pub struct Server
 {
@@ -22,8 +23,9 @@ pub fn worker_thread_fn(streams: Receiver<Connection>, shutdown_token: Cancellat
 
 async fn worker_thread_work(streams: Receiver<Connection>, shutdown_token: CancellationToken)
 {
-    let mut replays = Replays::new(shutdown_token);
-    replays.handle_connections(streams).await;
+    let mut replays = Replays::build(shutdown_token);
+    let wrapper = ReceiverStream::new(streams);
+    replays.handle_connections_and_replays(wrapper).await;
 }
 
 impl Server {

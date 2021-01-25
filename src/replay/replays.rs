@@ -1,8 +1,7 @@
 use std::rc::{Weak, Rc};
 
-use async_stream::stream;
-use futures::{Stream, future::Either, StreamExt};
-use tokio::sync::mpsc::Receiver;
+use futures::{Stream, StreamExt};
+use tokio::join;
 use weak_table::WeakValueHashMap;
 use tokio_util::sync::CancellationToken;
 
@@ -11,59 +10,66 @@ use crate::accept::header::ConnectionType;
 
 use super::Replay;
 
-type NewReplayOrConnection = Either<Rc<Replay>, (Connection, Rc<Replay>)>;
-
-fn replays_and_connections(mut s: Receiver<Connection>,
-                           replay_builder: impl Fn(u64) -> Replay) -> impl Stream<Item = NewReplayOrConnection> {
-    let mut replays = WeakValueHashMap::<u64, Weak<Replay>>::new();
-    stream! {
-        while let Some(conn) = s.recv().await {
-            let rid = conn.get_header().id;
-            let replay = match replays.get(&rid) {
-                Some(r) => r,
-                None => {
-                    if conn.get_header().type_ == ConnectionType::READER {
-                        log::debug!("Reader connection does not have a matching replay (id {})", rid);
-                        continue;
-                    }
-                    let r = Rc::new(replay_builder(rid));
-                    replays.insert(rid, r.clone());
-                    yield Either::Left(r.clone());
-                    r
-                }
-            };
-            yield Either::Right((conn, replay));
-        }
-    }
-}
-
-async fn run_one(s: NewReplayOrConnection) {
-    match s {
-        Either::Left(c) => c.lifetime().await,
-        Either::Right(args) => {
-            let (c, r) = args;
-            r.handle_connection(c).await
-        }
-    }
-}
-
-async fn handle_connections(conns: Receiver<Connection>,
-                            replay_builder: impl Fn(u64) -> Replay) {
-    let s = replays_and_connections(conns, replay_builder);
-    s.for_each_concurrent(None, run_one).await
+struct AssignedConnection {
+    connection: Connection,
+    replay: Rc<Replay>,
+    replay_is_newly_created: bool,
 }
 
 pub struct Replays {
-    shutdown_token: CancellationToken,
+    replays: WeakValueHashMap<u64, Weak<Replay>>,
+    replay_builder: Box<dyn Fn(u64) -> Replay>,
 }
 
 impl Replays {
-    pub fn new(shutdown_token: CancellationToken) -> Self
-    {
-        Replays {shutdown_token}
+    pub fn new(replay_builder: Box<dyn Fn(u64) -> Replay>) -> Self {
+        Self { replays: WeakValueHashMap::new(), replay_builder}
     }
 
-    pub async fn handle_connections(&mut self, connection_stream: Receiver<Connection>) {
-        handle_connections(connection_stream, |rid| {Replay::new(rid, self.shutdown_token.clone())}).await
+    pub fn build(shutdown_token: CancellationToken) -> Self {
+        let replay_builder = move |rid| {Replay::new(rid, shutdown_token.clone())};
+        Self::new(Box::new(replay_builder))
+    }
+
+    fn assign_connection_to_replay(&mut self, c: Connection) -> Option<AssignedConnection> {
+        let conn_header = c.get_header();
+        let mut replay_is_newly_created = false;
+
+        let maybe_replay = match self.replays.get(&conn_header.id) {
+            Some(r) => Some(r),
+            None => {
+                if conn_header.type_ == ConnectionType::READER {
+                    log::debug!("Reader connection does not have a matching replay (id {})", conn_header.id);
+                    None
+                } else {
+                    let r = Rc::new((self.replay_builder)(conn_header.id));
+                    self.replays.insert(conn_header.id, r.clone());
+                    replay_is_newly_created = true;
+                    Some(r)
+                }
+            }
+        };
+        match maybe_replay {
+            None => None,
+            Some(replay) => Some(AssignedConnection {connection: c, replay, replay_is_newly_created}),
+        }
+    }
+
+    async fn handle_connection_or_replay_lifetime(mac: Option<AssignedConnection>) {
+        if let Some(ac) = mac {
+            if ac.replay_is_newly_created {
+                join! {
+                    ac.replay.handle_connection(ac.connection),
+                    ac.replay.lifetime()
+                };
+            } else {
+                ac.replay.handle_connection(ac.connection).await;
+            }
+        }
+    }
+
+    pub async fn handle_connections_and_replays(&mut self, cs: impl Stream<Item = Connection>) {
+        cs.map(|c| self.assign_connection_to_replay(c))
+          .for_each_concurrent(None, Self::handle_connection_or_replay_lifetime).await
     }
 }
