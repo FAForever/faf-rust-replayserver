@@ -30,6 +30,10 @@ impl ReplayMerger {
         };
     }
 
+    pub fn finalize(&self) {
+        self.merge_strategy.borrow_mut().finish();
+    }
+
     pub fn get_merged_replay(&self) -> MReplayRef {
         self.merge_strategy.borrow().get_merged_replay()
     }

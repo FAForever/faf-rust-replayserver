@@ -58,6 +58,7 @@ impl Replay {
         self.wait_until_there_were_no_writers_for_a_while().await;
         self.should_stop_accepting_connections.set(true);
         self.writer_connection_count.wait_until_empty().await;
+        self.merger.finalize();
         self.saver.save_replay(self.merger.get_merged_replay()).await;
         self.reader_connection_count.wait_until_empty().await;
         // Cancel to return from timeout
