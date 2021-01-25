@@ -35,7 +35,7 @@ impl MergedReplay {
         self.header.as_ref()
     }
 
-    pub fn delayed_wait(&self, until: StreamPosition) -> impl Future<Output = StreamPosition> {
+    pub fn wait(&self, until: StreamPosition) -> impl Future<Output = StreamPosition> {
         self.delayed_progress.wait(until)
     }
 
@@ -76,22 +76,6 @@ impl MergedReplay {
     pub fn finish(&mut self) {
         let final_len = self.position().len();
         self.delayed_progress.advance(StreamPosition::FINISHED(final_len));
-    }
-}
-
-impl ReadAt for MergedReplay {
-    fn read_at(&self, start: usize, buf: &mut [u8]) -> std::io::Result<usize> {
-        match &self.header {
-            None => Ok(0),
-            Some(h) => {
-                if start < h.data.len() {
-                    let mut chunk = &h.data[start..];
-                    chunk.read(buf)
-                } else {
-                    self.data.read_at(start - h.data.len(), buf)
-                }
-            }
-        }
     }
 }
 

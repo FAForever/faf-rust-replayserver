@@ -20,13 +20,16 @@ pub struct Replay {
 
 impl Replay {
     pub fn new(id: u64, shutdown_token: CancellationToken) -> Self {
-        let replay_timeout_token = shutdown_token.child_token();
-        let merger = ReplayMerger::new(replay_timeout_token.clone());
-        let sender = ReplaySender::new();
-        let saver = ReplaySaver::new();
         let writer_connection_count = EmptyCounter::new();
         let reader_connection_count = EmptyCounter::new();
         let should_stop_accepting_connections = Cell::new(false);
+        let replay_timeout_token = shutdown_token.child_token();
+
+        let merger = ReplayMerger::new(replay_timeout_token.clone());
+        let merged_replay = merger.get_merged_replay();
+        let sender = ReplaySender::new(merged_replay, replay_timeout_token.clone());
+        let saver = ReplaySaver::new();
+
         Self { id, merger, sender, saver, replay_timeout_token,
                writer_connection_count, reader_connection_count,
                should_stop_accepting_connections }
