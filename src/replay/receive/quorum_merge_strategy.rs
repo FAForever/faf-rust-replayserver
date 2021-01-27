@@ -182,12 +182,12 @@ struct SharedState {
 }
 
 impl SharedState {
-    fn new() -> Self {
+    fn new(target_quorum_size: usize, stream_cmp_distance: usize) -> Self {
         Self {
             token: 0,
-            stream_cmp_distance: 4096, /* TODO configure */
+            stream_cmp_distance,
             delayed_data_started: false,
-            target_quorum_size: 2, /* TODO configure */
+            target_quorum_size,
             replays: HashMap::new(),
             canonical_stream: Rc::new(RefCell::new(MergedReplay::new())),
         }
@@ -280,9 +280,9 @@ pub struct MergeStalemateState {
 //   * G and Res are given to quorum constructor.
 
 impl MergeStalemateState {
-    fn new() -> Self {
+    fn new(target_quorum_size: usize, stream_cmp_distance: usize) -> Self {
         Self {
-            s: SharedState::new(),
+            s: SharedState::new(target_quorum_size, stream_cmp_distance),
             candidates: HashMap::new(),
             reserve: HashSet::new(),
         }
@@ -574,8 +574,8 @@ macro_rules! both {
 }
 
 impl QuorumMergeStrategy {
-    pub fn new() -> Self {
-        Self::Stalemate(MergeStalemateState::new())
+    pub fn new(target_quorum_size: usize, stream_cmp_distance: usize) -> Self {
+        Self::Stalemate(MergeStalemateState::new(target_quorum_size, stream_cmp_distance))
     }
 
     fn should_change_state(&self) -> bool {
@@ -738,9 +738,13 @@ mod tests {
     use super::QuorumMergeStrategy;
     use crate::util::buf_traits::ReadAtExt;
 
+    fn strat() -> QuorumMergeStrategy {
+        QuorumMergeStrategy::new(2, 4096)
+    }
+
     #[test]
     fn test_strategy_ends_stream_when_finalized() {
-        let mut strat = QuorumMergeStrategy::new();
+        let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let token1 = strat.replay_added(stream1.clone());
         stream1.borrow_mut().finish();
@@ -755,7 +759,7 @@ mod tests {
 
     #[test]
     fn test_strategy_picks_at_least_one_header() {
-        let mut strat = QuorumMergeStrategy::new();
+        let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
         stream2.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
@@ -777,7 +781,7 @@ mod tests {
 
     #[test]
     fn test_strategy_gets_all_data_of_one() {
-        let mut strat = QuorumMergeStrategy::new();
+        let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         stream1.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
 
@@ -811,7 +815,7 @@ mod tests {
 
     #[test]
     fn test_strategy_gets_common_prefix_of_all() {
-        let mut strat = QuorumMergeStrategy::new();
+        let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
 
@@ -865,7 +869,7 @@ mod tests {
 
     #[test]
     fn test_strategy_later_has_more_data() {
-        let mut strat = QuorumMergeStrategy::new();
+        let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
 

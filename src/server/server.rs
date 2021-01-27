@@ -15,24 +15,27 @@ pub struct Server
     shutdown_token: CancellationToken,
 }
 
-pub fn worker_thread_fn(streams: Receiver<Connection>, shutdown_token: CancellationToken)
+pub fn worker_thread_fn(streams: Receiver<Connection>, shutdown_token: CancellationToken, config: Settings)
 {
     let local_loop = tokio::runtime::Builder::new_current_thread().build().unwrap();
-    local_loop.block_on(worker_thread_work(streams, shutdown_token));
+    local_loop.block_on(worker_thread_work(streams, shutdown_token, config));
 }
 
-async fn worker_thread_work(streams: Receiver<Connection>, shutdown_token: CancellationToken)
+async fn worker_thread_work(streams: Receiver<Connection>, shutdown_token: CancellationToken, config: Settings)
 {
-    let mut replays = Replays::build(shutdown_token);
+    let mut replays = Replays::build(shutdown_token, config);
     let wrapper = ReceiverStream::new(streams);
     replays.handle_connections_and_replays(wrapper).await;
 }
 
 impl Server {
-    pub fn new(config: &Settings,
+    pub fn new(config: Settings,
                producer: ConnectionProducer,
                shutdown_token: CancellationToken) -> Self {
-        let thread_pool = ReplayThreadPool::new(worker_thread_fn, config.server.worker_threads, shutdown_token.clone());
+        let c = config.clone();
+        let t = shutdown_token.clone();
+        let work = Box::new(move |s| { worker_thread_fn(s, t.clone(), c.clone()) });
+        let thread_pool = ReplayThreadPool::new( move|| work.clone(), config.server.worker_threads);
         let acceptor = ConnectionAcceptor::build(thread_pool);
         Self { acceptor, producer, shutdown_token }
     }
@@ -44,7 +47,7 @@ impl Server {
             acceptor.accept(c).await;
         });
         select! {
-            _ = work => { unreachable!() }
+            _ = work => { debug!("Server stopped accepting connections for some reason!") }
             _ = self.shutdown_token.cancelled() => { debug!("Server shutting down") }
         }
     }

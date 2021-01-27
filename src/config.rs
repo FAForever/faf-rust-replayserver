@@ -5,14 +5,14 @@ use serde::Deserialize;
 
 // TODO - validate values.
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerSettings {
     pub port: u16,
     pub worker_threads: u32,
     pub connection_accept_timeout_s: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub host: String,
     pub port: u16,
@@ -21,14 +21,14 @@ pub struct DatabaseSettings {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct StorageSettings {
     pub vault_path: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ReplaySettings {
-    pub forced_timeout_in_seconds: u64,
+    pub forced_timeout_s: u64,
     pub time_with_zero_writers_to_end_replay_s: u64,
     pub delay_s: u64,
     pub update_interval_ms: u64,
@@ -36,7 +36,7 @@ pub struct ReplaySettings {
     pub stream_comparison_distance_b: usize,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     pub server: ServerSettings,
     pub database: DatabaseSettings,
@@ -63,7 +63,7 @@ impl Settings {
                 vault_path: "/tmp/foo".into(),
             },
             replay: ReplaySettings {
-                forced_timeout_in_seconds: 3600 * 6,
+                forced_timeout_s: 3600 * 6,
                 time_with_zero_writers_to_end_replay_s: 10,
                 delay_s: 60 * 5,
                 update_interval_ms: 1000,

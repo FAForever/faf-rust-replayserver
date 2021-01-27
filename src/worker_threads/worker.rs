@@ -1,11 +1,10 @@
 use std::thread;
 use std::thread::JoinHandle;
 use tokio::sync::mpsc::{Sender, channel, Receiver};
-use tokio_util::sync::CancellationToken;
 
 use crate::server::connection::Connection;
 
-pub type ThreadFn = fn(Receiver<Connection>, CancellationToken) -> ();
+pub type ThreadFn = Box<dyn Fn(Receiver<Connection>) -> () + Send>;
 
 pub struct ReplayWorkerThread
 {
@@ -14,11 +13,9 @@ pub struct ReplayWorkerThread
 }
 
 impl ReplayWorkerThread {
-    pub fn new(work: ThreadFn, shutdown_token: CancellationToken) -> Self {
+    pub fn new(work: ThreadFn) -> Self {
         let (s, r) = channel(1);
-        let handle = thread::spawn(move || {
-            work(r, shutdown_token)
-        });
+        let handle = thread::spawn(move || { work(r) });
         ReplayWorkerThread {
             handle: Some(handle),
             channel: s,
@@ -33,7 +30,9 @@ impl ReplayWorkerThread {
 }
 
 impl Drop for ReplayWorkerThread {
+    // This waits until the worker thread joins.
+    // FIXME is it a good idea to do this in Drop? We don't want to panic here.
     fn drop(&mut self) {
-        self.handle.take().unwrap().join().unwrap();    /* TODO log */
+        self.handle.take().unwrap().join().unwrap();
     }
 }

@@ -3,7 +3,7 @@ use std::{time::Duration, cell::Cell};
 use tokio::{select, join};
 use tokio_util::sync::CancellationToken;
 
-use crate::{server::connection::Connection, accept::header::ConnectionType, util::empty_counter::EmptyCounter};
+use crate::{server::connection::Connection, accept::header::ConnectionType, util::empty_counter::EmptyCounter, config::Settings};
 
 use super::{receive::ReplayMerger, send::ReplaySender, save::ReplaySaver};
 
@@ -15,30 +15,34 @@ pub struct Replay {
     replay_timeout_token: CancellationToken,
     writer_connection_count: EmptyCounter,
     reader_connection_count: EmptyCounter,
+    time_with_zero_writers_to_end_replay: Duration,
+    forced_timeout: Duration,
     should_stop_accepting_connections: Cell<bool>,
 }
 
 impl Replay {
-    pub fn new(id: u64, shutdown_token: CancellationToken) -> Self {
+    pub fn new(id: u64, shutdown_token: CancellationToken, config: &Settings) -> Self {
         let writer_connection_count = EmptyCounter::new();
         let reader_connection_count = EmptyCounter::new();
         let should_stop_accepting_connections = Cell::new(false);
+        let time_with_zero_writers_to_end_replay = Duration::from_secs(config.replay.time_with_zero_writers_to_end_replay_s);
+        let forced_timeout = Duration::from_secs(config.replay.forced_timeout_s);
         let replay_timeout_token = shutdown_token.child_token();
 
-        let merger = ReplayMerger::new(replay_timeout_token.clone());
+        let merger = ReplayMerger::new(replay_timeout_token.clone(), config);
         let merged_replay = merger.get_merged_replay();
         let sender = ReplaySender::new(merged_replay, replay_timeout_token.clone());
         let saver = ReplaySaver::new();
 
         Self { id, merger, sender, saver, replay_timeout_token,
                writer_connection_count, reader_connection_count,
+               time_with_zero_writers_to_end_replay, forced_timeout,
                should_stop_accepting_connections }
     }
 
     async fn timeout(&self) {
         let cancellation = async {
-            // FIXME configure
-            tokio::time::sleep(Duration::from_secs(6 * 3600)).await;
+            tokio::time::sleep(self.forced_timeout).await;
             self.replay_timeout_token.cancel();
         };
 
@@ -50,8 +54,7 @@ impl Replay {
     }
 
     async fn wait_until_there_were_no_writers_for_a_while(&self) {
-        // FIXME make configurable
-        self.writer_connection_count.wait_until_empty_for(Duration::from_secs(30)).await;
+        self.writer_connection_count.wait_until_empty_for(self.time_with_zero_writers_to_end_replay).await;
     }
 
     async fn regular_lifetime(&self) {
@@ -89,6 +92,5 @@ impl Replay {
                 self.reader_connection_count.dec();
             }
         }
-        // TODO
     }
 }

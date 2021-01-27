@@ -1,5 +1,3 @@
-use tokio_util::sync::CancellationToken;
-
 use crate::server::connection::Connection;
 use super::worker::{ReplayWorkerThread, ThreadFn};
 
@@ -9,10 +7,11 @@ pub struct ReplayThreadPool
 }
 
 impl ReplayThreadPool {
-    pub fn new(work: ThreadFn, count: u32, shutdown_token: CancellationToken) -> Self {
+    // Funky type so that we can clone work closures for each thread.
+    pub fn new(work: impl Fn() -> ThreadFn, count: u32) -> Self {
         let mut replay_workers = Vec::new();
         for _ in 0..count {
-            let worker = ReplayWorkerThread::new(work, shutdown_token.clone());
+            let worker = ReplayWorkerThread::new(work());
             replay_workers.push(worker);
         }
         Self { replay_workers }

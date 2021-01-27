@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use tokio::join;
 use tokio_util::sync::CancellationToken;
 
-use crate::{server::connection::Connection, replay::streams::read_from_connection, replay::streams::WriterReplay, replay::streams::MReplayRef};
+use crate::{server::connection::Connection, replay::streams::read_from_connection, replay::streams::WriterReplay, replay::streams::MReplayRef, config::Settings};
 
 use super::{replay_delay::StreamDelay, merge_strategy::MergeStrategy, quorum_merge_strategy::QuorumMergeStrategy};
 
@@ -15,10 +15,10 @@ pub struct ReplayMerger {
 }
 
 impl ReplayMerger {
-    pub fn new(shutdown_token: CancellationToken) -> Self {
-        // FIXME configure / inject
-        let stream_delay = StreamDelay::new(300, 1000);
-        let merge_strategy = RefCell::new(QuorumMergeStrategy::new());
+    pub fn new(shutdown_token: CancellationToken, config: &Settings) -> Self {
+        let stream_delay = StreamDelay::new(config.replay.delay_s, config.replay.update_interval_ms);
+        let merge_strategy = RefCell::new(QuorumMergeStrategy::new(
+                config.replay.merge_quorum_size, config.replay.stream_comparison_distance_b));
         Self {shutdown_token, merge_strategy, stream_delay }
     }
 

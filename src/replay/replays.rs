@@ -5,7 +5,7 @@ use tokio::join;
 use weak_table::WeakValueHashMap;
 use tokio_util::sync::CancellationToken;
 
-use crate::server::connection::Connection;
+use crate::{server::connection::Connection, config::Settings};
 use crate::accept::header::ConnectionType;
 
 use super::Replay;
@@ -26,8 +26,8 @@ impl Replays {
         Self { replays: WeakValueHashMap::new(), replay_builder}
     }
 
-    pub fn build(shutdown_token: CancellationToken) -> Self {
-        let replay_builder = move |rid| {Replay::new(rid, shutdown_token.clone())};
+    pub fn build(shutdown_token: CancellationToken, config: Settings) -> Self {
+        let replay_builder = move |rid| {Replay::new(rid, shutdown_token.clone(), &config)};
         Self::new(Box::new(replay_builder))
     }
 
