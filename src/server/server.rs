@@ -1,6 +1,6 @@
 use crate::{accept::ConnectionProducer, replay::Replays, worker_threads::ReplayThreadPool};
 use crate::accept::ConnectionAcceptor;
-use crate::config::Config;
+use crate::config::Settings;
 use super::connection::Connection;
 use log::debug;
 use tokio::{select, sync::mpsc::Receiver};
@@ -29,10 +29,10 @@ async fn worker_thread_work(streams: Receiver<Connection>, shutdown_token: Cance
 }
 
 impl Server {
-    pub fn new(config: &Config,
+    pub fn new(config: &Settings,
                producer: ConnectionProducer,
                shutdown_token: CancellationToken) -> Self {
-        let thread_pool = ReplayThreadPool::new(worker_thread_fn, config.worker_threads, shutdown_token.clone());
+        let thread_pool = ReplayThreadPool::new(worker_thread_fn, config.server.worker_threads, shutdown_token.clone());
         let acceptor = ConnectionAcceptor::build(thread_pool);
         Self { acceptor, producer, shutdown_token }
     }

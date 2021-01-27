@@ -7,37 +7,21 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
-[dependencies.futures]
-version = "0.3.8"
-
-[dependencies.signal-hook]
-version = "0.3.0"
-
-[dependencies.log]
-version = "0.4.11"
-
-[dependencies.env_logger]
-version = "0.8.2"
-
-[dependencies.thiserror]
-version = "1.0.22"
-
-[dependencies.async-stream]
-version = "0.3.0"
+futures = "0.3.8"
+signal-hook = "0.3.0"
+log = "0.4.11"
+env_logger = "0.8.2"
+thiserror = "1.0.22"
+async-stream = "0.3.0"
+tokio-util = "0.6.0"
+tokio-stream = "0.1.2"
+weak-table = "0.3.0"
+serde = { version = "1.0.123", features = ["derive"] }
+config = { version = "0.10.1", features = ["yaml"] }
 
 [dependencies.tokio]
 version = "1.0.1"
 features = ["sync", "net", "io-util", "rt", "macros", "test-util", "time"]
-
-[dependencies.tokio-util]
-version = "0.6.0"
-
-[dependencies.tokio-stream]
-version = "0.1.2"
-
-[dependencies.weak-table]
-version = "0.3.0"
 
 [dev-dependencies]
 faux = "0.0.7"
