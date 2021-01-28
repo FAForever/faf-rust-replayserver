@@ -36,7 +36,7 @@ impl Server {
         let t = shutdown_token.clone();
         let work = Box::new(move |s| { worker_thread_fn(s, t.clone(), c.clone()) });
         let thread_pool = ReplayThreadPool::new( move|| work.clone(), config.server.worker_threads);
-        let acceptor = ConnectionAcceptor::build(thread_pool);
+        let acceptor = ConnectionAcceptor::build(thread_pool, &config);
         Self { acceptor, producer, shutdown_token }
     }
 

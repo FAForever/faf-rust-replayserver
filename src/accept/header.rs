@@ -50,7 +50,6 @@ impl std::fmt::Display for MaybeConnectionHeader {
 pub struct ConnectionHeaderReader {
 }
 
-/* TODO implement read timeout */
 impl ConnectionHeaderReader {
     pub fn new() -> Self { Self { } }
 
@@ -109,9 +108,8 @@ impl ConnectionHeaderReader {
 
 #[cfg(test)]
 mod test {
-        use tokio::io::BufReader;
-
-use crate::{server::connection::Connection, error::ConnectionError};
+    use tokio::io::BufReader;
+    use crate::{server::connection::Connection, error::ConnectionError};
     use super::{ConnectionHeaderReader, ConnectionType};
     use std::{sync::Once, io::Cursor};
 
