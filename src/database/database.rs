@@ -5,15 +5,15 @@ use log::error;
 use crate::{config::Settings, error::SaveError};
 use sqlx::types::time::OffsetDateTime;
 
-// Unlike python server, we don't split DB into arbitrary query & our data requsts. Setting up a DB
-// in order to run tests is a huge pain. We'll do it only for this struct's unit tests.
+// Unlike python server, we don't do arbitrary queries. We run specific queries and nothing more.
+// This means we only need a real DB for this thing's unit tests, not for system tests.
 pub struct Database {
    pool: sqlx::MySqlPool,
 }
 
 
 #[derive(sqlx::FromRow)]
-pub struct TeamPlayerRow { pub login: String, pub team: u16 }
+pub struct TeamPlayerRow { pub login: String, pub team: u64 }
 
 #[derive(sqlx::FromRow)]
 pub struct GameStatRow {
@@ -27,10 +27,16 @@ pub struct GameStatRow {
 }
 
 #[derive(sqlx::FromRow)]
-pub struct PlayerCount {pub count: u32}
+pub struct PlayerCount {pub count: u64}
+
+#[derive(sqlx::FromRow)]
+pub struct ModVersions {
+    pub file_id: u64,
+    pub version: u64,
+}
 
 impl Database {
-    pub fn new(self, config: &Settings) -> Option<Self> {
+    pub fn new(config: &Settings) -> Option<Self> {
         let dbc = &config.database;
         let addr = format!("mysql://{user}:{pass}!{host}:{port}/{db}",
                            user=dbc.user,
@@ -68,7 +74,7 @@ impl Database {
               ON `game_player_stats`.`gameId` = `game_stats`.`id`
             INNER JOIN `login`
               ON `login`.id = `game_player_stats`.`playerId`
-            WHERE `game_stats`.`id` = $1 AND `game_player_stats`.`AI` = 0
+            WHERE `game_stats`.`id` = ? AND `game_player_stats`.`AI` = 0
         ";
         Ok(sqlx::query_as::<_, TeamPlayerRow>(query).bind(id).fetch_all(&self.pool).await?)
     }
@@ -91,12 +97,12 @@ impl Database {
               ON `login`.id = `game_stats`.`host`
             LEFT JOIN  `game_featuredMods`
               ON `game_stats`.`gameMod` = `game_featuredMods`.`id`
-            WHERE `game_stats`.`id` = $1
+            WHERE `game_stats`.`id` = ?
         ";
         Ok(sqlx::query_as::<_, GameStatRow>(query).bind(id).fetch_one(&self.pool).await?)
     }
 
-    pub async fn get_player_count(&self, id: u64) -> Result<u32, SaveError> {
+    pub async fn get_player_count(&self, id: u64) -> Result<u64, SaveError> {
        let query = "
            SELECT COUNT(*) AS count FROM `game_player_stats`
            WHERE `game_player_stats`.`gameId` = %s
@@ -104,9 +110,43 @@ impl Database {
         Ok(sqlx::query_as::<_, PlayerCount>(query).bind(id).fetch_one(&self.pool).await?.count)
     }
 
-    pub async fn get_mod_versions(&self, game_mod: &str) {
+    pub async fn get_mod_version_list(&self, game_mod: &str) -> Result<Vec<ModVersions>, SaveError> {
+        // We have to build table name dynamically, that's just how the DB is.
+        // Since we know what existing tables look like, we do very restrictive validation.
+        for c in game_mod.chars() {
+            if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || "_-".contains(c)) {
+                log::info!("Game mod '{}' has unexpected characters (outside 'a-zA-Z0-9_-'", game_mod);
+                return Ok(Vec::new());
+            }
+        }
+        // Uses base game. Ugly check. Happens often enough for us just to skip it altogether.
+        if game_mod == "ladder1v1" {
+            return Ok(Vec::new());
+        }
+        let query = format!("
+            SELECT
+                `updates_{game_mod}_files`.`fileId` AS file_id,
+                MAX(`updates_{game_mod}_files`.`version`) AS version
+            FROM `updates_{game_mod}`
+            INNER JOIN `updates_{game_mod}_files` ON `fileId` = `updates_{game_mod}`.`id`
+            GROUP BY `updates_{game_mod}_files`.`fileId`
+        ", game_mod=game_mod);
+        match sqlx::query_as::<_, ModVersions>(query.as_str()).fetch_all(&self.pool).await {
+            Err(e) => {
+                log::warn!("Failed to query version of mod '{}': '{}'", game_mod, e);
+                Ok(Vec::new())
+            }
+            Ok(v) => Ok(v)
+        }
     }
 
-    pub async fn update_game_stats(&self, id: u64, replay_ticks: u64) {
+    pub async fn update_game_stats(&self, id: u64, replay_ticks: u64) -> Result<(), SaveError>{
+        let query = "
+            UPDATE `game_stats` SET
+                `game_stats`.`replay_ticks` = ?
+            WHERE `game_stats`.`id` = ?
+        ";
+        sqlx::query(query).bind(replay_ticks).bind(id).execute(&self.pool).await?;
+        Ok(())
     }
 }
