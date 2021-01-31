@@ -20,9 +20,9 @@ pub struct GameStatRow {
     pub start_time: OffsetDateTime,
     pub end_time: Option<OffsetDateTime>,
     pub game_type: String,
-    pub host: Option<String>,
+    pub host: String,
     pub game_name: String,
-    pub game_mod: Option<String>,
+    pub game_mod: String,
     pub file_name: Option<String>,
 }
 
@@ -35,6 +35,8 @@ pub struct ModVersions {
     pub version: u64,
 }
 
+// TODO - SQL queries should probably be moved to some central FAF component.
+// For what it's worth, I checked that inner / left joins correspond to foreign / nullable keys.
 impl Database {
     pub fn new(config: &Settings) -> Option<Self> {
         let dbc = &config.database;
@@ -91,12 +93,12 @@ impl Database {
                 `game_featuredMods`.`gamemod` AS game_mod,
                 `table_map`.`filename` AS file_name
             FROM `game_stats`
+            INNER JOIN `login`
+              ON `login`.id = `game_stats`.`host`
+            INNER JOIN  `game_featuredMods`
+              ON `game_stats`.`gameMod` = `game_featuredMods`.`id`
             LEFT JOIN `table_map`
               ON `game_stats`.`mapId` = `table_map`.`id`
-            LEFT JOIN `login`
-              ON `login`.id = `game_stats`.`host`
-            LEFT JOIN  `game_featuredMods`
-              ON `game_stats`.`gameMod` = `game_featuredMods`.`id`
             WHERE `game_stats`.`id` = ?
         ";
         Ok(sqlx::query_as::<_, GameStatRow>(query).bind(id).fetch_one(&self.pool).await?)
@@ -105,7 +107,7 @@ impl Database {
     pub async fn get_player_count(&self, id: u64) -> Result<u64, SaveError> {
        let query = "
            SELECT COUNT(*) AS count FROM `game_player_stats`
-           WHERE `game_player_stats`.`gameId` = %s
+           WHERE `game_player_stats`.`gameId` = ?
         ";
         Ok(sqlx::query_as::<_, PlayerCount>(query).bind(id).fetch_one(&self.pool).await?.count)
     }

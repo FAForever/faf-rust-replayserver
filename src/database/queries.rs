@@ -51,18 +51,19 @@ impl Queries {
         // Previous two servers extracted the stuff with path.splitext(path.basename(...)).
         // Rust unix path handling is ugly and it really won't ever be anything else than this
         // (see MapService in API), so we just trim manually.
+        if stats.file_name.is_none() {
+            log::warn!("Map name for replay {} is missing! Saving anyway.", id);
+        }
         let mapname = stats.file_name
             .and_then(|f| f.rsplitn(2, '.').last().map(String::from))
             .and_then(|f| f.rsplitn(2, '/').nth(0).map(String::from))
             .unwrap_or("None".into());
 
-        let host = stats.host.unwrap_or("Unknown".into());
-
         Ok(GameStats {
-            featured_mod: stats.game_mod.unwrap_or("None".into()),
+            featured_mod: stats.game_mod,
             game_type: stats.game_type,
-            recorder: host.clone(),
-            host,
+            recorder: stats.host.clone(),
+            host: stats.host,
             launched_at: stats.start_time.unix_timestamp() as f64,
             game_end: stats.end_time.unwrap_or(OffsetDateTime::now_utc()).unix_timestamp() as f64,
             title: stats.game_name,
