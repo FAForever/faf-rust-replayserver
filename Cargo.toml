@@ -18,6 +18,8 @@ tokio-stream = "0.1.2"
 weak-table = "0.3.0"
 serde = { version = "1.0.123", features = ["derive"] }
 config = { version = "0.10.1", features = ["yaml"] }
+sqlx = {version = "0.4.2", features = ["runtime-tokio-rustls", "mysql", "time"] }
+time = {version = "0.2.25", features = ["std"] }
 
 [dependencies.tokio]
 version = "1.0.1"
