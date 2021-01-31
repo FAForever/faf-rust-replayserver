@@ -150,3 +150,12 @@ impl Database {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn foo() {
+        todo!()
+    }
+}
