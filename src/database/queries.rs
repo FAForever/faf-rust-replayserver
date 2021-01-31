@@ -56,11 +56,13 @@ impl Queries {
             .and_then(|f| f.rsplitn(2, '/').nth(0).map(String::from))
             .unwrap_or("None".into());
 
+        let host = stats.host.unwrap_or("Unknown".into());
+
         Ok(GameStats {
-            featured_mod: stats.game_mod,
+            featured_mod: stats.game_mod.unwrap_or("None".into()),
             game_type: stats.game_type,
-            recorder: stats.host.clone(),
-            host: stats.host,
+            recorder: host.clone(),
+            host,
             launched_at: stats.start_time.unix_timestamp() as f64,
             game_end: stats.end_time.unwrap_or(OffsetDateTime::now_utc()).unix_timestamp() as f64,
             title: stats.game_name,
@@ -81,10 +83,4 @@ impl Queries {
     pub async fn update_game_stats(&self, id: u64, replay_ticks: u64) -> Result<(), SaveError> {
         self.db.update_game_stats(id, replay_ticks).await
     }
-
 }
-
-
-
-
-

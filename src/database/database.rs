@@ -20,9 +20,9 @@ pub struct GameStatRow {
     pub start_time: OffsetDateTime,
     pub end_time: Option<OffsetDateTime>,
     pub game_type: String,
-    pub host: String,
+    pub host: Option<String>,
     pub game_name: String,
-    pub game_mod: String,
+    pub game_mod: Option<String>,
     pub file_name: Option<String>,
 }
 
