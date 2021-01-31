@@ -98,3 +98,9 @@ macro_rules! some_error {
         (|| -> std::result::Result<_, SomeError> {Ok($e) })()
     }
 }
+
+#[derive(Error, Debug)]
+pub enum SaveError {
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] sqlx::Error),
+}

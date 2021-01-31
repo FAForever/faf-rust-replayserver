@@ -7,6 +7,7 @@ pub mod server;
 pub mod worker_threads;
 pub mod accept;
 pub mod replay;
+pub mod database;
 
 #[macro_use] pub mod error;
 

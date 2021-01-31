@@ -14,6 +14,7 @@ pub struct ServerSettings {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseSettings {
+    pub pool_size: u32,
     pub host: String,
     pub port: u16,
     pub user: String,
@@ -53,6 +54,7 @@ impl Settings {
                 connection_accept_timeout_s: 7200,
             },
             database: DatabaseSettings {
+                pool_size: 8,
                 host: "localhost".into(),
                 port: 3306,
                 user: "root".into(),
