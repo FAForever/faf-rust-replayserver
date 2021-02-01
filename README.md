@@ -58,3 +58,22 @@ Fake time
 =========
 
 `tokio::time::pause()` does everything automagically.
+
+
+
+Things that will turn into a real README
+----------------------------------------
+
+Running database tests
+======================
+
+To run database query unit tests, do the following:
+* Setup a local database from faf-stack. See [here](https://github.com/FAForever/db).
+* Clear the local database and load test data:
+  ```
+  ./test/clear_and_populate_db.sh <DB arguments to mysql>
+  ```
+* Run `cargo test` as follows:
+  ```
+  env DB_HOST=<db_host> DB_PORT=<db_port> cargo test --features local_db_tests
+  ```
