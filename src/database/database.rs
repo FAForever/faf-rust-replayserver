@@ -278,6 +278,85 @@ mod test {
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
     #[tokio::test]
+    async fn test_db_players_with_ai() {
+        // 1v1 game against AI.
+        let db = get_db();
+
+        // We count all players...
+        assert_eq!(db.get_player_count(1010).await.unwrap(), 2);
+
+        // But don't list AI players in teams.
+        let players = db.get_team_players(1010).await.unwrap();
+        let expected_players = vec![TeamPlayerRow {
+            login: "user1".into(),
+            team: 1,
+        }];
+        assert_eq!(players_to_map(players), players_to_map(expected_players));
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_game_on_old_map_version() {
+        let db = get_db();
+        let stats = db.get_game_stat_row(1030).await.unwrap();
+        assert_eq!(stats.file_name.unwrap(), "maps/scmp_003.zip".to_string());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_game_on_new_map_version() {
+        let db = get_db();
+        let stats = db.get_game_stat_row(1040).await.unwrap();
+        assert_eq!(
+            stats.file_name.unwrap(),
+            "maps/scmp_003.v0003.zip".to_string()
+        );
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_game_with_no_end_time() {
+        let db = get_db();
+        let stats = db.get_game_stat_row(1050).await.unwrap();
+        assert!(stats.end_time.is_none());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_game_with_max_nulls() {
+        let db = get_db();
+        let stats = db.get_game_stat_row(1060).await.unwrap();
+        assert!(stats.end_time.is_none());
+        assert!(stats.file_name.is_none());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_game_with_no_players() {
+        let db = get_db();
+        let stats = db.get_team_players(1070).await.unwrap();
+        assert!(stats.is_empty());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_game_with_ai_only() {
+        let db = get_db();
+        let stats = db.get_team_players(1080).await.unwrap();
+        assert!(stats.is_empty());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_nonexistent_game() {
+        let db = get_db();
+        db.get_game_stat_row(10000)
+            .await
+            .expect_err("Game should not exist");
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
     async fn test_db_typical_mod() {
         let db = get_db();
         let mod_data = db.get_mod_version_list("faf").await.unwrap();
@@ -296,5 +375,41 @@ mod test {
             },
         ];
         assert_eq!(mods_to_map(mod_data), mods_to_map(expected_mod_data));
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_ladder_mod_is_ignored() {
+        let db = get_db();
+        let mod_data = db.get_mod_version_list("ladder1v1").await.unwrap();
+        assert!(mod_data.is_empty());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_nonexistent_mod_is_empty() {
+        let db = get_db();
+        let mod_data = db.get_mod_version_list("blarlargwars").await.unwrap();
+        assert!(mod_data.is_empty());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_mod_selects_newest_file() {
+        let db = get_db();
+        let mod_data = db.get_mod_version_list("murderparty").await.unwrap();
+        let expected_mod_data = vec![ModVersions {
+            file_id: 44,
+            version: 1002,
+        }];
+        assert_eq!(mods_to_map(mod_data), mods_to_map(expected_mod_data));
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_mod_with_no_files() {
+        let db = get_db();
+        let mod_data = db.get_mod_version_list("labwars").await.unwrap();
+        assert!(mod_data.is_empty());
     }
 }
