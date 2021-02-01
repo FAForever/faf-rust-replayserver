@@ -36,7 +36,7 @@ pub struct PlayerCount {
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
 pub struct ModVersions {
     pub file_id: u64,
-    pub version: u64,
+    pub version: i32,
 }
 
 // TODO - SQL queries should probably be moved to some central FAF component.
@@ -216,6 +216,22 @@ use super::*;
         let _db = get_db();
     }
 
+    fn to_map<K: Eq + std::hash::Hash, V, F: Fn(&V) -> K>(v: Vec<V>, f: F) -> HashMap<K, V> {
+        let mut m = HashMap::new();
+        for p in v.into_iter() {
+            m.insert(f(&p), p);
+        }
+        m
+    }
+
+    fn players_to_map(p: Vec<TeamPlayerRow>) -> HashMap<String, TeamPlayerRow> {
+        to_map(p, |p| p.login.clone())
+    }
+
+    fn mods_to_map(m: Vec<ModVersions>) -> HashMap<u64, ModVersions> {
+        to_map(m, |m| m.file_id)
+    }
+
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
     #[tokio::test]
     async fn test_db_typical_game() {
@@ -242,13 +258,19 @@ use super::*;
             TeamPlayerRow { login: "user3".into(), team: 2 },
             TeamPlayerRow { login: "user4".into(), team: 2 },
         );
-        let to_map = |v: Vec<TeamPlayerRow>| {
-            let mut player_map = HashMap::new();
-            for p in v.into_iter() {
-                player_map.insert(p.login.clone(), p);
-            }
-            player_map
+        assert_eq!(players_to_map(players), players_to_map(expected_players));
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_typical_mod() {
+        let db = get_db();
+        let mod_data = db.get_mod_version_list("faf").await.unwrap();
+        let expected_mod_data = vec! {
+            ModVersions { file_id: 41, version: 3659 },
+            ModVersions { file_id: 42, version: 3659 },
+            ModVersions { file_id: 43, version: 3656 },
         };
-        assert_eq!(to_map(players), to_map(expected_players));
+        assert_eq!(mods_to_map(mod_data), mods_to_map(expected_mod_data));
     }
 }

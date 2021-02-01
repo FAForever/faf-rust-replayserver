@@ -17,7 +17,7 @@ pub struct GameStats {
     pub mapname: String,
     pub num_players: i64,
 }
-pub type ModVersions = HashMap<String, u64>;
+pub type ModVersions = HashMap<String, i32>;
 
 pub struct Queries {
     db: Database,
