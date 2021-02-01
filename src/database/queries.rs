@@ -27,8 +27,8 @@ impl Queries {
     fn new(db: Database) -> Self {
         Self { db }
     }
-    fn build(config: &DatabaseSettings) -> Option<Self> {
-        Database::new(config).map(|db| Self { db })
+    fn build(config: &DatabaseSettings) -> Self {
+        Self { db: Database::new(config) }
     }
 
     pub async fn get_teams_in_game(&self, id: u64) -> Result<GameTeams, SaveError> {

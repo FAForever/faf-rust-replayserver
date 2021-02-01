@@ -3,7 +3,7 @@ use std::time::Duration;
 use log::error;
 
 use crate::{config::DatabaseSettings, error::SaveError};
-use sqlx::types::time::OffsetDateTime;
+use sqlx::{types::time::OffsetDateTime, mysql::MySqlSslMode, mysql::MySqlConnectOptions};
 
 // Unlike python server, we don't do arbitrary queries. We run specific queries and nothing more.
 // This means we only need a real DB for this thing's unit tests, not for system tests.
@@ -11,13 +11,13 @@ pub struct Database {
     pool: sqlx::MySqlPool,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
 pub struct TeamPlayerRow {
     pub login: String,
     pub team: u64,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
 pub struct GameStatRow {
     pub start_time: OffsetDateTime,
     pub end_time: Option<OffsetDateTime>,
@@ -28,12 +28,12 @@ pub struct GameStatRow {
     pub file_name: Option<String>,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
 pub struct PlayerCount {
     pub count: u64,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
 pub struct ModVersions {
     pub file_id: u64,
     pub version: u64,
@@ -42,26 +42,20 @@ pub struct ModVersions {
 // TODO - SQL queries should probably be moved to some central FAF component.
 // For what it's worth, I checked that inner / left joins correspond to foreign / nullable keys.
 impl Database {
-    pub fn new(dbc: &DatabaseSettings) -> Option<Self> {
-        let addr = format!(
-            "mysql://{user}:{pass}@{host}:{port}/{db}",
-            user = dbc.user,
-            pass = dbc.password,
-            host = dbc.host,
-            port = dbc.port,
-            db = dbc.name
-        );
+    pub fn new(dbc: &DatabaseSettings) -> Self {
+        let options = MySqlConnectOptions::new()
+            .host(dbc.host.as_str())
+            .port(dbc.port)
+            .username(dbc.user.as_str())
+            .password(dbc.password.as_str())
+            .database(dbc.name.as_str())
+            .ssl_mode(MySqlSslMode::Disabled); // FIXME do we use SSL? Should this be configurable?
+
         let pool = sqlx::mysql::MySqlPoolOptions::new()
             .max_connections(dbc.pool_size)
             .max_lifetime(Some(Duration::from_secs(24 * 60 * 60)))
-            .connect_lazy(addr.as_str());
-        match pool {
-            Err(e) => {
-                error!("Failed to connect to database: {}", e);
-                None
-            }
-            Ok(pool) => Some(Self { pool }),
-        }
+            .connect_lazy_with(options);
+        Self { pool }
     }
 
     pub async fn close(&self) {
@@ -190,7 +184,14 @@ impl Database {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    // See db_unit_test_data.sql for data used here.
+        use time::{macros::{date, time}, Date, Time};
+
+use super::*;
+
+    fn dt(d: Date, t: Time) -> OffsetDateTime {
+        d.with_time(t).assume_utc()
+    }
 
     fn get_db() -> Database {
         let cfg = DatabaseSettings {
@@ -204,12 +205,29 @@ mod test {
             name: "faf".into(),
             pool_size: 4,
         };
-        Database::new(&cfg).unwrap()
+        Database::new(&cfg)
     }
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
     #[tokio::test]
     async fn test_db_init() {
         let _db = get_db();
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_typical_game() {
+        let db = get_db();
+        let stats = db.get_game_stat_row(1000).await.unwrap();
+        let expected_stats = GameStatRow {
+            start_time: dt(date!(2010-01-01), time!(00:00:00)),
+            end_time: Some(dt(date!(2010-01-01), time!(01:00:00))),
+            game_type: "0".into(),
+            host: "user1".into(),
+            game_name: "2v2 Game".into(),
+            game_mod: "faf".into(),
+            file_name: Some("maps/scmp_001.zip".into()),
+        };
+        assert_eq!(stats, expected_stats);
     }
 }
