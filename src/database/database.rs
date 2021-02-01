@@ -49,7 +49,7 @@ impl Database {
             .username(dbc.user.as_str())
             .password(dbc.password.as_str())
             .database(dbc.name.as_str())
-            .ssl_mode(MySqlSslMode::Disabled); // FIXME do we use SSL? Should this be configurable?
+            .ssl_mode(MySqlSslMode::Disabled);
 
         let pool = sqlx::mysql::MySqlPoolOptions::new()
             .max_connections(dbc.pool_size)
