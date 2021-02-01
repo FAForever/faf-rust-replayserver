@@ -1,5 +1,5 @@
-use std::io::Write;
 use super::buf_traits::{DiscontiguousBuf, DiscontiguousBufExt};
+use std::io::Write;
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -14,7 +14,7 @@ impl BufList {
     pub fn new() -> Self {
         Self {
             chunks: Vec::new(),
-            len: 0
+            len: 0,
         }
     }
 }

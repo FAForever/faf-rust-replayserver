@@ -1,8 +1,7 @@
-use crate::server::connection::Connection;
 use super::worker::{ReplayWorkerThread, ThreadFn};
+use crate::server::connection::Connection;
 
-pub struct ReplayThreadPool
-{
+pub struct ReplayThreadPool {
     replay_workers: Vec<ReplayWorkerThread>,
 }
 

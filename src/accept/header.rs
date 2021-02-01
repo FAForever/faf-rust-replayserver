@@ -4,12 +4,11 @@ use std::str::from_utf8;
 
 use tokio::io::AsyncReadExt;
 
-use crate::{server::connection::read_until_exact, some_error};
 use crate::error::ConnResult;
 use crate::error::ConnectionError;
-use crate::server::connection::Connection;
 use crate::error::SomeError;
-
+use crate::server::connection::Connection;
+use crate::{server::connection::read_until_exact, some_error};
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum ConnectionType {
@@ -31,7 +30,7 @@ pub struct MaybeConnectionHeader {
 
 impl From<Option<ConnectionHeader>> for MaybeConnectionHeader {
     fn from(v: Option<ConnectionHeader>) -> MaybeConnectionHeader {
-        MaybeConnectionHeader {v}
+        MaybeConnectionHeader { v }
     }
 }
 
@@ -39,35 +38,41 @@ impl std::fmt::Display for MaybeConnectionHeader {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match &self.v {
             None => f.write_str("Initial connection"),
-            Some(h) => write!(f, "{} '{}' for replay {}", match h.type_ {
-                ConnectionType::READER => "Reader",
-                ConnectionType::WRITER => "Writer",
-            }, h.name, h.id)
+            Some(h) => write!(
+                f,
+                "{} '{}' for replay {}",
+                match h.type_ {
+                    ConnectionType::READER => "Reader",
+                    ConnectionType::WRITER => "Writer",
+                },
+                h.name,
+                h.id
+            ),
         }
     }
 }
 
-pub struct ConnectionHeaderReader {
-}
+pub struct ConnectionHeaderReader {}
 
 impl ConnectionHeaderReader {
-    pub fn new() -> Self { Self { } }
+    pub fn new() -> Self {
+        Self {}
+    }
 
-    async fn read_type(conn: &mut Connection) -> ConnResult<ConnectionType>
-    {
+    async fn read_type(conn: &mut Connection) -> ConnResult<ConnectionType> {
         let mut buf: [u8; 2] = [0; 2];
         conn.read_exact(&mut buf).await?;
         match &buf {
             b"P/" => Ok(ConnectionType::WRITER),
             b"G/" => Ok(ConnectionType::READER),
-            _ => Err(format!("Invalid connection type: {:x?}", buf).into())
+            _ => Err(format!("Invalid connection type: {:x?}", buf).into()),
         }
     }
 
-    async fn read_game_data(conn: &mut Connection) -> ConnResult<(u64, String)>
-    {
+    async fn read_game_data(conn: &mut Connection) -> ConnResult<(u64, String)> {
         let mut line = Vec::<u8>::new();
-        read_until_exact(&mut conn.take(1024), b'\0', &mut line).await
+        read_until_exact(&mut conn.take(1024), b'\0', &mut line)
+            .await
             .map_err(|_| ConnectionError::bad_data("Connection header is incomplete"))?;
 
         let pieces: Vec<&[u8]> = line[..].splitn(2, |c| c == &b'/').collect();
@@ -84,38 +89,35 @@ impl ConnectionHeaderReader {
         Ok((id, name))
     }
 
-    async fn read_connection_header(conn: &mut Connection) -> ConnResult<ConnectionHeader>
-    {
-        let type_ = Self::read_type(conn).await.map_err(|e| {
-            match e {
-                ConnectionError::IO{source: e, ..} if e.kind() == ErrorKind::UnexpectedEof => ConnectionError::NoData(),
-                e => e,
+    async fn read_connection_header(conn: &mut Connection) -> ConnResult<ConnectionHeader> {
+        let type_ = Self::read_type(conn).await.map_err(|e| match e {
+            ConnectionError::IO { source: e, .. } if e.kind() == ErrorKind::UnexpectedEof => {
+                ConnectionError::NoData()
             }
+            e => e,
         })?;
         let (id, name) = Self::read_game_data(conn).await?;
-        Ok(ConnectionHeader {type_, id, name})
+        Ok(ConnectionHeader { type_, id, name })
     }
 
     /* Cancellable. */
-    pub async fn read_and_set_connection_header(&self, conn: &mut Connection) -> ConnResult<()>
-    {
+    pub async fn read_and_set_connection_header(&self, conn: &mut Connection) -> ConnResult<()> {
         let header = Self::read_connection_header(conn).await?;
         conn.set_header(header);
         Ok(())
     }
 }
 
-
 #[cfg(test)]
 mod test {
-    use tokio::io::BufReader;
-    use crate::{server::connection::Connection, error::ConnectionError};
     use super::{ConnectionHeaderReader, ConnectionType};
-    use std::{sync::Once, io::Cursor};
+    use crate::{error::ConnectionError, server::connection::Connection};
+    use std::{io::Cursor, sync::Once};
+    use tokio::io::BufReader;
 
     static INIT: Once = Once::new();
 
-    fn setup()  {
+    fn setup() {
         INIT.call_once(env_logger::init);
     }
 
@@ -142,7 +144,11 @@ mod test {
         setup();
         let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"U/1/foo\0");
-        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        let err = reader
+            .read_and_set_connection_header(&mut c)
+            .await
+            .err()
+            .unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
@@ -152,7 +158,11 @@ mod test {
             setup();
             let reader = ConnectionHeaderReader::new();
             let mut c = conn_from_read_data(short_data);
-            let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+            let err = reader
+                .read_and_set_connection_header(&mut c)
+                .await
+                .err()
+                .unwrap();
             assert!(matches!(err, ConnectionError::NoData()));
         }
     }
@@ -173,7 +183,11 @@ mod test {
         setup();
         let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/bar/foo\0");
-        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        let err = reader
+            .read_and_set_connection_header(&mut c)
+            .await
+            .err()
+            .unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
@@ -182,7 +196,11 @@ mod test {
         setup();
         let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/1/foo");
-        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        let err = reader
+            .read_and_set_connection_header(&mut c)
+            .await
+            .err()
+            .unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
@@ -191,7 +209,11 @@ mod test {
         setup();
         let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/1\0");
-        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        let err = reader
+            .read_and_set_connection_header(&mut c)
+            .await
+            .err()
+            .unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
@@ -212,7 +234,11 @@ mod test {
         let reader = ConnectionHeaderReader::new();
         // Lonely start character is invalid unicode
         let mut c = conn_from_read_data(b"G/1/foo \xc0 bar\0");
-        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        let err = reader
+            .read_and_set_connection_header(&mut c)
+            .await
+            .err()
+            .unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
@@ -227,7 +253,11 @@ mod test {
         }
         data.extend(b"\0");
         let mut c = conn_from_read_data(data.leak());
-        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        let err = reader
+            .read_and_set_connection_header(&mut c)
+            .await
+            .err()
+            .unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
@@ -236,7 +266,11 @@ mod test {
         setup();
         let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/-1/foo\0");
-        let err = reader.read_and_set_connection_header(&mut c).await.err().unwrap();
+        let err = reader
+            .read_and_set_connection_header(&mut c)
+            .await
+            .err()
+            .unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 }

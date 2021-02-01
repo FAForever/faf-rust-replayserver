@@ -1,10 +1,14 @@
-use std::{cell::RefCell, rc::Rc, io::Write};
+use std::{cell::RefCell, io::Write, rc::Rc};
 
 use futures::Future;
 use tokio::{io::AsyncReadExt, select};
 use tokio_util::sync::CancellationToken;
 
-use crate::{replay::position::StreamPosition, server::connection::Connection, replay::position::PositionTracker, error::ConnResult, util::buf_deque::BufDeque, util::buf_traits::DiscontiguousBuf, util::buf_traits::BufWithDiscard};
+use crate::{
+    error::ConnResult, replay::position::PositionTracker, replay::position::StreamPosition,
+    server::connection::Connection, util::buf_deque::BufDeque, util::buf_traits::BufWithDiscard,
+    util::buf_traits::DiscontiguousBuf,
+};
 
 use super::ReplayHeader;
 
@@ -41,7 +45,9 @@ impl WriterReplay {
             MaybeHeader::Some(h) => h.data.len(),
             _ => panic!("Cannot take header"),
         };
-        if let MaybeHeader::Some(h) = std::mem::replace(&mut self.header, MaybeHeader::Discarded(data_len)) {
+        if let MaybeHeader::Some(h) =
+            std::mem::replace(&mut self.header, MaybeHeader::Discarded(data_len))
+        {
             return h;
         } else {
             panic!("Cannot take header");
@@ -95,7 +101,11 @@ impl WriterReplay {
     }
 }
 
-pub async fn read_from_connection(me: Rc<RefCell<WriterReplay>>, c: &mut Connection, shutdown_token: CancellationToken) {
+pub async fn read_from_connection(
+    me: Rc<RefCell<WriterReplay>>,
+    c: &mut Connection,
+    shutdown_token: CancellationToken,
+) {
     select! {
         // Ignore connection errors. We only need the data.
         _ = do_read_from_connection(&me, c) => {}
@@ -104,7 +114,10 @@ pub async fn read_from_connection(me: Rc<RefCell<WriterReplay>>, c: &mut Connect
     me.borrow_mut().finish();
 }
 
-async fn do_read_from_connection(me: &Rc<RefCell<WriterReplay>>, mut c: &mut Connection) -> ConnResult<()> {
+async fn do_read_from_connection(
+    me: &Rc<RefCell<WriterReplay>>,
+    mut c: &mut Connection,
+) -> ConnResult<()> {
     // TODO dep injection?
     let header = ReplayHeader::from_connection(&mut c).await?;
     {
@@ -117,7 +130,7 @@ async fn do_read_from_connection(me: &Rc<RefCell<WriterReplay>>, mut c: &mut Con
     loop {
         let read = c.read(&mut *buf).await?;
         if read == 0 {
-            break
+            break;
         }
         {
             me.borrow_mut().add_data(&buf[0..read]);

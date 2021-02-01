@@ -1,6 +1,10 @@
-use std::{cell::RefCell, rc::Rc, collections::HashMap, collections::HashSet};
+use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
-use crate::{replay::position::StreamPosition, util::buf_traits::DiscontiguousBuf, util::buf_traits::DiscontiguousBufExt, replay::streams::WReplayRef, replay::streams::MReplayRef, replay::streams::MergedReplay};
+use crate::{
+    replay::position::StreamPosition, replay::streams::MReplayRef, replay::streams::MergedReplay,
+    replay::streams::WReplayRef, util::buf_traits::DiscontiguousBuf,
+    util::buf_traits::DiscontiguousBufExt,
+};
 
 use super::merge_strategy::MergeStrategy;
 
@@ -16,7 +20,6 @@ use super::merge_strategy::MergeStrategy;
 // * Parameters:
 //   * stream_cmp_distance, in bytes,
 //   * target_quorum_size, in count.
-
 
 // For a replay r in R, we define:
 // * r matches C (written r ~ C) iff C's data is a (non-strict) prefix of r's data.
@@ -42,9 +45,9 @@ use super::merge_strategy::MergeStrategy;
 // We keep the state of a replay r in R in the struct below:
 
 struct ReplayState {
-    replay: WReplayRef,             // Writer replay, updated from connection in another task.
-    canon_replay: MReplayRef,       // Canonical replay C.
-    stream_cmp_distance: usize,     // As defined above.
+    replay: WReplayRef, // Writer replay, updated from connection in another task.
+    canon_replay: MReplayRef, // Canonical replay C.
+    stream_cmp_distance: usize, // As defined above.
 
     // Fields used to lazily check relation of r towards C.
     data_matching_canon: usize,
@@ -82,7 +85,10 @@ impl ReplayState {
     }
 
     fn common_prefix_from(&self, other: &ReplayState, start: usize) -> usize {
-        self.replay.borrow().get_data().common_prefix_from(other.replay.borrow().get_data(), start)
+        self.replay
+            .borrow()
+            .get_data()
+            .common_prefix_from(other.replay.borrow().get_data(), start)
     }
 
     fn falls_behind_canon(&self) -> bool {
@@ -136,7 +142,8 @@ impl ReplayState {
             let my_data = my_replay.get_data();
             let canon_replay = self.canon_replay.borrow();
             let canon_data = canon_replay.get_data();
-            self.data_matching_canon = my_data.common_prefix_from(canon_data, self.canon_match_start());
+            self.data_matching_canon =
+                my_data.common_prefix_from(canon_data, self.canon_match_start());
         }
         if self.data_matching_canon < self.canon_len() {
             self.set_diverged();
@@ -178,7 +185,7 @@ struct SharedState {
     delayed_data_started: bool,
     target_quorum_size: usize,
     replays: HashMap<u64, ReplayState>,
-    canonical_stream: MReplayRef,     // FIXME
+    canonical_stream: MReplayRef, // FIXME
 }
 
 impl SharedState {
@@ -233,10 +240,11 @@ impl SharedState {
         if hint <= self.merged_delayed_position() {
             return;
         }
-        self.canonical_stream.borrow_mut().advance_delayed_data(hint);
+        self.canonical_stream
+            .borrow_mut()
+            .advance_delayed_data(hint);
     }
 }
-
 
 // The strategy switches between two states - a quorum and a stalemate.
 // During a quorum, it chooses a subset of replays and merges data from them into C every once in a
@@ -305,19 +313,19 @@ impl MergeStalemateState {
             let replay = self.s.get_replay(id).replay.borrow();
             if replay.get_data().len() <= self.s.merged_data_len() {
                 if replay.is_finished() {
-                    self.reserve.remove(&id);                                       // Replay finished short.
+                    self.reserve.remove(&id); // Replay finished short.
                 }
-                return;                                                             // Replay is short, still in reserve.
+                return; // Replay is short, still in reserve.
             }
         }
         {
             self.reserve.remove(&id);
             if self.s.get_mut_replay(id).diverges_from_canon() {
-                return;                                                             // Replay diverged in the meantime.
+                return; // Replay diverged in the meantime.
             }
         }
         {
-            let replay = self.s.get_replay(id).replay.borrow();                     // Replay matches and can become a candidate.
+            let replay = self.s.get_replay(id).replay.borrow(); // Replay matches and can become a candidate.
             let next_byte = replay.get_data().at(self.s.merged_data_len());
             if self.candidates.get(&next_byte).is_none() {
                 self.candidates.insert(next_byte, Vec::new());
@@ -369,10 +377,14 @@ impl MergeStalemateState {
         debug_assert!(!self.candidates.is_empty());
 
         // Sort by stream count, then by longest stream.
-        let replay_len  = |&id| self.s.get_replay(id).data_len();
-        let best_byte = *self.candidates.iter().map(|(k, v)| {
-            (v.len(), v.iter().map(replay_len).max().unwrap(), k)
-        }).max().unwrap().2;
+        let replay_len = |&id| self.s.get_replay(id).data_len();
+        let best_byte = *self
+            .candidates
+            .iter()
+            .map(|(k, v)| (v.len(), v.iter().map(replay_len).max().unwrap(), k))
+            .max()
+            .unwrap()
+            .2;
 
         let good_replays = self.candidates.remove(&best_byte).unwrap();
 
@@ -420,7 +432,7 @@ pub struct MergeQuorumState {
 //   set Res. Q is populated with replays from G. Remaining replays in G are added into Res.
 // * A quorum can perform a "merging step" that adds data to C. In a merging step, replays in Q are
 //   compared from the end of C and their common prefix is appended to C.
-// 
+//
 // * Whenever C's delayed position reaches its data length, a merging step is performed.
 // * If, between calls, C's delayed position equals its data length, quorum should transition to a
 //   stalemate.
@@ -430,7 +442,11 @@ pub struct MergeQuorumState {
 //   * Stalemate is constructed with Res.
 
 impl MergeQuorumState {
-    fn from_stalemate(shared: SharedState, mut good_replays: Vec<u64>, mut reserve: HashSet<u64>) -> Self {
+    fn from_stalemate(
+        shared: SharedState,
+        mut good_replays: Vec<u64>,
+        mut reserve: HashSet<u64>,
+    ) -> Self {
         debug_assert!(!good_replays.is_empty());
 
         // Take longest replays
@@ -469,7 +485,11 @@ impl MergeQuorumState {
     // if a replay stalls, so at the very least we'll switch to a stalemate in a reasonable amount
     // of time.
     fn quorum_delayed_position(&self) -> usize {
-        self.quorum.iter().map(|id| self.s.get_replay(*id).delayed_data_len()).min().unwrap_or(0)
+        self.quorum
+            .iter()
+            .map(|id| self.s.get_replay(*id).delayed_data_len())
+            .min()
+            .unwrap_or(0)
     }
 
     fn replay_data_updated(&mut self, id: u64) {
@@ -491,10 +511,15 @@ impl MergeQuorumState {
 
     fn can_merge_more_data(&self) -> bool {
         if let Some(..) = self.quorum_diverges_at {
-            return false
+            return false;
         }
         // Do all quorum streams have some more data?
-        self.quorum.iter().map(|id| self.s.get_replay(*id).data_len()).min().unwrap() > self.s.merged_data_len()
+        self.quorum
+            .iter()
+            .map(|id| self.s.get_replay(*id).data_len())
+            .min()
+            .unwrap()
+            > self.s.merged_data_len()
     }
 
     /* CAVEAT - only correct in-between calls! Never call from inside! */
@@ -504,10 +529,14 @@ impl MergeQuorumState {
 
     fn enter_stalemate(self) -> MergeStalemateState {
         let mut s = self.s;
-        let mut reserve: HashSet<u64> = self.reserve.into_iter().filter(|id| {
-            let r = s.get_mut_replay(*id);
-            !r.diverges_from_canon()
-        }).collect();
+        let mut reserve: HashSet<u64> = self
+            .reserve
+            .into_iter()
+            .filter(|id| {
+                let r = s.get_mut_replay(*id);
+                !r.diverges_from_canon()
+            })
+            .collect();
         reserve.extend(self.quorum.iter());
         MergeStalemateState::from_quorum(s, reserve)
     }
@@ -518,7 +547,11 @@ impl MergeQuorumState {
     fn calculate_quorum_prefix(&mut self) -> usize {
         debug_assert!(!self.quorum.is_empty());
 
-        let shortest_id = *self.quorum.iter().min_by_key(|id| self.s.get_replay(**id).data_len()).unwrap();
+        let shortest_id = *self
+            .quorum
+            .iter()
+            .min_by_key(|id| self.s.get_replay(**id).data_len())
+            .unwrap();
         let shortest = self.s.get_replay(shortest_id);
 
         let cmp_start = self.s.merged_data_len();
@@ -551,7 +584,8 @@ impl MergeQuorumState {
     }
 
     fn update_delayed_position(&mut self) {
-        self.s.update_merged_delayed_position(self.quorum_delayed_position());
+        self.s
+            .update_merged_delayed_position(self.quorum_delayed_position());
     }
 }
 
@@ -560,22 +594,25 @@ impl MergeQuorumState {
 pub enum QuorumMergeStrategy {
     Quorum(MergeQuorumState),
     Stalemate(MergeStalemateState),
-    Swapping,   // Dummy value so we can swap between quorum and stalemate. Never used otherwise.
+    Swapping, // Dummy value so we can swap between quorum and stalemate. Never used otherwise.
 }
 
 macro_rules! both {
-    ($value:expr, $pattern:pat => $result:expr) => (
+    ($value:expr, $pattern:pat => $result:expr) => {
         match $value {
             Self::Quorum($pattern) => $result,
             Self::Stalemate($pattern) => $result,
             Self::Swapping => panic!("Programmer error - we're swapping state right now!"),
         }
-    )
+    };
 }
 
 impl QuorumMergeStrategy {
     pub fn new(target_quorum_size: usize, stream_cmp_distance: usize) -> Self {
-        Self::Stalemate(MergeStalemateState::new(target_quorum_size, stream_cmp_distance))
+        Self::Stalemate(MergeStalemateState::new(
+            target_quorum_size,
+            stream_cmp_distance,
+        ))
     }
 
     fn should_change_state(&self) -> bool {
@@ -656,7 +693,7 @@ impl MergeStrategy for QuorumMergeStrategy {
                 //   finished empty, so nothing was ever added to Cand.
                 // Therefore Cand is empty.
                 debug_assert!(s.candidates.is_empty());
-            },
+            }
         }
         self.get_merged_replay().borrow_mut().finish();
     }
@@ -729,14 +766,16 @@ impl MergeStrategy for QuorumMergeStrategy {
 // quorums. Don't implement this unless you verify that the issue exists and that this fixes it.
 //
 
-
 // TODO - parametrize with stream cutoff and quorum once we make them configurable.
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc, io::Read};
-    use crate::{replay::receive::merge_strategy::MergeStrategy, util::buf_traits::DiscontiguousBuf, replay::streams::WriterReplay, replay::streams::ReplayHeader};
     use super::QuorumMergeStrategy;
     use crate::util::buf_traits::ReadAtExt;
+    use crate::{
+        replay::receive::merge_strategy::MergeStrategy, replay::streams::ReplayHeader,
+        replay::streams::WriterReplay, util::buf_traits::DiscontiguousBuf,
+    };
+    use std::{cell::RefCell, io::Read, rc::Rc};
 
     fn strat() -> QuorumMergeStrategy {
         QuorumMergeStrategy::new(2, 4096)
@@ -762,7 +801,9 @@ mod tests {
         let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
-        stream2.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
+        stream2.borrow_mut().add_header(ReplayHeader {
+            data: vec![1, 3, 3, 7],
+        });
 
         let token1 = strat.replay_added(stream1.clone());
         let token2 = strat.replay_added(stream2.clone());
@@ -783,7 +824,9 @@ mod tests {
     fn test_strategy_gets_all_data_of_one() {
         let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
-        stream1.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
+        stream1.borrow_mut().add_header(ReplayHeader {
+            data: vec![1, 3, 3, 7],
+        });
 
         let token1 = strat.replay_added(stream1.clone());
         strat.replay_header_added(token1);
@@ -819,8 +862,12 @@ mod tests {
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
 
-        stream1.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
-        stream2.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
+        stream1.borrow_mut().add_header(ReplayHeader {
+            data: vec![1, 3, 3, 7],
+        });
+        stream2.borrow_mut().add_header(ReplayHeader {
+            data: vec![1, 3, 3, 7],
+        });
         let token1 = strat.replay_added(stream1.clone());
         let token2 = strat.replay_added(stream2.clone());
         strat.replay_header_added(token1);
@@ -873,8 +920,12 @@ mod tests {
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
 
-        stream1.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
-        stream2.borrow_mut().add_header(ReplayHeader { data:vec!(1, 3, 3, 7) });
+        stream1.borrow_mut().add_header(ReplayHeader {
+            data: vec![1, 3, 3, 7],
+        });
+        stream2.borrow_mut().add_header(ReplayHeader {
+            data: vec![1, 3, 3, 7],
+        });
         let token1 = strat.replay_added(stream1.clone());
         let token2 = strat.replay_added(stream2.clone());
         strat.replay_header_added(token1);

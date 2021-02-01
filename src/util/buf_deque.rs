@@ -1,5 +1,5 @@
-use std::{collections::VecDeque, cmp::min};
 use std::io::Write;
+use std::{cmp::min, collections::VecDeque};
 
 use super::buf_traits::{BufWithDiscard, DiscontiguousBuf, DiscontiguousBufExt};
 
@@ -80,12 +80,11 @@ impl Write for BufDeque {
     }
 }
 
-
 impl BufWithDiscard for BufDeque {
     /* TODO - shrink_to_fit on vecdeque? It'll never be large anyway */
     fn discard(&mut self, until: usize) {
         if until <= self.discard_start {
-            return
+            return;
         }
 
         let until_chunk_idx = until / CHUNK_SIZE;
@@ -101,12 +100,12 @@ impl BufWithDiscard for BufDeque {
 
 #[cfg(test)]
 mod test {
-    use std::io::Write;
-    use crate::util::buf_traits::{DiscontiguousBuf, BufWithDiscard};
     use super::{BufDeque, CHUNK_SIZE};
+    use crate::util::buf_traits::{BufWithDiscard, DiscontiguousBuf};
+    use std::io::Write;
 
     fn append_at(offset: usize) {
-        let off: Box<[u8]> = vec![0 as u8;offset].into();
+        let off: Box<[u8]> = vec![0 as u8; offset].into();
         let mut bl = BufDeque::new();
         let data = [0, 1, 2, 3, 4, 5, 6, 7];
         let total_len = offset + data.len();
@@ -139,7 +138,7 @@ mod test {
         let data = [0, 1, 2, 3, 4, 5, 6, 7];
         for i in 0..(CHUNK_SIZE * 3) {
             bl.write_all(&data).unwrap();
-            assert_eq!(bl.end, (i+ 1) * data.len());
+            assert_eq!(bl.end, (i + 1) * data.len());
         }
 
         let mut cursor = 0;

@@ -1,7 +1,7 @@
-use std::{cell::RefCell, collections::VecDeque};
 use async_stream::stream;
-use futures::{Stream, FutureExt};
 use futures::stream::StreamExt;
+use futures::{FutureExt, Stream};
+use std::{cell::RefCell, collections::VecDeque};
 
 use crate::replay::{position::StreamPosition, streams::WReplayRef};
 
@@ -55,7 +55,8 @@ impl StreamDelay {
             let f = replay.borrow().wait(at_header);
             f.await;
             StreamUpdates::NewHeader
-        }.into_stream()
+        }
+        .into_stream()
     }
 
     fn data_update_stream(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
@@ -117,16 +118,20 @@ impl StreamDelay {
     }
 
     pub async fn update_delayed_data_and_drive_merge_strategy(
-        &self, replay: WReplayRef, strategy: &RefCell<impl MergeStrategy>)
-    {
+        &self,
+        replay: WReplayRef,
+        strategy: &RefCell<impl MergeStrategy>,
+    ) {
         let token = strategy.borrow_mut().replay_added(replay.clone());
-        self.track_delayed_progress(replay).for_each( |p| async move {
-            let mut s = strategy.borrow_mut();
-            match p {
-                StreamUpdates::NewHeader => s.replay_header_added(token),
-                StreamUpdates::DataUpdate => s.replay_data_updated(token),
-                StreamUpdates::Finished => s.replay_removed(token),
-            }
-        }).await;
+        self.track_delayed_progress(replay)
+            .for_each(|p| async move {
+                let mut s = strategy.borrow_mut();
+                match p {
+                    StreamUpdates::NewHeader => s.replay_header_added(token),
+                    StreamUpdates::DataUpdate => s.replay_data_updated(token),
+                    StreamUpdates::Finished => s.replay_removed(token),
+                }
+            })
+            .await;
     }
 }

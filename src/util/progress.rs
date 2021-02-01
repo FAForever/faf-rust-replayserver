@@ -1,10 +1,10 @@
-use std::future::Future;
-use std::task::{Poll, Context, Waker};
-use std::pin::Pin;
-use std::collections::BinaryHeap;
-use std::cmp::{Ordering,Reverse};
 use std::cell::RefCell;
+use std::cmp::{Ordering, Reverse};
+use std::collections::BinaryHeap;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
+use std::task::{Context, Poll, Waker};
 
 /* Awaitable progress tracker. Some tasks can wait for the tracker to reach some progress level,
  * others can set progress.
@@ -60,7 +60,7 @@ impl<T: ProgressKey> Inner<T> {
     }
 
     pub fn was_reached(&self, pos: T) -> bool {
-            pos <= self.position
+        pos <= self.position
     }
 
     pub fn insert(&mut self, token: WakerToken<T>) {
@@ -80,10 +80,10 @@ impl<T: ProgressKey> Inner<T> {
                 Some(rw_ref) => {
                     let Reverse(w_ref) = rw_ref;
                     if !self.was_reached(w_ref.pos) {
-                        return
+                        return;
                     }
                     let Reverse(w) = self.waiters.pop().unwrap();
-                    let WakerToken {waker, ..} = w;
+                    let WakerToken { waker, .. } = w;
                     waker.wake();
                 }
             }
@@ -102,9 +102,12 @@ impl<T: ProgressKey> Future for WaitProgressFuture<T> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut inner = self.inner.borrow_mut();
         if inner.was_reached(self.until) {
-            return Poll::Ready(inner.position)
+            return Poll::Ready(inner.position);
         }
-        let token = WakerToken { pos: self.until, waker: cx.waker().clone() };
+        let token = WakerToken {
+            pos: self.until,
+            waker: cx.waker().clone(),
+        };
         inner.insert(token);
         Poll::Pending
     }

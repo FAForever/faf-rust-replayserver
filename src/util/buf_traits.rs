@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, io::Read};
+use std::{cell::RefCell, io::Read, rc::Rc};
 
 // Buffer made up of smaller contiguous chunks. We use those to discard data more easily.
 
@@ -37,7 +37,11 @@ impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
         while at < max_cmp {
             let my_chunk = self.get_chunk(at);
             let other_chunk = other.get_chunk(at);
-            let eq_len = my_chunk.iter().zip(other_chunk).take_while(|(a, b)| a == b).count();
+            let eq_len = my_chunk
+                .iter()
+                .zip(other_chunk)
+                .take_while(|(a, b)| a == b)
+                .count();
             at += eq_len;
             if eq_len < std::cmp::min(my_chunk.len(), other_chunk.len()) {
                 return at;
@@ -112,7 +116,7 @@ pub trait ReadAtExt: ReadAt {
 
 impl<T: ReadAt> ReadAtExt for T {
     fn reader_from<'a>(&'a self, start: usize) -> ReadAtCursor<'a, Self> {
-        ReadAtCursor {bwd: self, start}
+        ReadAtCursor { bwd: self, start }
     }
     fn reader<'a>(&'a self) -> ReadAtCursor<'a, Self> {
         self.reader_from(0)

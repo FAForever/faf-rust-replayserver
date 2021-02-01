@@ -1,17 +1,15 @@
+use crate::server::connection::Connection;
+use async_stream::stream;
 use futures::Stream;
 use tokio::net::TcpListener;
-use async_stream::stream;
-use crate::server::connection::Connection;
 
 pub struct ConnectionProducer {
     addr: String,
 }
 
 impl ConnectionProducer {
-    pub fn new(
-            addr: String,
-            ) -> Self {
-        Self {addr}
+    pub fn new(addr: String) -> Self {
+        Self { addr }
     }
 
     /* Returned stream never ends. */

@@ -1,11 +1,14 @@
-use std::{time::Duration, cell::Cell};
+use std::{cell::Cell, time::Duration};
 
-use tokio::{select, join};
+use tokio::{join, select};
 use tokio_util::sync::CancellationToken;
 
-use crate::{server::connection::Connection, accept::header::ConnectionType, util::empty_counter::EmptyCounter, config::Settings};
+use crate::{
+    accept::header::ConnectionType, config::Settings, server::connection::Connection,
+    util::empty_counter::EmptyCounter,
+};
 
-use super::{receive::ReplayMerger, send::ReplaySender, save::ReplaySaver};
+use super::{receive::ReplayMerger, save::ReplaySaver, send::ReplaySender};
 
 pub struct Replay {
     id: u64,
@@ -25,7 +28,8 @@ impl Replay {
         let writer_connection_count = EmptyCounter::new();
         let reader_connection_count = EmptyCounter::new();
         let should_stop_accepting_connections = Cell::new(false);
-        let time_with_zero_writers_to_end_replay = Duration::from_secs(config.replay.time_with_zero_writers_to_end_replay_s);
+        let time_with_zero_writers_to_end_replay =
+            Duration::from_secs(config.replay.time_with_zero_writers_to_end_replay_s);
         let forced_timeout = Duration::from_secs(config.replay.forced_timeout_s);
         let replay_timeout_token = shutdown_token.child_token();
 
@@ -34,10 +38,18 @@ impl Replay {
         let sender = ReplaySender::new(merged_replay, replay_timeout_token.clone());
         let saver = ReplaySaver::new();
 
-        Self { id, merger, sender, saver, replay_timeout_token,
-               writer_connection_count, reader_connection_count,
-               time_with_zero_writers_to_end_replay, forced_timeout,
-               should_stop_accepting_connections }
+        Self {
+            id,
+            merger,
+            sender,
+            saver,
+            replay_timeout_token,
+            writer_connection_count,
+            reader_connection_count,
+            time_with_zero_writers_to_end_replay,
+            forced_timeout,
+            should_stop_accepting_connections,
+        }
     }
 
     async fn timeout(&self) {
@@ -54,7 +66,9 @@ impl Replay {
     }
 
     async fn wait_until_there_were_no_writers_for_a_while(&self) {
-        self.writer_connection_count.wait_until_empty_for(self.time_with_zero_writers_to_end_replay).await;
+        self.writer_connection_count
+            .wait_until_empty_for(self.time_with_zero_writers_to_end_replay)
+            .await;
     }
 
     async fn regular_lifetime(&self) {
@@ -62,7 +76,9 @@ impl Replay {
         self.should_stop_accepting_connections.set(true);
         self.writer_connection_count.wait_until_empty().await;
         self.merger.finalize();
-        self.saver.save_replay(self.merger.get_merged_replay()).await;
+        self.saver
+            .save_replay(self.merger.get_merged_replay())
+            .await;
         self.reader_connection_count.wait_until_empty().await;
         // Cancel to return from timeout
         self.replay_timeout_token.cancel();
@@ -75,17 +91,16 @@ impl Replay {
         };
     }
 
-    pub async fn handle_connection(&self, mut c: Connection) -> ()
-    {
+    pub async fn handle_connection(&self, mut c: Connection) -> () {
         if self.should_stop_accepting_connections.get() {
-            return;     // TODO log
+            return; // TODO log
         }
         match c.get_header().type_ {
             ConnectionType::WRITER => {
                 self.writer_connection_count.inc();
                 self.merger.handle_connection(&mut c).await;
                 self.writer_connection_count.dec();
-            },
+            }
             ConnectionType::READER => {
                 self.reader_connection_count.inc();
                 self.sender.handle_connection(&mut c).await;

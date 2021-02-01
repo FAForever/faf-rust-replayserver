@@ -1,18 +1,19 @@
 use accept::ConnectionProducer;
 use futures::join;
 
-pub mod config;
-pub mod util;
-pub mod server;
-pub mod worker_threads;
 pub mod accept;
-pub mod replay;
+pub mod config;
 pub mod database;
+pub mod replay;
+pub mod server;
+pub mod util;
+pub mod worker_threads;
 
-#[macro_use] pub mod error;
+#[macro_use]
+pub mod error;
 
-use crate::server::server::Server;
 use crate::config::Settings;
+use crate::server::server::Server;
 use crate::server::signal::cancel_at_sigint;
 use tokio_util::sync::CancellationToken;
 
@@ -35,6 +36,8 @@ async fn run_server() {
 
 pub fn run() -> () {
     env_logger::init();
-    let local_loop = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    let local_loop = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
     local_loop.block_on(run_server());
 }

@@ -12,7 +12,7 @@ pub enum StreamPosition {
     // might happen multiple times ("still at zero data after the header").
     HEADER,
     DATA(usize),
-    FINISHED(usize),    // Final size, not used for cmp / sort
+    FINISHED(usize), // Final size, not used for cmp / sort
 }
 
 impl StreamPosition {
@@ -20,7 +20,7 @@ impl StreamPosition {
         match *self {
             Self::DATA(s) => s,
             Self::FINISHED(s) => s,
-            Self::START | Self::HEADER=> 0,
+            Self::START | Self::HEADER => 0,
         }
     }
 }
@@ -32,7 +32,7 @@ impl PartialEq for StreamPosition {
             (Self::HEADER, Self::HEADER) => true,
             (Self::FINISHED(..), Self::FINISHED(..)) => true,
             (Self::DATA(u), Self::DATA(v)) => u == v,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -73,18 +73,22 @@ impl Add<usize> for StreamPosition {
 }
 
 impl ProgressKey for StreamPosition {
-    fn bottom() -> Self {StreamPosition::START}
-    fn top() -> Self {StreamPosition::FINISHED(0)}
+    fn bottom() -> Self {
+        StreamPosition::START
+    }
+    fn top() -> Self {
+        StreamPosition::FINISHED(0)
+    }
 }
 
 pub type PositionTracker = ProgressTracker<StreamPosition>;
 
 #[cfg(test)]
 mod test {
-    use std::cell::RefCell;
-    use tokio::sync::mpsc::{channel, Receiver, Sender};
-    use tokio::join;
     use super::{PositionTracker, StreamPosition};
+    use std::cell::RefCell;
+    use tokio::join;
+    use tokio::sync::mpsc::{channel, Receiver, Sender};
 
     async fn advance_some(t: &RefCell<PositionTracker>, mut c: Receiver<()>) {
         t.borrow_mut().advance(StreamPosition::DATA(0));

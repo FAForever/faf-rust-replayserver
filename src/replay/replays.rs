@@ -1,12 +1,12 @@
-use std::rc::{Weak, Rc};
+use std::rc::{Rc, Weak};
 
 use futures::{Stream, StreamExt};
 use tokio::join;
-use weak_table::WeakValueHashMap;
 use tokio_util::sync::CancellationToken;
+use weak_table::WeakValueHashMap;
 
-use crate::{server::connection::Connection, config::Settings};
 use crate::accept::header::ConnectionType;
+use crate::{config::Settings, server::connection::Connection};
 
 use super::Replay;
 
@@ -23,11 +23,14 @@ pub struct Replays {
 
 impl Replays {
     pub fn new(replay_builder: Box<dyn Fn(u64) -> Replay>) -> Self {
-        Self { replays: WeakValueHashMap::new(), replay_builder}
+        Self {
+            replays: WeakValueHashMap::new(),
+            replay_builder,
+        }
     }
 
     pub fn build(shutdown_token: CancellationToken, config: Settings) -> Self {
-        let replay_builder = move |rid| {Replay::new(rid, shutdown_token.clone(), &config)};
+        let replay_builder = move |rid| Replay::new(rid, shutdown_token.clone(), &config);
         Self::new(Box::new(replay_builder))
     }
 
@@ -39,7 +42,10 @@ impl Replays {
             Some(r) => Some(r),
             None => {
                 if conn_header.type_ == ConnectionType::READER {
-                    log::debug!("Reader connection does not have a matching replay (id {})", conn_header.id);
+                    log::debug!(
+                        "Reader connection does not have a matching replay (id {})",
+                        conn_header.id
+                    );
                     None
                 } else {
                     let r = Rc::new((self.replay_builder)(conn_header.id));
@@ -51,7 +57,11 @@ impl Replays {
         };
         match maybe_replay {
             None => None,
-            Some(replay) => Some(AssignedConnection {connection: c, replay, replay_is_newly_created}),
+            Some(replay) => Some(AssignedConnection {
+                connection: c,
+                replay,
+                replay_is_newly_created,
+            }),
         }
     }
 
@@ -70,6 +80,7 @@ impl Replays {
 
     pub async fn handle_connections_and_replays(&mut self, cs: impl Stream<Item = Connection>) {
         cs.map(|c| self.assign_connection_to_replay(c))
-          .for_each_concurrent(None, Self::handle_connection_or_replay_lifetime).await
+            .for_each_concurrent(None, Self::handle_connection_or_replay_lifetime)
+            .await
     }
 }

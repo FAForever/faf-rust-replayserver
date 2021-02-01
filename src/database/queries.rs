@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use sqlx::types::time::OffsetDateTime;
+use std::collections::HashMap;
 
-use crate::{error::SaveError, config::DatabaseSettings};
+use crate::{config::DatabaseSettings, error::SaveError};
 
 use super::database::Database;
 
@@ -9,9 +9,9 @@ pub type GameTeams = HashMap<u64, Vec<String>>;
 pub struct GameStats {
     pub featured_mod: String,
     pub game_type: String,
-    pub recorder: String,   // Same as host. This used to only be in local replays. I accidentally added it server-side. Not harmful.
+    pub recorder: String, // Same as host. This used to only be in local replays. I accidentally added it server-side. Not harmful.
     pub host: String,
-    pub launched_at: f64,   // Both need to be float, as the original replay server used Python's time.time()
+    pub launched_at: f64, // Both need to be float, as the original replay server used Python's time.time()
     pub game_end: f64,
     pub title: String,
     pub mapname: String,
@@ -54,7 +54,8 @@ impl Queries {
         if stats.file_name.is_none() {
             log::warn!("Map name for replay {} is missing! Saving anyway.", id);
         }
-        let mapname = stats.file_name
+        let mapname = stats
+            .file_name
             .and_then(|f| f.rsplitn(2, '.').last().map(String::from))
             .and_then(|f| f.rsplitn(2, '/').nth(0).map(String::from))
             .unwrap_or("None".into());
@@ -65,7 +66,10 @@ impl Queries {
             recorder: stats.host.clone(),
             host: stats.host,
             launched_at: stats.start_time.unix_timestamp() as f64,
-            game_end: stats.end_time.unwrap_or(OffsetDateTime::now_utc()).unix_timestamp() as f64,
+            game_end: stats
+                .end_time
+                .unwrap_or(OffsetDateTime::now_utc())
+                .unix_timestamp() as f64,
             title: stats.game_name,
             mapname,
             num_players: player_count,

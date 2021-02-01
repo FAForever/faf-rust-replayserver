@@ -8,12 +8,14 @@ use sqlx::types::time::OffsetDateTime;
 // Unlike python server, we don't do arbitrary queries. We run specific queries and nothing more.
 // This means we only need a real DB for this thing's unit tests, not for system tests.
 pub struct Database {
-   pool: sqlx::MySqlPool,
+    pool: sqlx::MySqlPool,
 }
 
-
 #[derive(sqlx::FromRow)]
-pub struct TeamPlayerRow { pub login: String, pub team: u64 }
+pub struct TeamPlayerRow {
+    pub login: String,
+    pub team: u64,
+}
 
 #[derive(sqlx::FromRow)]
 pub struct GameStatRow {
@@ -27,7 +29,9 @@ pub struct GameStatRow {
 }
 
 #[derive(sqlx::FromRow)]
-pub struct PlayerCount {pub count: u64}
+pub struct PlayerCount {
+    pub count: u64,
+}
 
 #[derive(sqlx::FromRow)]
 pub struct ModVersions {
@@ -39,12 +43,14 @@ pub struct ModVersions {
 // For what it's worth, I checked that inner / left joins correspond to foreign / nullable keys.
 impl Database {
     pub fn new(dbc: &DatabaseSettings) -> Option<Self> {
-        let addr = format!("mysql://{user}:{pass}@{host}:{port}/{db}",
-                           user=dbc.user,
-                           pass=dbc.password,
-                           host=dbc.host,
-                           port=dbc.port,
-                           db=dbc.name);
+        let addr = format!(
+            "mysql://{user}:{pass}@{host}:{port}/{db}",
+            user = dbc.user,
+            pass = dbc.password,
+            host = dbc.host,
+            port = dbc.port,
+            db = dbc.name
+        );
         let pool = sqlx::mysql::MySqlPoolOptions::new()
             .max_connections(dbc.pool_size)
             .max_lifetime(Some(Duration::from_secs(24 * 60 * 60)))
@@ -54,7 +60,7 @@ impl Database {
                 error!("Failed to connect to database: {}", e);
                 None
             }
-            Ok(pool) => Some(Self { pool })
+            Ok(pool) => Some(Self { pool }),
         }
     }
 
@@ -77,7 +83,10 @@ impl Database {
               ON `login`.id = `game_player_stats`.`playerId`
             WHERE `game_stats`.`id` = ? AND `game_player_stats`.`AI` = 0
         ";
-        Ok(sqlx::query_as::<_, TeamPlayerRow>(query).bind(id).fetch_all(&self.pool).await?)
+        Ok(sqlx::query_as::<_, TeamPlayerRow>(query)
+            .bind(id)
+            .fetch_all(&self.pool)
+            .await?)
     }
 
     pub async fn get_game_stat_row(&self, id: u64) -> Result<GameStatRow, SaveError> {
@@ -100,23 +109,40 @@ impl Database {
               ON `game_stats`.`mapId` = `table_map`.`id`
             WHERE `game_stats`.`id` = ?
         ";
-        Ok(sqlx::query_as::<_, GameStatRow>(query).bind(id).fetch_one(&self.pool).await?)
+        Ok(sqlx::query_as::<_, GameStatRow>(query)
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await?)
     }
 
     pub async fn get_player_count(&self, id: u64) -> Result<u64, SaveError> {
-       let query = "
+        let query = "
            SELECT COUNT(*) AS count FROM `game_player_stats`
            WHERE `game_player_stats`.`gameId` = ?
         ";
-        Ok(sqlx::query_as::<_, PlayerCount>(query).bind(id).fetch_one(&self.pool).await?.count)
+        Ok(sqlx::query_as::<_, PlayerCount>(query)
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await?
+            .count)
     }
 
-    pub async fn get_mod_version_list(&self, game_mod: &str) -> Result<Vec<ModVersions>, SaveError> {
+    pub async fn get_mod_version_list(
+        &self,
+        game_mod: &str,
+    ) -> Result<Vec<ModVersions>, SaveError> {
         // We have to build table name dynamically, that's just how the DB is.
         // Since we know what existing tables look like, we do very restrictive validation.
         for c in game_mod.chars() {
-            if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || "_-".contains(c)) {
-                log::info!("Game mod '{}' has unexpected characters (outside 'a-zA-Z0-9_-'", game_mod);
+            if !((c >= 'a' && c <= 'z')
+                || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9')
+                || "_-".contains(c))
+            {
+                log::info!(
+                    "Game mod '{}' has unexpected characters (outside 'a-zA-Z0-9_-'",
+                    game_mod
+                );
                 return Ok(Vec::new());
             }
         }
@@ -124,30 +150,40 @@ impl Database {
         if game_mod == "ladder1v1" {
             return Ok(Vec::new());
         }
-        let query = format!("
+        let query = format!(
+            "
             SELECT
                 `updates_{game_mod}_files`.`fileId` AS file_id,
                 MAX(`updates_{game_mod}_files`.`version`) AS version
             FROM `updates_{game_mod}`
             INNER JOIN `updates_{game_mod}_files` ON `fileId` = `updates_{game_mod}`.`id`
             GROUP BY `updates_{game_mod}_files`.`fileId`
-        ", game_mod=game_mod);
-        match sqlx::query_as::<_, ModVersions>(query.as_str()).fetch_all(&self.pool).await {
+        ",
+            game_mod = game_mod
+        );
+        match sqlx::query_as::<_, ModVersions>(query.as_str())
+            .fetch_all(&self.pool)
+            .await
+        {
             Err(e) => {
                 log::warn!("Failed to query version of mod '{}': '{}'", game_mod, e);
                 Ok(Vec::new())
             }
-            Ok(v) => Ok(v)
+            Ok(v) => Ok(v),
         }
     }
 
-    pub async fn update_game_stats(&self, id: u64, replay_ticks: u64) -> Result<(), SaveError>{
+    pub async fn update_game_stats(&self, id: u64, replay_ticks: u64) -> Result<(), SaveError> {
         let query = "
             UPDATE `game_stats` SET
                 `game_stats`.`replay_ticks` = ?
             WHERE `game_stats`.`id` = ?
         ";
-        sqlx::query(query).bind(replay_ticks).bind(id).execute(&self.pool).await?;
+        sqlx::query(query)
+            .bind(replay_ticks)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 }
@@ -159,7 +195,10 @@ mod test {
     fn get_db() -> Database {
         let cfg = DatabaseSettings {
             host: std::env::var("DB_HOST").expect("DB_HOST is not set"),
-            port: std::env::var("DB_PORT").expect("DB_PORT is not set").parse::<u16>().expect("DB_HOST is not a number"),
+            port: std::env::var("DB_PORT")
+                .expect("DB_PORT is not set")
+                .parse::<u16>()
+                .expect("DB_HOST is not a number"),
             user: "root".into(),
             password: "banana".into(),
             name: "faf".into(),

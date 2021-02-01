@@ -1,6 +1,8 @@
 use tokio::io::{AsyncBufRead, AsyncReadExt};
 
-use crate::{server::connection::Connection, error::ConnResult, server::connection::read_until_exact};
+use crate::{
+    error::ConnResult, server::connection::read_until_exact, server::connection::Connection,
+};
 
 #[derive(Clone)]
 pub struct ReplayHeader {
@@ -11,13 +13,22 @@ impl ReplayHeader {
     pub async fn from_connection(c: &mut Connection) -> ConnResult<Self> {
         let max_size = 1024 * 1024;
         let limited = c.take(max_size);
-        Self::do_from_connection(limited).await.map_err(|x| x.into())
+        Self::do_from_connection(limited)
+            .await
+            .map_err(|x| x.into())
     }
 
-    async fn skip<T: AsyncBufRead + Unpin>(r: &mut T, count: u64, buf: &mut Vec<u8>) -> std::io::Result<()> {
+    async fn skip<T: AsyncBufRead + Unpin>(
+        r: &mut T,
+        count: u64,
+        buf: &mut Vec<u8>,
+    ) -> std::io::Result<()> {
         let read = r.take(count).read_to_end(buf).await?;
         if read < count as usize {
-            Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, format!("EOF reached before skipping {} bytes", count)))
+            Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!("EOF reached before skipping {} bytes", count),
+            ))
         } else {
             Ok(())
         }
@@ -26,13 +37,11 @@ impl ReplayHeader {
     async fn do_from_connection<T: AsyncBufRead + Unpin>(mut r: T) -> std::io::Result<Self> {
         let mut data = Vec::<u8>::new();
         macro_rules! read_value {
-            ($f: ident) => {
-                {
-                    let i = r.$f().await?;
-                    data.extend_from_slice(&i.to_le_bytes());
-                    i
-                }
-            }
+            ($f: ident) => {{
+                let i = r.$f().await?;
+                data.extend_from_slice(&i.to_le_bytes());
+                i
+            }};
         }
 
         let _version = read_until_exact(&mut r, 0, &mut data).await;
@@ -66,6 +75,6 @@ impl ReplayHeader {
         }
 
         let _random_seed = read_value!(read_u32_le);
-        Ok(ReplayHeader{data})
+        Ok(ReplayHeader { data })
     }
 }

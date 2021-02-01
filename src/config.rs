@@ -1,6 +1,6 @@
 use std::env;
 
-use config::{ConfigError, Config, File};
+use config::{Config, ConfigError, File};
 use serde::Deserialize;
 
 // TODO - validate values.
@@ -59,7 +59,7 @@ impl Settings {
                 port: 3306,
                 user: "root".into(),
                 password: "banana".into(),
-                name: "faf".into()
+                name: "faf".into(),
             },
             storage: StorageSettings {
                 vault_path: "/tmp/foo".into(),
@@ -71,13 +71,15 @@ impl Settings {
                 update_interval_ms: 1000,
                 merge_quorum_size: 2,
                 stream_comparison_distance_b: 4096,
-            }
+            },
         }
     }
     pub fn from_env() -> Result<Self, ConfigError> {
-        let config_file = env::var("RS_CONFIG_FILE")
-            .map_err(|_| ConfigError::Message(
-                    "RS_CONFIG_FILE env var not set, place the path to the config file there.".into()))?;
+        let config_file = env::var("RS_CONFIG_FILE").map_err(|_| {
+            ConfigError::Message(
+                "RS_CONFIG_FILE env var not set, place the path to the config file there.".into(),
+            )
+        })?;
         let db_password = env::var("RS_DB_PASSWORD")
             .map_err(|_| ConfigError::NotFound("Database password was not provided".into()))?;
         let mut c = Config::new();

@@ -1,8 +1,11 @@
-use std::{io::Write, rc::Rc, cell::RefCell};
+use std::{cell::RefCell, io::Write, rc::Rc};
 
 use futures::Future;
 
-use crate::{util::buf_list::BufList, replay::position::PositionTracker, replay::position::StreamPosition, util::buf_traits::DiscontiguousBuf};
+use crate::{
+    replay::position::PositionTracker, replay::position::StreamPosition, util::buf_list::BufList,
+    util::buf_traits::DiscontiguousBuf,
+};
 
 use super::{writer_replay::WriterReplay, ReplayHeader};
 
@@ -74,7 +77,8 @@ impl MergedReplay {
 
     pub fn finish(&mut self) {
         let final_len = self.position().len();
-        self.delayed_progress.advance(StreamPosition::FINISHED(final_len));
+        self.delayed_progress
+            .advance(StreamPosition::FINISHED(final_len));
     }
 }
 

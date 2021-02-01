@@ -3,7 +3,10 @@ use std::io::{Read, Write};
 use tokio::{io::AsyncWriteExt, select};
 use tokio_util::sync::CancellationToken;
 
-use crate::{server::connection::Connection, replay::streams::MReplayRef, replay::position::StreamPosition, util::buf_traits::ReadAtExt, util::buf_traits::DiscontiguousBuf};
+use crate::{
+    replay::position::StreamPosition, replay::streams::MReplayRef, server::connection::Connection,
+    util::buf_traits::DiscontiguousBuf, util::buf_traits::ReadAtExt,
+};
 
 enum ReadProgress {
     Header(usize),
@@ -45,7 +48,11 @@ impl MergedReplayReader {
                 } else {
                     let data_written = buf.write(&header.data[l..]).unwrap();
                     l += data_written;
-                    self.bytes_read = if l < header.data.len() { ReadProgress::Header(l) } else  { ReadProgress::Data(0) };
+                    self.bytes_read = if l < header.data.len() {
+                        ReadProgress::Header(l)
+                    } else {
+                        ReadProgress::Data(0)
+                    };
                     data_written
                 }
             }
@@ -107,7 +114,10 @@ pub struct ReplaySender {
 
 impl ReplaySender {
     pub fn new(merged_replay: MReplayRef, shutdown_token: CancellationToken) -> Self {
-        Self { merged_replay, shutdown_token }
+        Self {
+            merged_replay,
+            shutdown_token,
+        }
     }
 
     pub async fn handle_connection(&self, c: &mut Connection) {

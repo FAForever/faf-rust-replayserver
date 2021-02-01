@@ -25,34 +25,37 @@ impl ConnectionError {
 }
 // Usually we want to throw BadData.
 impl From<String> for ConnectionError {
-    fn from(s : String) -> Self {
+    fn from(s: String) -> Self {
         Self::BadData(s)
     }
 }
 
 impl From<&str> for ConnectionError {
-    fn from(s : &str) -> Self {
+    fn from(s: &str) -> Self {
         Self::BadData(String::from(s))
     }
 }
 
 impl From<std::io::Error> for ConnectionError {
     fn from(source: std::io::Error) -> ConnectionError {
-        ConnectionError::IO {source, context: String::new()}
+        ConnectionError::IO {
+            source,
+            context: String::new(),
+        }
     }
 }
 
 impl ConnectionError {
     pub fn log(&self, c: MaybeConnectionHeader) {
         match self {
-            Self::BadData(..) | Self::IO {..} => info!("{} ended: {}", c, self),
+            Self::BadData(..) | Self::IO { .. } => info!("{} ended: {}", c, self),
             _ => (),
         }
     }
     pub fn context(self, s: String) -> Self {
         match self {
             Self::BadData(_) => Self::BadData(s),
-            Self::IO {source, ..} => Self::IO {source, context: s},
+            Self::IO { source, .. } => Self::IO { source, context: s },
             other => other,
         }
     }
@@ -83,8 +86,7 @@ impl<T> AddContext<&str> for ConnResult<T> {
 }
 
 // Below code lets us handle errors we don't need the type of.
-pub struct SomeError {
-}
+pub struct SomeError {}
 
 impl<T: std::error::Error> From<T> for SomeError {
     fn from(_: T) -> Self {
@@ -95,8 +97,8 @@ impl<T: std::error::Error> From<T> for SomeError {
 #[macro_export]
 macro_rules! some_error {
     ($e: expr) => {
-        (|| -> std::result::Result<_, SomeError> {Ok($e) })()
-    }
+        (|| -> std::result::Result<_, SomeError> { Ok($e) })()
+    };
 }
 
 #[derive(Error, Debug)]
