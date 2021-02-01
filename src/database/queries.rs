@@ -5,7 +5,7 @@ use crate::{config::DatabaseSettings, error::SaveError};
 
 use super::database::Database;
 
-pub type GameTeams = HashMap<u64, Vec<String>>;
+pub type GameTeams = HashMap<i8, Vec<String>>;
 pub struct GameStats {
     pub featured_mod: String,
     pub game_type: String,
@@ -15,7 +15,7 @@ pub struct GameStats {
     pub game_end: f64,
     pub title: String,
     pub mapname: String,
-    pub num_players: u64,
+    pub num_players: i64,
 }
 pub type ModVersions = HashMap<String, u64>;
 

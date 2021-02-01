@@ -14,7 +14,7 @@ pub struct Database {
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
 pub struct TeamPlayerRow {
     pub login: String,
-    pub team: u64,
+    pub team: i8,
 }
 
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
@@ -30,7 +30,7 @@ pub struct GameStatRow {
 
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
 pub struct PlayerCount {
-    pub count: u64,
+    pub count: i64,     // In db it's signed BIGINT
 }
 
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
@@ -109,7 +109,7 @@ impl Database {
             .await?)
     }
 
-    pub async fn get_player_count(&self, id: u64) -> Result<u64, SaveError> {
+    pub async fn get_player_count(&self, id: u64) -> Result<i64, SaveError> {
         let query = "
            SELECT COUNT(*) AS count FROM `game_player_stats`
            WHERE `game_player_stats`.`gameId` = ?
@@ -185,7 +185,9 @@ impl Database {
 #[cfg(test)]
 mod test {
     // See db_unit_test_data.sql for data used here.
-        use time::{macros::{date, time}, Date, Time};
+            use std::collections::HashMap;
+
+use time::{macros::{date, time}, Date, Time};
 
 use super::*;
 
@@ -218,6 +220,7 @@ use super::*;
     #[tokio::test]
     async fn test_db_typical_game() {
         let db = get_db();
+
         let stats = db.get_game_stat_row(1000).await.unwrap();
         let expected_stats = GameStatRow {
             start_time: dt(date!(2010-01-01), time!(00:00:00)),
@@ -229,5 +232,23 @@ use super::*;
             file_name: Some("maps/scmp_001.zip".into()),
         };
         assert_eq!(stats, expected_stats);
+
+        assert_eq!(db.get_player_count(1000).await.unwrap(), 4);
+
+        let players = db.get_team_players(1000).await.unwrap();
+        let expected_players = vec!(
+            TeamPlayerRow { login: "user1".into(), team: 1 },
+            TeamPlayerRow { login: "user2".into(), team: 1 },
+            TeamPlayerRow { login: "user3".into(), team: 2 },
+            TeamPlayerRow { login: "user4".into(), team: 2 },
+        );
+        let to_map = |v: Vec<TeamPlayerRow>| {
+            let mut player_map = HashMap::new();
+            for p in v.into_iter() {
+                player_map.insert(p.login.clone(), p);
+            }
+            player_map
+        };
+        assert_eq!(to_map(players), to_map(expected_players));
     }
 }
