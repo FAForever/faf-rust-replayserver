@@ -3,7 +3,7 @@ use std::time::Duration;
 use log::error;
 
 use crate::{config::DatabaseSettings, error::SaveError};
-use sqlx::{types::time::OffsetDateTime, mysql::MySqlSslMode, mysql::MySqlConnectOptions};
+use sqlx::{mysql::MySqlConnectOptions, mysql::MySqlSslMode, types::time::OffsetDateTime};
 
 // Unlike python server, we don't do arbitrary queries. We run specific queries and nothing more.
 // This means we only need a real DB for this thing's unit tests, not for system tests.
@@ -30,7 +30,7 @@ pub struct GameStatRow {
 
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
 pub struct PlayerCount {
-    pub count: i64,     // In db it's signed BIGINT
+    pub count: i64, // In db it's signed BIGINT
 }
 
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
@@ -185,11 +185,14 @@ impl Database {
 #[cfg(test)]
 mod test {
     // See db_unit_test_data.sql for data used here.
-            use std::collections::HashMap;
+    use std::collections::HashMap;
 
-use time::{macros::{date, time}, Date, Time};
+    use time::{
+        macros::{date, time},
+        Date, Time,
+    };
 
-use super::*;
+    use super::*;
 
     fn dt(d: Date, t: Time) -> OffsetDateTime {
         d.with_time(t).assume_utc()
@@ -239,8 +242,8 @@ use super::*;
 
         let stats = db.get_game_stat_row(1000).await.unwrap();
         let expected_stats = GameStatRow {
-            start_time: dt(date!(2010-01-01), time!(00:00:00)),
-            end_time: Some(dt(date!(2010-01-01), time!(01:00:00))),
+            start_time: dt(date!(2010 - 01 - 01), time!(00:00:00)),
+            end_time: Some(dt(date!(2010 - 01 - 01), time!(01:00:00))),
             game_type: "0".into(),
             host: "user1".into(),
             game_name: "2v2 Game".into(),
@@ -252,12 +255,24 @@ use super::*;
         assert_eq!(db.get_player_count(1000).await.unwrap(), 4);
 
         let players = db.get_team_players(1000).await.unwrap();
-        let expected_players = vec!(
-            TeamPlayerRow { login: "user1".into(), team: 1 },
-            TeamPlayerRow { login: "user2".into(), team: 1 },
-            TeamPlayerRow { login: "user3".into(), team: 2 },
-            TeamPlayerRow { login: "user4".into(), team: 2 },
-        );
+        let expected_players = vec![
+            TeamPlayerRow {
+                login: "user1".into(),
+                team: 1,
+            },
+            TeamPlayerRow {
+                login: "user2".into(),
+                team: 1,
+            },
+            TeamPlayerRow {
+                login: "user3".into(),
+                team: 2,
+            },
+            TeamPlayerRow {
+                login: "user4".into(),
+                team: 2,
+            },
+        ];
         assert_eq!(players_to_map(players), players_to_map(expected_players));
     }
 
@@ -266,11 +281,20 @@ use super::*;
     async fn test_db_typical_mod() {
         let db = get_db();
         let mod_data = db.get_mod_version_list("faf").await.unwrap();
-        let expected_mod_data = vec! {
-            ModVersions { file_id: 41, version: 3659 },
-            ModVersions { file_id: 42, version: 3659 },
-            ModVersions { file_id: 43, version: 3656 },
-        };
+        let expected_mod_data = vec![
+            ModVersions {
+                file_id: 41,
+                version: 3659,
+            },
+            ModVersions {
+                file_id: 42,
+                version: 3659,
+            },
+            ModVersions {
+                file_id: 43,
+                version: 3656,
+            },
+        ];
         assert_eq!(mods_to_map(mod_data), mods_to_map(expected_mod_data));
     }
 }
