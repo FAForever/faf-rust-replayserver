@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use sqlx::types::time::OffsetDateTime;
 
-use crate::{error::SaveError, config::Settings};
+use crate::{error::SaveError, config::DatabaseSettings};
 
 use super::database::Database;
 
@@ -27,7 +27,7 @@ impl Queries {
     fn new(db: Database) -> Self {
         Self { db }
     }
-    fn build(config: &Settings) -> Option<Self> {
+    fn build(config: &DatabaseSettings) -> Option<Self> {
         Database::new(config).map(|db| Self { db })
     }
 

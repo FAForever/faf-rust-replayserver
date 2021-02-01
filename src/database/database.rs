@@ -1,8 +1,8 @@
-use std::{time::Duration, collections::HashMap};
+use std::time::Duration;
 
 use log::error;
 
-use crate::{config::Settings, error::SaveError};
+use crate::{config::DatabaseSettings, error::SaveError};
 use sqlx::types::time::OffsetDateTime;
 
 // Unlike python server, we don't do arbitrary queries. We run specific queries and nothing more.
@@ -38,16 +38,15 @@ pub struct ModVersions {
 // TODO - SQL queries should probably be moved to some central FAF component.
 // For what it's worth, I checked that inner / left joins correspond to foreign / nullable keys.
 impl Database {
-    pub fn new(config: &Settings) -> Option<Self> {
-        let dbc = &config.database;
-        let addr = format!("mysql://{user}:{pass}!{host}:{port}/{db}",
+    pub fn new(dbc: &DatabaseSettings) -> Option<Self> {
+        let addr = format!("mysql://{user}:{pass}@{host}:{port}/{db}",
                            user=dbc.user,
                            pass=dbc.password,
                            host=dbc.host,
                            port=dbc.port,
                            db=dbc.name);
         let pool = sqlx::mysql::MySqlPoolOptions::new()
-            .max_connections(config.database.pool_size)
+            .max_connections(dbc.pool_size)
             .max_lifetime(Some(Duration::from_secs(24 * 60 * 60)))
             .connect_lazy(addr.as_str());
         match pool {
@@ -155,9 +154,23 @@ impl Database {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
+    fn get_db() -> Database {
+        let cfg = DatabaseSettings {
+            host: std::env::var("DB_HOST").expect("DB_HOST is not set"),
+            port: std::env::var("DB_PORT").expect("DB_PORT is not set").parse::<u16>().expect("DB_HOST is not a number"),
+            user: "root".into(),
+            password: "banana".into(),
+            name: "faf".into(),
+            pool_size: 4,
+        };
+        Database::new(&cfg).unwrap()
+    }
+
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
     #[tokio::test]
-    async fn foo() {
-        todo!()
+    async fn test_db_init() {
+        let _db = get_db();
     }
 }
