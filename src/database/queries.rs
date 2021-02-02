@@ -7,12 +7,11 @@ use super::database::Database;
 
 pub type GameTeams = HashMap<i8, Vec<String>>;
 pub struct GameStats {
-    pub featured_mod: String,
+    pub featured_mod: Option<String>,
     pub game_type: String,
-    pub recorder: String, // Same as host. This used to only be in local replays. I accidentally added it server-side. Not harmful.
     pub host: String,
-    pub launched_at: f64, // Both need to be float, as the original replay server used Python's time.time()
-    pub game_end: f64,
+    pub launched_at: i64,
+    pub game_end: i64,
     pub title: String,
     pub mapname: String,
     pub num_players: i64,
@@ -65,13 +64,12 @@ impl Queries {
         Ok(GameStats {
             featured_mod: stats.game_mod,
             game_type: stats.game_type,
-            recorder: stats.host.clone(),
             host: stats.host,
-            launched_at: stats.start_time.unix_timestamp() as f64,
+            launched_at: stats.start_time.unix_timestamp(),
             game_end: stats
                 .end_time
                 .unwrap_or(OffsetDateTime::now_utc())
-                .unix_timestamp() as f64,
+                .unix_timestamp(),
             title: stats.game_name,
             mapname,
             num_players: player_count,

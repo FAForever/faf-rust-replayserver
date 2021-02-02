@@ -1,2 +1,2 @@
-mod database;
-mod queries;
+pub mod database;
+pub mod queries;

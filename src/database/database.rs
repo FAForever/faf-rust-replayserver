@@ -24,7 +24,7 @@ pub struct GameStatRow {
     pub game_type: String,
     pub host: String,
     pub game_name: String,
-    pub game_mod: String,
+    pub game_mod: Option<String>,
     pub file_name: Option<String>,
 }
 
@@ -247,7 +247,7 @@ mod test {
             game_type: "0".into(),
             host: "user1".into(),
             game_name: "2v2 Game".into(),
-            game_mod: "faf".into(),
+            game_mod: Some("faf".into()),
             file_name: Some("maps/scmp_001.zip".into()),
         };
         assert_eq!(stats, expected_stats);
@@ -344,6 +344,13 @@ mod test {
         let db = get_db();
         let stats = db.get_team_players(1080).await.unwrap();
         assert!(stats.is_empty());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_db_game_with_null_modname() {
+        let db = get_db();
+        let stats = db.get_game_stat_row(1100).await.unwrap();
     }
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]

@@ -31,7 +31,8 @@ insert into game_featuredMods
 values (31,   'faf',         'FAF',          'FAF',        1,       'fa.git',      'a',        'nx2',          FALSE),
        (32,   'ladder1v1',   'FAF',          'Ladder',     1,       'ladder.git',  'b',        'nx2',          TRUE),
        (33,   'murderparty', 'Murder Party', 'Random mod', 1,       'example.git', 'c',        'cop',          TRUE),
-       (34,   'labwars',     'Lab wars',     'No files',   1,       'example.git', 'd',        'nx2',          TRUE);
+       (34,   'labwars',     'Lab wars',     'No files',   1,       'example.git', 'd',        'nx2',          TRUE),
+       (35,   NULL,          'Null name!',   'No files',   1,       'example.git', 'd',        'nx2',          TRUE);
 
 insert into updates_faf
        (id, filename,             path)
@@ -68,7 +69,8 @@ values (1000, '2010-01-01 00:00:00', '2010-01-01 01:00:00', '2v2 Game',         
        (1060, '2010-01-03 00:00:00', NULL,                  'Game with max nulls',     '0',       31,      1,      NULL,  0),
        (1070, '2010-01-03 00:00:00', NULL,                  'Game with no players',    '0',       31,      1,      21,    0),
        (1080, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with AI only',       '0',       31,      1,      21,    0),
-       (1090, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with no mod files',  '0',       34,      1,      21,    0);
+       (1090, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with no mod files',  '0',       34,      1,      21,    0),
+       (1100, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with null mod!',     '0',       35,      1,      21,    0);
 
 insert into game_player_stats
        (id,   gameId, playerId, AI, faction, color, team, place, mean, deviation)  -- all not nullable
