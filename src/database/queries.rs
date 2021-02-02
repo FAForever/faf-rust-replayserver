@@ -23,13 +23,8 @@ pub struct Queries {
 }
 
 impl Queries {
-    fn new(db: Database) -> Self {
+    pub fn new(db: Database) -> Self {
         Self { db }
-    }
-    fn build(config: &DatabaseSettings) -> Self {
-        Self {
-            db: Database::new(config),
-        }
     }
 
     pub async fn get_teams_in_game(&self, id: u64) -> Result<GameTeams, SaveError> {

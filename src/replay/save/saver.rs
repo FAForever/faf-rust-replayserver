@@ -1,14 +1,16 @@
-use crate::replay::streams::MReplayRef;
+use std::sync::Arc;
+
+use crate::{database::queries::Queries, replay::streams::MReplayRef};
 
 pub struct ReplaySaver {
-    // TODO
+    db: Queries,
 }
 
 impl ReplaySaver {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(db: Queries) -> Self {
+        Self { db }
     }
-    pub async fn save_replay(&self, r: MReplayRef) {
+    pub async fn save_replay(&self, replay: MReplayRef, replay_id: u64) {
         // TODO
     }
 }

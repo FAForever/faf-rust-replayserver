@@ -1,6 +1,11 @@
+use std::sync::Arc;
+
 use super::connection::Connection;
-use crate::accept::ConnectionAcceptor;
 use crate::config::Settings;
+use crate::{
+    accept::ConnectionAcceptor, database::database::Database, database::queries::Queries,
+    replay::save::ReplaySaver,
+};
 use crate::{accept::ConnectionProducer, replay::Replays, worker_threads::ReplayThreadPool};
 use futures::stream::StreamExt;
 use log::debug;
@@ -18,19 +23,21 @@ pub fn worker_thread_fn(
     streams: Receiver<Connection>,
     shutdown_token: CancellationToken,
     config: Settings,
+    saver: Arc<ReplaySaver>,
 ) {
     let local_loop = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
-    local_loop.block_on(worker_thread_work(streams, shutdown_token, config));
+    local_loop.block_on(worker_thread_work(streams, shutdown_token, config, saver));
 }
 
 async fn worker_thread_work(
     streams: Receiver<Connection>,
     shutdown_token: CancellationToken,
     config: Settings,
+    saver: Arc<ReplaySaver>,
 ) {
-    let mut replays = Replays::build(shutdown_token, config);
+    let mut replays = Replays::build(shutdown_token, config, saver);
     let wrapper = ReceiverStream::new(streams);
     replays.handle_connections_and_replays(wrapper).await;
 }
@@ -39,11 +46,13 @@ impl Server {
     pub fn new(
         config: Settings,
         producer: ConnectionProducer,
+        database: Database,
         shutdown_token: CancellationToken,
     ) -> Self {
+        let saver = Arc::new(ReplaySaver::new(Queries::new(database)));
         let c = config.clone();
         let t = shutdown_token.clone();
-        let work = Box::new(move |s| worker_thread_fn(s, t.clone(), c.clone()));
+        let work = Box::new(move |s| worker_thread_fn(s, t.clone(), c.clone(), saver.clone()));
         let thread_pool = ReplayThreadPool::new(move || work.clone(), config.server.worker_threads);
         let acceptor = ConnectionAcceptor::build(thread_pool, &config);
         Self {

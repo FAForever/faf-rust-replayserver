@@ -1,4 +1,5 @@
 use accept::ConnectionProducer;
+use database::database::Database;
 use futures::join;
 
 pub mod accept;
@@ -27,7 +28,8 @@ async fn run_server() {
 
     let shutdown_token = CancellationToken::new();
     let producer = ConnectionProducer::new(format!("localhost:{}", config.server.port));
-    let server = Server::new(config, producer, shutdown_token.clone());
+    let database = Database::new(&config.database);
+    let server = Server::new(config, producer, database, shutdown_token.clone());
     let f1 = server.accept();
     let f2 = cancel_at_sigint(shutdown_token);
     join!(f1, f2);

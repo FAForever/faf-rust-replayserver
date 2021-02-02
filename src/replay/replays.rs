@@ -1,14 +1,19 @@
-use std::rc::{Rc, Weak};
+use std::{
+    rc::{Rc, Weak},
+    sync::Arc,
+};
 
 use futures::{Stream, StreamExt};
 use tokio::join;
 use tokio_util::sync::CancellationToken;
 use weak_table::WeakValueHashMap;
 
-use crate::accept::header::ConnectionType;
+use crate::{
+    accept::header::ConnectionType, database::database::Database, database::queries::Queries,
+};
 use crate::{config::Settings, server::connection::Connection};
 
-use super::Replay;
+use super::{save::ReplaySaver, Replay};
 
 struct AssignedConnection {
     connection: Connection,
@@ -29,8 +34,13 @@ impl Replays {
         }
     }
 
-    pub fn build(shutdown_token: CancellationToken, config: Settings) -> Self {
-        let replay_builder = move |rid| Replay::new(rid, shutdown_token.clone(), &config);
+    pub fn build(
+        shutdown_token: CancellationToken,
+        config: Settings,
+        saver: Arc<ReplaySaver>,
+    ) -> Self {
+        let replay_builder =
+            move |rid| Replay::new(rid, shutdown_token.clone(), &config, saver.clone());
         Self::new(Box::new(replay_builder))
     }
 
