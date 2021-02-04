@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{database::queries::GameTeams, database::queries::Queries, error::SaveError};
 
 // Saved replay's json header. Some fields are weird / redundant, that's legacy. TODO: new format.
+#[derive(serde::Serialize)]
 pub struct ReplayJsonHeader {
     complete: bool,
     featured_mod: Option<String>,

@@ -10,6 +10,7 @@ pub struct ServerSettings {
     pub port: u16,
     pub worker_threads: u32,
     pub connection_accept_timeout_s: u64,
+    pub replay_save_directory: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -52,6 +53,7 @@ impl Settings {
                 port: 15000,
                 worker_threads: 8,
                 connection_accept_timeout_s: 7200,
+                replay_save_directory: "./".into(),
             },
             database: DatabaseSettings {
                 pool_size: 8,

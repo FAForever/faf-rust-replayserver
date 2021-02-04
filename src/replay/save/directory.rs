@@ -5,9 +5,9 @@ pub struct SavedReplayDirectory {
 }
 
 impl SavedReplayDirectory {
-    pub fn new(root: impl Into<String>) -> Self {
+    pub fn new(root: &str) -> Self {
         Self {
-            root: PathBuf::from(root.into()),
+            root: PathBuf::from(root),
         }
     }
 

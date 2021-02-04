@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::connection::Connection;
 use crate::config::Settings;
 use crate::{
-    accept::ConnectionAcceptor, database::database::Database, database::queries::Queries,
+    accept::ConnectionAcceptor, database::database::Database,
     replay::save::ReplaySaver,
 };
 use crate::{accept::ConnectionProducer, replay::Replays, worker_threads::ReplayThreadPool};
@@ -49,7 +49,7 @@ impl Server {
         database: Database,
         shutdown_token: CancellationToken,
     ) -> Self {
-        let saver = Arc::new(ReplaySaver::new(Queries::new(database)));
+        let saver = Arc::new(ReplaySaver::new(database, &config));
         let c = config.clone();
         let t = shutdown_token.clone();
         let work = Box::new(move |s| worker_thread_fn(s, t.clone(), c.clone(), saver.clone()));
