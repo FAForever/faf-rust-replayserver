@@ -97,13 +97,13 @@ impl<T: ReadAt> ReadAt for Rc<RefCell<T>> {
 }
 
 pub struct ReadAtCursor<'a, T: ReadAt + ?Sized> {
-    bwd: &'a T,
+    src: &'a T,
     start: usize,
 }
 
 impl<'a, T: ReadAt + ?Sized> Read for ReadAtCursor<'a, T> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let res = self.bwd.read_at(self.start, buf)?;
+        let res = self.src.read_at(self.start, buf)?;
         self.start += res;
         Ok(res)
     }
@@ -116,7 +116,7 @@ pub trait ReadAtExt: ReadAt {
 
 impl<T: ReadAt> ReadAtExt for T {
     fn reader_from<'a>(&'a self, start: usize) -> ReadAtCursor<'a, Self> {
-        ReadAtCursor { bwd: self, start }
+        ReadAtCursor { src: self, start }
     }
     fn reader<'a>(&'a self) -> ReadAtCursor<'a, Self> {
         self.reader_from(0)

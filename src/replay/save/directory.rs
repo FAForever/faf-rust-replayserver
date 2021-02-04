@@ -6,7 +6,9 @@ pub struct SavedReplayDirectory {
 
 impl SavedReplayDirectory {
     pub fn new(root: impl Into<String>) -> Self {
-        Self { root: PathBuf::from(root.into()) }
+        Self {
+            root: PathBuf::from(root.into()),
+        }
     }
 
     fn replay_path(&self, replay_id: u64) -> PathBuf {
@@ -15,26 +17,30 @@ impl SavedReplayDirectory {
         let padded_id = format!("{:0>10}", replay_id.to_string());
         let digits = &padded_id[padded_id.len() - 10..padded_id.len() - 2];
         // in 4 groups by 2 starting by most significant,
-        let groups = vec!(&digits[0..2], &digits[2..4], &digits[4..6], &digits[6..8]);
+        let groups = vec![&digits[0..2], &digits[2..4], &digits[4..6], &digits[6..8]];
         // NOT left-padded, so 0x -> x
         let dirs: Vec<String> = groups
             .into_iter()
             .map(|x| x.parse::<i32>().unwrap().to_string())
             .collect();
 
-        dirs.into_iter().fold(self.root.clone(), |mut p, d| {p.push(d) ; p})
+        dirs.into_iter().fold(self.root.clone(), |mut p, d| {
+            p.push(d);
+            p
+        })
     }
 
-    pub fn touch_and_return_file(&self, replay_id: u64) -> std::io::Result<std::fs::File> {
+    pub async fn touch_and_return_file(&self, replay_id: u64) -> std::io::Result<tokio::fs::File> {
         let mut target = self.replay_path(replay_id);
         std::fs::create_dir_all(&target)?;
 
         let basename = format!("{}.fafreplay", replay_id);
         target.push(basename);
-        std::fs::OpenOptions::new()
+        tokio::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(target)
+            .await
     }
 }
 
