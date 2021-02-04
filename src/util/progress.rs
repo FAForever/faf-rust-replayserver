@@ -133,14 +133,3 @@ impl<T: ProgressKey> ProgressTracker<T> {
         self.inner.borrow().position
     }
 }
-
-impl<T: ProgressKey> Drop for ProgressTracker<T> {
-    /* Sanity check. IMO better to require caller to explicitly reach progress end.*/
-    fn drop(&mut self) {
-        if self.position() != T::top() {
-            // TODO do not panic, as this causes aborts when other tests panic.
-            // What to do with this then? Log error and hope for the best?
-            // panic!("Progress tracker was dropped without reaching the end");
-        }
-    }
-}

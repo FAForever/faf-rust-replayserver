@@ -23,6 +23,14 @@ impl StreamPosition {
             Self::START | Self::HEADER => 0,
         }
     }
+    fn variant_order(&self) -> u8 {
+        match *self {
+            Self::START => 0,
+            Self::HEADER => 1,
+            Self::DATA(..) => 2,
+            Self::FINISHED(..) => 3,
+        }
+    }
 }
 
 impl PartialEq for StreamPosition {
@@ -45,19 +53,8 @@ impl PartialOrd for StreamPosition {
 impl Ord for StreamPosition {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (*self, *other) {
-            (Self::START, Self::START) => std::cmp::Ordering::Equal,
-            (Self::START, _) => std::cmp::Ordering::Less,
-            (_, Self::START) => std::cmp::Ordering::Greater,
-
-            (Self::HEADER, Self::HEADER) => std::cmp::Ordering::Equal,
-            (Self::HEADER, _) => std::cmp::Ordering::Less,
-            (_, Self::HEADER) => std::cmp::Ordering::Greater,
-
             (Self::DATA(u), Self::DATA(v)) => u.cmp(&v),
-            (Self::DATA(..), _) => std::cmp::Ordering::Less,
-            (_, Self::DATA(..)) => std::cmp::Ordering::Greater,
-
-            (Self::FINISHED(..), Self::FINISHED(..)) => std::cmp::Ordering::Equal,
+            (one, other) => one.variant_order().cmp(&other.variant_order()),
         }
     }
 }
