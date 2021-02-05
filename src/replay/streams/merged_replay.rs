@@ -9,9 +9,6 @@ use crate::{
 
 use super::{writer_replay::WriterReplay, ReplayHeader};
 
-// FIXME there's some overlap between this and WriterReplay. Then again, both are used somewhat
-// differently, making them share code would probably be worse.
-
 // To merged replay readers we give an interface that merges header and data.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum MergedReplayPosition {

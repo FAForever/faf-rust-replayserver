@@ -27,5 +27,5 @@ pub trait MergeStrategy {
     fn replay_header_added(&mut self, id: u64);
     fn replay_data_updated(&mut self, id: u64);
     fn finish(&mut self);
-    fn get_merged_replay(&self) -> MReplayRef; // FIXME change return type?
+    fn get_merged_replay(&self) -> MReplayRef;
 }

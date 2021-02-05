@@ -74,7 +74,6 @@ impl WriterReplay {
         self.delayed_data_progress
     }
 
-    // TODO annoying wrapper.
     pub fn discard(&mut self, until: usize) {
         self.data.discard(until);
     }

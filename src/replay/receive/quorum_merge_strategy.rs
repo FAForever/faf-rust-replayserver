@@ -185,7 +185,7 @@ struct SharedState {
     delayed_data_started: bool,
     target_quorum_size: usize,
     replays: HashMap<u64, ReplayState>,
-    canonical_stream: MReplayRef, // FIXME
+    canonical_stream: MReplayRef,
 }
 
 impl SharedState {
