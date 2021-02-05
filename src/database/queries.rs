@@ -1,7 +1,7 @@
 use sqlx::types::time::OffsetDateTime;
 use std::collections::HashMap;
 
-use crate::{config::DatabaseSettings, error::SaveError};
+use crate::error::SaveError;
 
 use super::database::Database;
 

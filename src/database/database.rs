@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-use log::error;
-
 use crate::{config::DatabaseSettings, error::SaveError};
 use sqlx::{mysql::MySqlConnectOptions, mysql::MySqlSslMode, types::time::OffsetDateTime};
 

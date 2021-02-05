@@ -1,10 +1,10 @@
-use std::{cell::RefCell, io::Write, rc::Rc};
+use std::{cell::RefCell, io::Read, io::Write, rc::Rc};
 
 use futures::Future;
 
 use crate::{
-    replay::position::PositionTracker, replay::position::StreamPosition, util::buf_list::BufList,
-    util::buf_traits::DiscontiguousBuf,
+    util::buf_list::BufList, util::buf_traits::DiscontiguousBuf, util::buf_traits::ReadAt,
+    util::progress::ProgressKey, util::progress::ProgressTracker,
 };
 
 use super::{writer_replay::WriterReplay, ReplayHeader};
@@ -12,10 +12,28 @@ use super::{writer_replay::WriterReplay, ReplayHeader};
 // FIXME there's some overlap between this and WriterReplay. Then again, both are used somewhat
 // differently, making them share code would probably be worse.
 
+// To merged replay readers we give an interface that merges header and data.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum MergedReplayPosition {
+    Data(usize),
+    Finished,
+}
+
+impl ProgressKey for MergedReplayPosition {
+    fn bottom() -> Self {
+        Self::Data(0)
+    }
+
+    fn top() -> Self {
+        Self::Finished
+    }
+}
+
 pub struct MergedReplay {
     data: BufList,
     header: Option<ReplayHeader>,
-    delayed_progress: PositionTracker,
+    delayed_progress: ProgressTracker<MergedReplayPosition>,
+    delayed_data_len: usize,
 }
 
 impl MergedReplay {
@@ -23,32 +41,47 @@ impl MergedReplay {
         Self {
             data: BufList::new(),
             header: None,
-            delayed_progress: PositionTracker::new(),
+            delayed_progress: ProgressTracker::new(),
+            delayed_data_len: 0,
+        }
+    }
+
+    // The three values below are *delayed* data.
+    fn header_len(&self) -> usize {
+        self.get_header().map_or(0, |h| h.data.len())
+    }
+
+    pub fn data_len(&self) -> usize {
+        self.delayed_data_len
+    }
+
+    pub fn len(&self) -> usize {
+        self.delayed_data_len + self.header_len()
+    }
+
+    /* Counts both header and data bytes. */
+    pub fn wait_for_byte(&self, until: usize) -> impl Future<Output = ()> {
+        let f = self
+            .delayed_progress
+            .wait(MergedReplayPosition::Data(until));
+        async {
+            f.await;
         }
     }
 
     pub fn add_header(&mut self, header: ReplayHeader) {
-        debug_assert!(self.delayed_progress.position() == StreamPosition::START);
+        debug_assert!(self.delayed_progress.position() == MergedReplayPosition::Data(0));
         self.header = Some(header);
-        self.delayed_progress.advance(StreamPosition::DATA(0));
+        self.delayed_progress
+            .advance(MergedReplayPosition::Data(self.header_len()));
     }
 
     pub fn get_header(&self) -> Option<&ReplayHeader> {
         self.header.as_ref()
     }
 
-    pub fn wait(&self, until: StreamPosition) -> impl Future<Output = StreamPosition> {
-        self.delayed_progress.wait(until)
-    }
-
-    pub fn position(&self) -> StreamPosition {
-        self.delayed_progress.position()
-    }
-
-    // FIXME this might fit better among buffer traits?
     pub fn add_data(&mut self, writer: &WriterReplay, until: usize) {
-        debug_assert!(self.position() >= StreamPosition::DATA(0));
-        debug_assert!(self.position() < StreamPosition::FINISHED(0));
+        debug_assert!(self.delayed_progress.position() < MergedReplayPosition::Finished);
         debug_assert!(until <= writer.get_data().len());
 
         let writer_data = writer.get_data();
@@ -69,16 +102,34 @@ impl MergedReplay {
 
     pub fn advance_delayed_data(&mut self, len: usize) {
         debug_assert!(len <= self.data.len());
-        debug_assert!(self.position() >= StreamPosition::DATA(0));
-        debug_assert!(self.position() < StreamPosition::FINISHED(0));
-        let pos = StreamPosition::DATA(len);
+        debug_assert!(self.delayed_progress.position() < MergedReplayPosition::Finished);
+
+        self.delayed_data_len = len;
+        let pos = MergedReplayPosition::Data(self.header_len() + len);
         self.delayed_progress.advance(pos);
     }
 
     pub fn finish(&mut self) {
-        let final_len = self.position().len();
         self.delayed_progress
-            .advance(StreamPosition::FINISHED(final_len));
+            .advance(MergedReplayPosition::Finished);
+    }
+}
+
+impl ReadAt for MergedReplay {
+    fn read_at(&self, mut start: usize, buf: &mut [u8]) -> std::io::Result<usize> {
+        if start >= self.len() {
+            return Ok(0);
+        }
+        debug_assert!(self.header.is_some());
+        if start < self.header_len() {
+            let mut data = &self.get_header().unwrap().data[start..];
+            data.read(buf)
+        } else {
+            start -= self.header_len();
+            let read_max = std::cmp::min(buf.len(), self.data_len() - start);
+            self.data
+                .read_at(start - self.header_len(), &mut buf[..read_max])
+        }
     }
 }
 

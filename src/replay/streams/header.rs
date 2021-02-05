@@ -4,7 +4,6 @@ use crate::{
     error::ConnResult, server::connection::read_until_exact, server::connection::Connection,
 };
 
-#[derive(Clone)]
 pub struct ReplayHeader {
     pub data: Vec<u8>,
 }

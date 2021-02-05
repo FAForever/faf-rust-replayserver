@@ -101,6 +101,12 @@ pub struct ReadAtCursor<'a, T: ReadAt + ?Sized> {
     start: usize,
 }
 
+impl<'a, T: ReadAt + ?Sized> ReadAtCursor<'a, T> {
+    pub fn position(&self) -> usize {
+        self.start
+    }
+}
+
 impl<'a, T: ReadAt + ?Sized> Read for ReadAtCursor<'a, T> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let res = self.src.read_at(self.start, buf)?;

@@ -8,9 +8,7 @@ use tokio::join;
 use tokio_util::sync::CancellationToken;
 use weak_table::WeakValueHashMap;
 
-use crate::{
-    accept::header::ConnectionType, database::database::Database, database::queries::Queries,
-};
+use crate::accept::header::ConnectionType;
 use crate::{config::Settings, server::connection::Connection};
 
 use super::{save::ReplaySaver, Replay};

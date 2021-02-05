@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
 use crate::{
-    replay::position::StreamPosition, replay::streams::MReplayRef, replay::streams::MergedReplay,
+    replay::streams::MReplayRef, replay::streams::MergedReplay,
     replay::streams::WReplayRef, util::buf_traits::DiscontiguousBuf,
     util::buf_traits::DiscontiguousBufExt,
 };
@@ -221,7 +221,7 @@ impl SharedState {
     }
 
     fn merged_delayed_position(&self) -> usize {
-        self.canonical_stream.borrow().position().len()
+        self.canonical_stream.borrow().data_len()
     }
 
     fn append_canon_data(&mut self, id: u64, to: usize) {
@@ -655,7 +655,7 @@ impl MergeStrategy for QuorumMergeStrategy {
         let replay = both!(self, s => s.s.get_replay(id));
         let header = replay.replay.borrow_mut().take_header();
         let mut canonical_stream = both!(self, s => s.s.canonical_stream.borrow_mut());
-        if canonical_stream.position() < StreamPosition::HEADER {
+        if canonical_stream.get_header().is_none() {
             canonical_stream.add_header(header);
         }
     }

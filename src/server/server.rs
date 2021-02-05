@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use super::connection::Connection;
 use crate::config::Settings;
-use crate::{
-    accept::ConnectionAcceptor, database::database::Database,
-    replay::save::ReplaySaver,
-};
+use crate::{accept::ConnectionAcceptor, database::database::Database, replay::save::ReplaySaver};
 use crate::{accept::ConnectionProducer, replay::Replays, worker_threads::ReplayThreadPool};
 use futures::stream::StreamExt;
 use log::debug;
