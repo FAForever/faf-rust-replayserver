@@ -2,15 +2,27 @@ use tokio::io::{AsyncBufRead, AsyncReadExt};
 
 use crate::{error::ConnResult, server::connection::read_until_exact};
 
-#[derive(Debug)]
+const MAX_SIZE: u64 = 1024 * 1024;
+
 pub struct ReplayHeader {
     pub data: Vec<u8>,
 }
 
+// Only show the very start / end
+impl std::fmt::Debug for ReplayHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let start = &self.data[..std::cmp::min(30, self.data.len())];
+        let end = &self.data[self.data.len().saturating_sub(30)..];
+        f.debug_struct("ReplayHeader")
+            .field("data (start)", &format_args!("{:?}", &start))
+            .field("data (end)", &format_args!("{:?}", &end))
+            .finish()
+    }
+}
+
 impl ReplayHeader {
     pub async fn from_connection<T: AsyncBufRead + Unpin>(c: &mut T) -> ConnResult<Self> {
-        let max_size = 1024 * 1024;
-        let limited = c.take(max_size);
+        let limited = c.take(MAX_SIZE);
         Self::do_from_connection(limited)
             .await
             .map_err(|x| x.into())
@@ -81,9 +93,11 @@ impl ReplayHeader {
 mod test {
     use std::{fs::File, io::Read, path::PathBuf};
 
+    use futures::Future;
     use tokio::{
+        io::DuplexStream,
         io::{AsyncWriteExt, BufReader},
-        join,
+        try_join,
     };
 
     use super::*;
@@ -97,25 +111,38 @@ mod test {
         res
     }
 
-    #[tokio::test]
-    async fn read_example_header() {
-        let example_header = get_file("example_header");
+    async fn test_replay_on_data<F: Future<Output = ()>, FN>(data: &Vec<u8>, test: FN)
+    where
+        FN: Fn(BufReader<DuplexStream>) -> F,
+    {
         let (mut i, o) = tokio::io::duplex(1024);
-        let mut buf_read = BufReader::new(o);
+        let buf_read = BufReader::new(o);
 
         let writing_data = async {
-            i.write_all(example_header.as_ref()).await.unwrap();
+            i.write_all(data.as_ref()).await.unwrap();
+            drop(i);
         };
-        let read_header = async {
+        let read_header = test(buf_read);
+
+        // Return when test ends, but not when data writing ends
+        let _: Result<((), ()), ()> = try_join! {
+            async { writing_data.await ; Ok(()) },
+            async {read_header.await ; Err(()) },
+        };
+    }
+
+    #[tokio::test]
+    async fn example_header() {
+        let example_header = get_file("example_header");
+        let eref = &example_header;
+
+        test_replay_on_data(&example_header, |mut buf_read| async move {
+            let example_header = eref;
             let header = ReplayHeader::from_connection(&mut buf_read).await.unwrap();
             let expected: &[u8] = example_header.as_ref();
             assert_eq!(header.data, expected);
-        };
-
-        join! {
-            writing_data,
-            read_header,
-        };
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -126,23 +153,43 @@ mod test {
         for i in 0..example_header.len() {
             let mut short_header = example_header.clone();
             short_header.truncate(i);
-            let (mut i, o) = tokio::io::duplex(1024);
-            let mut buf_read = BufReader::new(o);
-
-            let writing_data = async move {
-                i.write_all(short_header.as_ref()).await.unwrap();
-                drop(i);
-            };
-            let read_header = async {
+            test_replay_on_data(&short_header, |mut buf_read| async move {
                 ReplayHeader::from_connection(&mut buf_read)
                     .await
                     .expect_err("Reading short header should result in an error!");
-            };
-
-            join! {
-                writing_data,
-                read_header,
-            };
+            })
+            .await;
         }
+    }
+
+    #[tokio::test]
+    async fn too_large_header() {
+        let example_header = get_file("example_header");
+
+        // We start with reading until \0, so let's prepend a lot of 1's
+        let mut long_header = vec![];
+        for _ in 0..(MAX_SIZE - 500) {
+            long_header.push(1);
+        }
+        long_header.append(&mut example_header.clone());
+        test_replay_on_data(&long_header, |mut buf_read| async move {
+            ReplayHeader::from_connection(&mut buf_read)
+                .await
+                .expect_err("Header should be too long");
+        })
+        .await;
+
+        // Just to be sure, check if a not-quite-long enough header works fine
+        let mut short_header = vec![];
+        for _ in 0..(MAX_SIZE - 2000) {
+            short_header.push(1);
+        }
+        short_header.append(&mut example_header.clone());
+        test_replay_on_data(&short_header, |mut buf_read| async move {
+            ReplayHeader::from_connection(&mut buf_read)
+                .await
+                .expect("Header should be short enough");
+        })
+        .await;
     }
 }
