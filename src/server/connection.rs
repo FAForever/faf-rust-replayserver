@@ -120,12 +120,83 @@ pub async fn read_until_exact<T: AsyncBufRead + Unpin>(
     buf: &mut Vec<u8>,
 ) -> std::io::Result<usize> {
     let result = r.read_until(byte, buf).await?;
-    if buf[buf.len() - 1] != byte {
+    if (result == 0) || (buf[buf.len() - 1] != byte) {
         Err(std::io::Error::new(
             std::io::ErrorKind::UnexpectedEof,
             format!("Reached end of stream while reading until '{}'", byte),
         ))
     } else {
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use tokio::{io::AsyncWriteExt, io::BufReader, join};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn read_until_exact_normal() {
+        let (mut i, o) = tokio::io::duplex(1024);
+        let mut buf_read = BufReader::new(o);
+
+        let writing_data = async move {
+            let buf: &[u8] = &[1, 2, 3, 4, 5];
+            i.write(buf).await.unwrap();
+            drop(i);
+        };
+        let read_header = async {
+            let mut data = vec![];
+            let val = read_until_exact(&mut buf_read, 3, &mut data).await.unwrap();
+            assert_eq!(val, 3);
+            assert_eq!(data, vec!(1, 2, 3));
+        };
+        join! {
+            writing_data,
+            read_header,
+        };
+    }
+
+    #[tokio::test]
+    async fn read_until_exact_missing() {
+        let (mut i, o) = tokio::io::duplex(1024);
+        let mut buf_read = BufReader::new(o);
+
+        let writing_data = async move {
+            let buf: &[u8] = &[1, 2, 3, 4, 5];
+            i.write(buf).await.unwrap();
+            drop(i);
+        };
+        let read_header = async {
+            let mut data = vec![];
+            read_until_exact(&mut buf_read, 8, &mut data)
+                .await
+                .expect_err("Should've reached end without finding 8");
+        };
+        join! {
+            writing_data,
+            read_header,
+        };
+    }
+
+    #[tokio::test]
+    async fn read_until_exact_empty() {
+        let (i, o) = tokio::io::duplex(1024);
+        let mut buf_read = BufReader::new(o);
+
+        let writing_data = async move {
+            drop(i);
+        };
+        let read_header = async {
+            let mut data = vec![];
+            let _name = read_until_exact(&mut buf_read, 0, &mut data)
+                .await
+                .expect_err("Zero read should be short");
+        };
+        join! {
+            writing_data,
+            read_header,
+        };
     }
 }

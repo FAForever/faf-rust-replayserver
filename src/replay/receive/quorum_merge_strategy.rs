@@ -1,9 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
 use crate::{
-    replay::streams::MReplayRef, replay::streams::MergedReplay,
-    replay::streams::WReplayRef, util::buf_traits::DiscontiguousBuf,
-    util::buf_traits::DiscontiguousBufExt,
+    replay::streams::MReplayRef, replay::streams::MergedReplay, replay::streams::WReplayRef,
+    util::buf_traits::DiscontiguousBuf, util::buf_traits::DiscontiguousBufExt,
 };
 
 use super::merge_strategy::MergeStrategy;

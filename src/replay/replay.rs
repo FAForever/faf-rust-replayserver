@@ -97,7 +97,10 @@ impl Replay {
 
     pub async fn handle_connection(&self, mut c: Connection) -> () {
         if self.should_stop_accepting_connections.get() {
-            log::info!("Replay {} dropped a connection because its write phase is over", self.id);
+            log::info!(
+                "Replay {} dropped a connection because its write phase is over",
+                self.id
+            );
             return;
         }
         match c.get_header().type_ {
