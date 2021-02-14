@@ -5,6 +5,7 @@ use sqlx::{mysql::MySqlConnectOptions, mysql::MySqlSslMode, types::time::OffsetD
 
 // Unlike python server, we don't do arbitrary queries. We run specific queries and nothing more.
 // This means we only need a real DB for this thing's unit tests, not for system tests.
+#[cfg_attr(test, faux::create)]
 pub struct Database {
     pool: sqlx::MySqlPool,
 }
@@ -39,6 +40,7 @@ pub struct ModVersions {
 
 // TODO - SQL queries should probably be moved to some central FAF component.
 // For what it's worth, I checked that inner / left joins correspond to foreign / nullable keys.
+#[cfg_attr(test, faux::methods)]
 impl Database {
     pub fn new(dbc: &DatabaseSettings) -> Self {
         let options = MySqlConnectOptions::new()
@@ -349,6 +351,7 @@ mod test {
     async fn test_db_game_with_null_modname() {
         let db = get_db();
         let stats = db.get_game_stat_row(1100).await.unwrap();
+        assert!(stats.game_mod.is_none());
     }
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]

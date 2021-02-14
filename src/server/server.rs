@@ -60,7 +60,7 @@ impl Server {
     }
 
     pub async fn accept(&self) {
-        let connections = self.producer.connections().await;
+        let connections = self.producer.listen();
         let acceptor = &self.acceptor;
         let work = connections.for_each_concurrent(None, |c| async move {
             acceptor.accept(c).await;
@@ -69,5 +69,23 @@ impl Server {
             _ = work => { debug!("Server stopped accepting connections for some reason!") }
             _ = self.shutdown_token.cancelled() => { debug!("Server shutting down") }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn mock_db() -> Database {
+        todo!()
+    }
+
+    fn mock_conns() -> ConnectionProducer {
+        todo!()
+    }
+
+    fn tmp_dir() -> String {
+        todo!()
     }
 }

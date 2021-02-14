@@ -1,21 +1,27 @@
+use std::pin::Pin;
+
 use crate::server::connection::Connection;
 use async_stream::stream;
 use futures::Stream;
 use tokio::net::TcpListener;
 
+pub type ConnectionStream = Pin<Box<dyn Stream<Item = Connection>>>;
+
+#[cfg_attr(test, faux::create)]
 pub struct ConnectionProducer {
-    addr: String,
+    addr: String
 }
 
+#[cfg_attr(test, faux::methods)]
 impl ConnectionProducer {
     pub fn new(addr: String) -> Self {
         Self { addr }
     }
 
-    /* Returned stream never ends. */
-    pub async fn connections(&self) -> impl Stream<Item = Connection> {
-        let listener = TcpListener::bind(self.addr.clone()).await.unwrap();
-        stream! {
+    pub fn listen(&self) -> ConnectionStream {
+        let addr = self.addr.clone();
+        let stream = stream! {
+            let listener = TcpListener::bind(addr).await.unwrap();
             loop {
                 match listener.accept().await {
                     Err(_) => (),    /* log? */
@@ -25,6 +31,7 @@ impl ConnectionProducer {
                     }
                 }
             }
-        }
+        };
+        Box::pin(stream)
     }
 }
