@@ -1,7 +1,4 @@
-use std::{
-    rc::{Rc, Weak},
-    sync::Arc,
-};
+use std::rc::{Rc, Weak};
 
 use futures::{Stream, StreamExt};
 use tokio::join;
@@ -32,13 +29,9 @@ impl Replays {
         }
     }
 
-    pub fn build(
-        shutdown_token: CancellationToken,
-        config: Settings,
-        saver: Arc<ReplaySaver>,
-    ) -> Self {
+    pub fn build(shutdown_token: CancellationToken, config: Settings, saver: ReplaySaver) -> Self {
         let replay_builder =
-            move |rid| Replay::new(rid, shutdown_token.clone(), &config, saver.clone());
+            move |rid| Replay::new(rid, shutdown_token.clone(), config.clone(), saver.clone());
         Self::new(Box::new(replay_builder))
     }
 

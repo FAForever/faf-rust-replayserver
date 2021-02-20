@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     config::Settings, database::database::Database, database::queries::Queries,
     replay::streams::MReplayRef,
@@ -5,17 +7,19 @@ use crate::{
 
 use super::{writer::write_replay, ReplayJsonHeader, SavedReplayDirectory};
 
-pub struct ReplaySaver {
+pub type ReplaySaver = Arc<InnerReplaySaver>;
+
+pub struct InnerReplaySaver {
     db: Queries,
     save_dir: SavedReplayDirectory,
 }
 
-impl ReplaySaver {
-    pub fn new(db: Database, config: &Settings) -> Self {
-        Self {
+impl InnerReplaySaver {
+    pub fn new(db: Database, config: Settings) -> Arc<Self> {
+        Arc::new(Self {
             db: Queries::new(db),
             save_dir: SavedReplayDirectory::new(config.server.replay_save_directory.as_ref()),
-        }
+        })
     }
     // TODO count and store ticks
     pub async fn save_replay(&self, replay: MReplayRef, replay_id: u64) {

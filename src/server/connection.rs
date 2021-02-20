@@ -131,7 +131,7 @@ pub async fn read_until_exact<T: AsyncBufRead + Unpin>(
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use tokio::{io::AsyncWriteExt, io::BufReader, join};
 
     use super::*;
@@ -198,5 +198,14 @@ mod test {
             writing_data,
             read_header,
         };
+    }
+
+    /* Connection, reader, writer */
+    pub type MockConnection = (Connection, tokio::io::DuplexStream, tokio::io::DuplexStream);
+    pub fn test_connection() -> MockConnection {
+        let (reader, conn_writer) = tokio::io::duplex(1024);
+        let (conn_reader, writer) = tokio::io::duplex(1024);
+        let c = Connection::test(Box::new(BufReader::new(conn_reader)), Box::new(conn_writer));
+        (c, reader, writer)
     }
 }

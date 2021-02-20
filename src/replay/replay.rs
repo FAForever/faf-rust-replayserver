@@ -1,4 +1,4 @@
-use std::{cell::Cell, sync::Arc, time::Duration};
+use std::{cell::Cell, time::Duration};
 
 use tokio::{join, select};
 use tokio_util::sync::CancellationToken;
@@ -14,7 +14,7 @@ pub struct Replay {
     id: u64,
     merger: ReplayMerger,
     sender: ReplaySender,
-    saver: Arc<ReplaySaver>,
+    saver: ReplaySaver,
     replay_timeout_token: CancellationToken,
     writer_connection_count: EmptyCounter,
     reader_connection_count: EmptyCounter,
@@ -27,8 +27,8 @@ impl Replay {
     pub fn new(
         id: u64,
         shutdown_token: CancellationToken,
-        config: &Settings,
-        saver: Arc<ReplaySaver>,
+        config: Settings,
+        saver: ReplaySaver,
     ) -> Self {
         let writer_connection_count = EmptyCounter::new();
         let reader_connection_count = EmptyCounter::new();

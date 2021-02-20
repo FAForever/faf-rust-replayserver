@@ -27,7 +27,7 @@ impl ConnectionAcceptor {
         }
     }
 
-    pub fn build(thread_pool: ReplayThreadPool, config: &Settings) -> Self {
+    pub fn build(thread_pool: ReplayThreadPool, config: Settings) -> Self {
         let header_reader = ConnectionHeaderReader::new();
         let connection_accept_timeout =
             Duration::from_secs(config.server.connection_accept_timeout_s);

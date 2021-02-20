@@ -183,7 +183,7 @@ impl Database {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     // See db_unit_test_data.sql for data used here.
     use std::collections::HashMap;
 
@@ -419,5 +419,38 @@ mod test {
         let db = get_db();
         let mod_data = db.get_mod_version_list("labwars").await.unwrap();
         assert!(mod_data.is_empty());
+    }
+
+    fn default_game_stats() -> GameStatRow {
+        GameStatRow {
+            start_time: dt(date!(2010 - 01 - 01), time!(00:00:00)),
+            end_time: Some(dt(date!(2010 - 01 - 01), time!(01:00:00))),
+            game_type: "0".into(),
+            host: "user1".into(),
+            game_name: "2v2 Game".into(),
+            game_mod: Some("faf".into()),
+            file_name: Some("maps/scmp_001.zip".into()),
+        }
+    }
+
+    fn mock_db() -> Database {
+        let mut mock_db = Database::faux();
+        faux::when!(mock_db.get_game_stat_row).safe_then(|_id| Ok(default_game_stats()));
+        faux::when!(mock_db.get_team_players).safe_then(|_id| {
+            Ok(vec![TeamPlayerRow {
+                login: "user".into(),
+                team: 1,
+            }])
+        });
+        faux::when!(mock_db.get_player_count).safe_then(|_id| Ok(1));
+        unsafe {
+            faux::when!(mock_db.get_mod_version_list).then(|_modname| {
+                Ok(vec![ModVersions {
+                    file_id: 50,
+                    version: 3000,
+                }])
+            });
+        }
+        mock_db
     }
 }

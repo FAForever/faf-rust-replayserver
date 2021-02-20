@@ -1,6 +1,5 @@
-use accept::ConnectionProducer;
-use database::database::Database;
 use futures::join;
+use server::server::run_server;
 
 pub mod accept;
 pub mod config;
@@ -13,24 +12,21 @@ pub mod worker_threads;
 #[macro_use]
 pub mod error;
 
-use crate::config::Settings;
-use crate::server::server::Server;
+use crate::config::InnerSettings;
 use crate::server::signal::cancel_at_sigint;
 use tokio_util::sync::CancellationToken;
 
-async fn run_server() {
-    let maybe_config = Settings::from_env();
-    if let Err(e) = maybe_config {
-        log::info!("Failed to load config: {}", e);
-        return;
-    }
-    let config = maybe_config.unwrap();
-
+async fn do_run_server() {
+    let maybe_config = InnerSettings::from_env();
+    let config = match maybe_config {
+        Err(e) => {
+            log::info!("Failed to load config: {}", e);
+            return;
+        }
+        Ok(o) => o,
+    };
     let shutdown_token = CancellationToken::new();
-    let producer = ConnectionProducer::new(format!("localhost:{}", config.server.port));
-    let database = Database::new(&config.database);
-    let server = Server::new(config, producer, database, shutdown_token.clone());
-    let f1 = server.accept();
+    let f1 = run_server(config, shutdown_token.clone());
     let f2 = cancel_at_sigint(shutdown_token);
     join!(f1, f2);
     /* Worker threads are joined once we drop the server. */
@@ -50,5 +46,5 @@ pub fn run() -> () {
     let local_loop = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
-    local_loop.block_on(run_server());
+    local_loop.block_on(do_run_server());
 }

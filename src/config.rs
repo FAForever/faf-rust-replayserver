@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, sync::Arc};
 
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
@@ -38,17 +38,19 @@ pub struct ReplaySettings {
     pub stream_comparison_distance_b: usize,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct Settings {
+pub type Settings = Arc<InnerSettings>;
+
+#[derive(Debug, Deserialize)]
+pub struct InnerSettings {
     pub server: ServerSettings,
     pub database: DatabaseSettings,
     pub storage: StorageSettings,
     pub replay: ReplaySettings,
 }
 
-impl Settings {
-    pub fn default() -> Self {
-        Self {
+impl InnerSettings {
+    pub fn default() -> Arc<Self> {
+        Arc::new(Self {
             server: ServerSettings {
                 port: 15000,
                 worker_threads: 8,
@@ -74,9 +76,9 @@ impl Settings {
                 merge_quorum_size: 2,
                 stream_comparison_distance_b: 4096,
             },
-        }
+        })
     }
-    pub fn from_env() -> Result<Self, ConfigError> {
+    pub fn from_env() -> Result<Arc<Self>, ConfigError> {
         let config_file = env::var("RS_CONFIG_FILE").map_err(|_| {
             ConfigError::Message(
                 "RS_CONFIG_FILE env var not set, place the path to the config file there.".into(),
@@ -88,6 +90,6 @@ impl Settings {
         c.set("database.password", db_password)?;
         c.merge(File::with_name(&config_file[..]))?;
 
-        c.try_into()
+        Ok(Arc::new(c.try_into()?))
     }
 }

@@ -6,16 +6,16 @@ use crate::server::connection::Connection;
 
 pub type ThreadFn = Box<dyn Fn(Receiver<Connection>) -> () + Send>;
 
-pub struct ReplayWorkerThread {
+pub struct ReplayThread {
     handle: Option<JoinHandle<()>>,
     channel: Sender<Connection>,
 }
 
-impl ReplayWorkerThread {
+impl ReplayThread {
     pub fn new(work: ThreadFn) -> Self {
         let (s, r) = channel(1);
         let handle = thread::spawn(move || work(r));
-        ReplayWorkerThread {
+        Self {
             handle: Some(handle),
             channel: s,
         }
@@ -28,7 +28,7 @@ impl ReplayWorkerThread {
     }
 }
 
-impl Drop for ReplayWorkerThread {
+impl Drop for ReplayThread {
     // This waits until the worker thread joins.
     // FIXME is it a good idea to do this in Drop? We don't want to panic here.
     fn drop(&mut self) {
