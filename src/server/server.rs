@@ -6,7 +6,7 @@ use crate::{
 };
 use crate::{accept::ConnectionAcceptor, database::database::Database, replay::save::ReplaySaver};
 use futures::{stream::StreamExt, Stream};
-use log::debug;
+use log::{debug, info};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 
@@ -34,10 +34,14 @@ pub async fn run_server_with_deps(
 ) {
     let saver = InnerReplaySaver::new(database, config.clone());
     let thread_pool = server_thread_pool(config.clone(), shutdown_token.clone(), saver);
-    let acceptor = ConnectionAcceptor::build(thread_pool, config);
+    let acceptor = ConnectionAcceptor::build(config);
 
-    let accept_connections = connections.for_each_concurrent(None, |c| async {
-        acceptor.accept(c).await;
+    let accept_connections = connections.for_each_concurrent(None, |mut c| async {
+        if let Err(e) = acceptor.accept(&mut c).await {
+            info!("{}", e);
+            return;
+        }
+        thread_pool.assign_connection(c).await;
     });
     select! {
         _ = accept_connections => { debug!("Server stopped accepting connections for some reason!") }

@@ -4,15 +4,13 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::server::connection::Connection;
 
-pub type ThreadFn = Box<dyn Fn(Receiver<Connection>) -> () + Send>;
-
 pub struct ReplayThread {
     handle: Option<JoinHandle<()>>,
     channel: Sender<Connection>,
 }
 
 impl ReplayThread {
-    pub fn new(work: ThreadFn) -> Self {
+    pub fn new(work: impl Fn(Receiver<Connection>) -> () + Send + 'static + Clone) -> Self {
         let (s, r) = channel(1);
         let handle = thread::spawn(move || work(r));
         Self {

@@ -1,5 +1,6 @@
-use super::worker::{ReplayThread, ThreadFn};
+use super::worker::ReplayThread;
 
+use tokio::sync::mpsc::Receiver;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 
@@ -12,19 +13,17 @@ pub struct ReplayThreadPool {
 }
 
 impl ReplayThreadPool {
-    // Funky type so that we can clone work closures for each thread.
-    // TODO possibly make private depending on whether we want to test this.
-    fn new(work: impl Fn() -> ThreadFn, count: u32) -> Self {
+    fn new(work: impl Fn(Receiver<Connection>) -> () + Send + 'static + Clone, count: u32) -> Self {
         let mut replay_workers = Vec::new();
         for _ in 0..count {
-            let worker = ReplayThread::new(work());
+            let worker = ReplayThread::new(work.clone());
             replay_workers.push(worker);
         }
         Self { replay_workers }
     }
 
     pub fn from_context(context: ReplayThreadContext, count: u32) -> Self {
-        Self::new(move || context.run_replays(), count)
+        Self::new(move |s| context.run_replays(s), count)
     }
 
     /* Cancellable. */
@@ -51,19 +50,16 @@ impl ReplayThreadContext {
         }
     }
 
-    pub fn run_replays(&self) -> ThreadFn {
+    pub fn run_replays(&self, s: Receiver<Connection>) {
         let c = self.clone();
-        Box::new(move |s| {
-            let c = c.clone();
-            let mut replays = Replays::build(c.shutdown_token, c.config, c.saver);
-            let wrapper = ReceiverStream::new(s);
+        let mut replays = Replays::build(c.shutdown_token, c.config, c.saver);
+        let wrapper = ReceiverStream::new(s);
 
-            let local_loop = tokio::runtime::Builder::new_current_thread()
-                .build()
-                .unwrap();
-            local_loop.block_on(async {
-                replays.handle_connections_and_replays(wrapper).await;
-            });
-        })
+        let local_loop = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        local_loop.block_on(async {
+            replays.handle_connections_and_replays(wrapper).await;
+        });
     }
 }
