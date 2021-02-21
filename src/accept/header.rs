@@ -1,4 +1,3 @@
-use std::fmt::Formatter;
 use std::io::ErrorKind;
 use std::str::from_utf8;
 
@@ -21,35 +20,6 @@ pub struct ConnectionHeader {
     pub type_: ConnectionType,
     pub id: u64,
     pub name: String,
-}
-
-// Just for logging
-pub struct MaybeConnectionHeader {
-    v: Option<ConnectionHeader>,
-}
-
-impl From<Option<ConnectionHeader>> for MaybeConnectionHeader {
-    fn from(v: Option<ConnectionHeader>) -> MaybeConnectionHeader {
-        MaybeConnectionHeader { v }
-    }
-}
-
-impl std::fmt::Display for MaybeConnectionHeader {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match &self.v {
-            None => f.write_str("Initial connection"),
-            Some(h) => write!(
-                f,
-                "{} '{}' for replay {}",
-                match h.type_ {
-                    ConnectionType::READER => "Reader",
-                    ConnectionType::WRITER => "Writer",
-                },
-                h.name,
-                h.id
-            ),
-        }
-    }
 }
 
 pub struct ConnectionHeaderReader {}

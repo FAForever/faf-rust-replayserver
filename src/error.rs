@@ -1,9 +1,4 @@
-use log::info;
-use thiserror::Error;
-
-use crate::accept::header::MaybeConnectionHeader;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ConnectionError {
     #[error("Empty connection")]
     NoData(),
@@ -46,12 +41,6 @@ impl From<std::io::Error> for ConnectionError {
 }
 
 impl ConnectionError {
-    pub fn log(&self, c: MaybeConnectionHeader) {
-        match self {
-            Self::BadData(..) | Self::IO { .. } => info!("{} ended: {}", c, self),
-            _ => (),
-        }
-    }
     pub fn context(self, s: String) -> Self {
         match self {
             Self::BadData(_) => Self::BadData(s),

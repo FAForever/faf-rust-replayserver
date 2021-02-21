@@ -1,4 +1,6 @@
-use crate::accept::header::ConnectionHeader;
+use std::fmt::Display;
+
+use crate::accept::header::{ConnectionType, ConnectionHeader};
 use tokio::{
     io::AsyncBufRead, io::AsyncBufReadExt, io::AsyncRead, io::AsyncWrite, io::BufReader,
     net::TcpStream,
@@ -55,6 +57,24 @@ impl Connection {
     }
     fn get_writer(&mut self) -> &mut dyn AsyncWrite {
         &mut *self.writer
+    }
+}
+
+impl Display for Connection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.header {
+            None => f.write_str("Initial connection"),
+            Some(h) => write!(
+                f,
+                "{} '{}' for replay {}",
+                match h.type_ {
+                    ConnectionType::READER => "Reader",
+                    ConnectionType::WRITER => "Writer",
+                },
+                h.name,
+                h.id
+            ),
+        }
     }
 }
 
