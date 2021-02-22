@@ -24,12 +24,9 @@ impl ReplayThread {
             _ => panic!("Could not dispatch a connection to a thread. Did it die?"),
         }
     }
-}
 
-impl Drop for ReplayThread {
-    // This waits until the worker thread joins.
-    // FIXME is it a good idea to do this in Drop? We don't want to panic here.
-    fn drop(&mut self) {
+    pub fn join(mut self) {
+        drop(self.channel);
         self.handle.take().unwrap().join().unwrap();
     }
 }

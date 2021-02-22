@@ -433,7 +433,7 @@ pub mod test {
         }
     }
 
-    fn mock_db() -> Database {
+    pub fn mock_database() -> Database {
         let mut mock_db = Database::faux();
         faux::when!(mock_db.get_game_stat_row).safe_then(|_id| Ok(default_game_stats()));
         faux::when!(mock_db.get_team_players).safe_then(|_id| {

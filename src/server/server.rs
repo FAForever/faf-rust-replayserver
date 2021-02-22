@@ -48,6 +48,8 @@ pub async fn run_server_with_deps(
         Some(_) => debug!("Server stopped accepting connections for some reason!"),
         None => debug!("Server shutting down"),
     }
+
+    thread_pool.join();
 }
 
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
@@ -57,13 +59,45 @@ pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
 
 #[cfg(test)]
 mod test {
+    use std::{sync::Arc, time::Duration};
+
+    use crate::{
+        config::test::default_config, database::database::test::mock_database,
+        server::connection::test::test_connection,
+    };
+    use async_stream::stream;
+    use tempfile::tempdir;
+    use tokio::select;
+
     use super::*;
 
-    //    fn mock_conns() -> impl Stream<Item = Connection> {
-    //        todo!()
-    //    }
+    #[tokio::test]
+    async fn single_empty_connection() {
+        tokio::time::pause();
 
-    fn tmp_dir() -> String {
-        todo!()
+        let (c, _reader, _writer) = test_connection();
+        let mut conf = default_config();
+        let db = mock_database();
+        let token = CancellationToken::new();
+        let tmp_dir = tempdir().unwrap();
+
+        conf.server.connection_accept_timeout_s = 20;
+        conf.storage.vault_path = tmp_dir.path().to_str().unwrap().into();
+
+        let server = run_server_with_deps(Arc::new(conf), token.clone(), stream! { yield c; }, db);
+        let mut ended_too_early = true;
+
+        let wait = async {
+            tokio::time::sleep(Duration::from_secs(19)).await;
+            ended_too_early = false;
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        };
+
+        select! {
+            _ = server => (),
+            _ = wait => panic!("Server should have quit after connection timeout"),
+        }
+        assert!(!ended_too_early);
+        /* TODO check that nothing happened, maybe, somehow? */
     }
 }

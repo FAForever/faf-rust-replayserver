@@ -49,8 +49,28 @@ pub struct InnerSettings {
 }
 
 impl InnerSettings {
-    pub fn default() -> Arc<Self> {
-        Arc::new(Self {
+    pub fn from_env() -> Result<Arc<Self>, ConfigError> {
+        let config_file = env::var("RS_CONFIG_FILE").map_err(|_| {
+            ConfigError::Message(
+                "RS_CONFIG_FILE env var not set, place the path to the config file there.".into(),
+            )
+        })?;
+        let db_password = env::var("RS_DB_PASSWORD")
+            .map_err(|_| ConfigError::NotFound("Database password was not provided".into()))?;
+        let mut c = Config::new();
+        c.set("database.password", db_password)?;
+        c.merge(File::with_name(&config_file[..]))?;
+
+        Ok(Arc::new(c.try_into()?))
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+
+    pub fn default_config() -> InnerSettings {
+        InnerSettings {
             server: ServerSettings {
                 port: 15000,
                 worker_threads: 8,
@@ -76,20 +96,6 @@ impl InnerSettings {
                 merge_quorum_size: 2,
                 stream_comparison_distance_b: 4096,
             },
-        })
-    }
-    pub fn from_env() -> Result<Arc<Self>, ConfigError> {
-        let config_file = env::var("RS_CONFIG_FILE").map_err(|_| {
-            ConfigError::Message(
-                "RS_CONFIG_FILE env var not set, place the path to the config file there.".into(),
-            )
-        })?;
-        let db_password = env::var("RS_DB_PASSWORD")
-            .map_err(|_| ConfigError::NotFound("Database password was not provided".into()))?;
-        let mut c = Config::new();
-        c.set("database.password", db_password)?;
-        c.merge(File::with_name(&config_file[..]))?;
-
-        Ok(Arc::new(c.try_into()?))
+        }
     }
 }

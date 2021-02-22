@@ -32,6 +32,12 @@ impl ReplayThreadPool {
         let worker_to_pick = (conn_info.id % self.replay_workers.len() as u64) as usize;
         self.replay_workers[worker_to_pick].dispatch(conn).await;
     }
+
+    pub fn join(self) {
+        for worker in self.replay_workers.into_iter() {
+            worker.join();
+        }
+    }
 }
 
 #[derive(Clone)]
