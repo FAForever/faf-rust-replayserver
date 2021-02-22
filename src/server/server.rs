@@ -34,7 +34,7 @@ pub async fn run_server_with_deps(
 ) {
     let saver = InnerReplaySaver::new(database, config.clone());
     let thread_pool = server_thread_pool(config.clone(), shutdown_token.clone(), saver);
-    let acceptor = ConnectionAcceptor::build(config);
+    let acceptor = ConnectionAcceptor::new(config);
 
     let accept_connections = connections.for_each_concurrent(None, |mut c| async {
         if let Err(e) = acceptor.accept(&mut c).await {

@@ -61,7 +61,7 @@ mod test {
         let (res, _) = join!(cancellable, cancel);
         assert!(res.is_some());
     }
-    
+
     #[tokio::test]
     async fn cancel_cancelled() {
         tokio::time::pause();

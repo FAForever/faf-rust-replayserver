@@ -22,12 +22,8 @@ pub struct ConnectionHeader {
     pub name: String,
 }
 
-pub struct ConnectionHeaderReader {}
-
-impl ConnectionHeaderReader {
-    pub fn new() -> Self {
-        Self {}
-    }
+pub mod header_reader {
+    use super::*;
 
     async fn read_type(conn: &mut Connection) -> ConnResult<ConnectionType> {
         let mut buf: [u8; 2] = [0; 2];
@@ -60,19 +56,19 @@ impl ConnectionHeaderReader {
     }
 
     async fn read_connection_header(conn: &mut Connection) -> ConnResult<ConnectionHeader> {
-        let type_ = Self::read_type(conn).await.map_err(|e| match e {
+        let type_ = read_type(conn).await.map_err(|e| match e {
             ConnectionError::IO { source: e, .. } if e.kind() == ErrorKind::UnexpectedEof => {
                 ConnectionError::NoData()
             }
             e => e,
         })?;
-        let (id, name) = Self::read_game_data(conn).await?;
+        let (id, name) = read_game_data(conn).await?;
         Ok(ConnectionHeader { type_, id, name })
     }
 
     /* Cancellable. */
-    pub async fn read_and_set_connection_header(&self, conn: &mut Connection) -> ConnResult<()> {
-        let header = Self::read_connection_header(conn).await?;
+    pub async fn read_and_set_connection_header(conn: &mut Connection) -> ConnResult<()> {
+        let header = read_connection_header(conn).await?;
         conn.set_header(header);
         Ok(())
     }
@@ -80,7 +76,8 @@ impl ConnectionHeaderReader {
 
 #[cfg(test)]
 mod test {
-    use super::{ConnectionHeaderReader, ConnectionType};
+    use super::header_reader::read_and_set_connection_header;
+    use super::*;
     use crate::{error::ConnectionError, server::connection::Connection};
     use std::{io::Cursor, sync::Once};
     use tokio::io::BufReader;
@@ -99,26 +96,20 @@ mod test {
     #[tokio::test]
     async fn test_connection_header_type() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"P/1/foo\0");
-        reader.read_and_set_connection_header(&mut c).await.unwrap();
+        read_and_set_connection_header(&mut c).await.unwrap();
         assert!(c.get_header().type_ == ConnectionType::WRITER);
 
         c = conn_from_read_data(b"G/1/foo\0");
-        reader.read_and_set_connection_header(&mut c).await.unwrap();
+        read_and_set_connection_header(&mut c).await.unwrap();
         assert!(c.get_header().type_ == ConnectionType::READER);
     }
 
     #[tokio::test]
     async fn test_connection_header_invalid_type() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"U/1/foo\0");
-        let err = reader
-            .read_and_set_connection_header(&mut c)
-            .await
-            .err()
-            .unwrap();
+        let err = read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
@@ -126,13 +117,8 @@ mod test {
     async fn test_connection_header_type_short_data() {
         for short_data in vec![b"" as &[u8], b"P"] {
             setup();
-            let reader = ConnectionHeaderReader::new();
             let mut c = conn_from_read_data(short_data);
-            let err = reader
-                .read_and_set_connection_header(&mut c)
-                .await
-                .err()
-                .unwrap();
+            let err = read_and_set_connection_header(&mut c).await.err().unwrap();
             assert!(matches!(err, ConnectionError::NoData()));
         }
     }
@@ -140,9 +126,8 @@ mod test {
     #[tokio::test]
     async fn test_connection_header_replay_info() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/1/foo\0");
-        reader.read_and_set_connection_header(&mut c).await.unwrap();
+        read_and_set_connection_header(&mut c).await.unwrap();
         let h = c.get_header();
         assert!(h.id == 1);
         assert!(h.name == "foo");
@@ -151,48 +136,32 @@ mod test {
     #[tokio::test]
     async fn test_connection_header_replay_uid_not_int() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/bar/foo\0");
-        let err = reader
-            .read_and_set_connection_header(&mut c)
-            .await
-            .err()
-            .unwrap();
+        let err = read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
     #[tokio::test]
     async fn test_connection_header_replay_info_no_null_end() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/1/foo");
-        let err = reader
-            .read_and_set_connection_header(&mut c)
-            .await
-            .err()
-            .unwrap();
+        let err = read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
     #[tokio::test]
     async fn test_connection_header_replay_info_no_delimiter() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/1\0");
-        let err = reader
-            .read_and_set_connection_header(&mut c)
-            .await
-            .err()
-            .unwrap();
+        let err = read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
     #[tokio::test]
     async fn test_connection_header_replay_info_more_slashes() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/1/name/with/slash\0");
-        reader.read_and_set_connection_header(&mut c).await.unwrap();
+        read_and_set_connection_header(&mut c).await.unwrap();
         let h = c.get_header();
         assert!(h.id == 1);
         assert!(h.name == "name/with/slash");
@@ -201,21 +170,15 @@ mod test {
     #[tokio::test]
     async fn test_connection_header_replay_info_invalid_unicode() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         // Lonely start character is invalid unicode
         let mut c = conn_from_read_data(b"G/1/foo \xc0 bar\0");
-        let err = reader
-            .read_and_set_connection_header(&mut c)
-            .await
-            .err()
-            .unwrap();
+        let err = read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
     #[tokio::test]
     async fn test_connection_header_replay_info_limit_overrun() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut data: Vec<u8> = b"G/1/".to_vec();
 
         for _ in 0..1024 {
@@ -223,24 +186,15 @@ mod test {
         }
         data.extend(b"\0");
         let mut c = conn_from_read_data(data.leak());
-        let err = reader
-            .read_and_set_connection_header(&mut c)
-            .await
-            .err()
-            .unwrap();
+        let err = read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
     #[tokio::test]
     async fn test_connection_header_replay_info_negative_id() {
         setup();
-        let reader = ConnectionHeaderReader::new();
         let mut c = conn_from_read_data(b"G/-1/foo\0");
-        let err = reader
-            .read_and_set_connection_header(&mut c)
-            .await
-            .err()
-            .unwrap();
+        let err = read_and_set_connection_header(&mut c).await.err().unwrap();
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 }
