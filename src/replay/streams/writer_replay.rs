@@ -1,13 +1,17 @@
 use std::{cell::RefCell, io::Write, rc::Rc};
 
 use futures::Future;
-use tokio::{io::AsyncReadExt, select};
+use tokio::io::AsyncReadExt;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    error::ConnResult, replay::position::PositionTracker, replay::position::StreamPosition,
-    server::connection::Connection, util::buf_deque::BufDeque, util::buf_traits::BufWithDiscard,
-    util::buf_traits::DiscontiguousBuf,
+    error::ConnResult,
+    replay::position::PositionTracker,
+    replay::position::StreamPosition,
+    server::connection::Connection,
+    util::buf_deque::BufDeque,
+    util::buf_traits::BufWithDiscard,
+    util::{buf_traits::DiscontiguousBuf, timeout::cancellable},
 };
 
 use super::ReplayHeader;
@@ -105,11 +109,7 @@ pub async fn read_from_connection(
     c: &mut Connection,
     shutdown_token: CancellationToken,
 ) {
-    select! {
-        // Ignore connection errors. We only need the data.
-        _ = do_read_from_connection(&me, c) => {}
-        _ = shutdown_token.cancelled() => {},
-    }
+    cancellable(do_read_from_connection(&me, c), &shutdown_token).await;
     me.borrow_mut().finish();
 }
 

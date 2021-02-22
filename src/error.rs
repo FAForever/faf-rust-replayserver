@@ -90,7 +90,7 @@ macro_rules! some_error {
     };
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum SaveError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] sqlx::Error),

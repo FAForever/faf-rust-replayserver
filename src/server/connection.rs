@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::accept::header::{ConnectionType, ConnectionHeader};
+use crate::accept::header::{ConnectionHeader, ConnectionType};
 use tokio::{
     io::AsyncBufRead, io::AsyncBufReadExt, io::AsyncRead, io::AsyncWrite, io::BufReader,
     net::TcpStream,

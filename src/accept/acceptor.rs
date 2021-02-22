@@ -1,12 +1,8 @@
 use std::time::Duration;
 
-use tokio::select;
-
 use super::header::ConnectionHeaderReader;
-use crate::server::connection::Connection;
-use crate::{
-    config::Settings, error::ConnResult, error::ConnectionError,
-};
+use crate::{config::Settings, error::ConnResult, error::ConnectionError};
+use crate::{server::connection::Connection, util::timeout::timeout};
 
 pub struct ConnectionAcceptor {
     header_reader: ConnectionHeaderReader,
@@ -14,10 +10,7 @@ pub struct ConnectionAcceptor {
 }
 
 impl ConnectionAcceptor {
-    pub fn new(
-        header_reader: ConnectionHeaderReader,
-        connection_accept_timeout: Duration,
-    ) -> Self {
+    pub fn new(header_reader: ConnectionHeaderReader, connection_accept_timeout: Duration) -> Self {
         ConnectionAcceptor {
             header_reader,
             connection_accept_timeout,
@@ -33,9 +26,16 @@ impl ConnectionAcceptor {
 
     /* Cancellable. */
     pub async fn accept(&self, mut c: &mut Connection) -> ConnResult<()> {
-        select! {
-            res = self.header_reader.read_and_set_connection_header(&mut c) => res,
-            _ = tokio::time::sleep(self.connection_accept_timeout) => Err(ConnectionError::bad_data("Timed out while accepting replay")),
+        match timeout(
+            self.header_reader.read_and_set_connection_header(&mut c),
+            self.connection_accept_timeout,
+        )
+        .await
+        {
+            Some(res) => res,
+            None => Err(ConnectionError::bad_data(
+                "Timed out while accepting connection",
+            )),
         }
     }
 }

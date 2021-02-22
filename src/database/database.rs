@@ -443,14 +443,12 @@ pub mod test {
             }])
         });
         faux::when!(mock_db.get_player_count).safe_then(|_id| Ok(1));
-        unsafe {
-            faux::when!(mock_db.get_mod_version_list).then(|_modname| {
-                Ok(vec![ModVersions {
-                    file_id: 50,
-                    version: 3000,
-                }])
-            });
-        }
+        faux::when!(mock_db.get_mod_version_list).then_do(|| {
+            Ok(vec![ModVersions {
+                file_id: 50,
+                version: 3000,
+            }])
+        });
         mock_db
     }
 }

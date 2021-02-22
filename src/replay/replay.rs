@@ -1,11 +1,13 @@
 use std::{cell::Cell, time::Duration};
 
-use tokio::{join, select};
+use tokio::join;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    accept::header::ConnectionType, config::Settings, server::connection::Connection,
-    util::empty_counter::EmptyCounter,
+    accept::header::ConnectionType,
+    config::Settings,
+    server::connection::Connection,
+    util::{empty_counter::EmptyCounter, timeout::cancellable},
 };
 
 use super::{receive::ReplayMerger, save::ReplaySaver, send::ReplaySender};
@@ -63,10 +65,7 @@ impl Replay {
         };
 
         // Return early if we got cancelled normally
-        select! {
-            _ = cancellation => (),
-            _ = self.replay_timeout_token.cancelled() => (),
-        }
+        cancellable(cancellation, &self.replay_timeout_token).await;
     }
 
     async fn wait_until_there_were_no_writers_for_a_while(&self) {

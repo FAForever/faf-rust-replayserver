@@ -1,9 +1,8 @@
-use tokio::select;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     replay::streams::MReplayRef, replay::streams::MergedReplayReader,
-    server::connection::Connection,
+    server::connection::Connection, util::timeout::cancellable,
 };
 
 pub struct ReplaySender {
@@ -20,10 +19,7 @@ impl ReplaySender {
     }
 
     pub async fn handle_connection(&self, c: &mut Connection) {
-        select! {
-            _ = self.send_replay_to_connection(c) => (),
-            _ = self.shutdown_token.cancelled() => (),
-        }
+        cancellable(self.send_replay_to_connection(c), &self.shutdown_token).await;
     }
 
     async fn send_replay_to_connection(&self, c: &mut Connection) {
