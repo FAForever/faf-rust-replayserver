@@ -62,6 +62,7 @@ impl ReplayThreadContext {
         let wrapper = ReceiverStream::new(s);
 
         let local_loop = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
             .build()
             .unwrap();
         local_loop.block_on(async {
