@@ -124,10 +124,11 @@ impl ReadAt for MergedReplay {
         } else {
             start -= self.header_len();
             let read_max = std::cmp::min(buf.len(), self.data_len() - start);
-            self.data
-                .read_at(start - self.header_len(), &mut buf[..read_max])
+            self.data.read_at(start, &mut buf[..read_max])
         }
     }
 }
 
 pub type MReplayRef = Rc<RefCell<MergedReplay>>;
+
+// TODO tests

@@ -51,3 +51,5 @@ impl ReplayMerger {
         self.merge_strategy.borrow().get_merged_replay()
     }
 }
+
+// TODO merger tests.

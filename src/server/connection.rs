@@ -163,7 +163,7 @@ pub mod test {
 
         let writing_data = async move {
             let buf: &[u8] = &[1, 2, 3, 4, 5];
-            i.write(buf).await.unwrap();
+            i.write_all(buf).await.unwrap();
             drop(i);
         };
         let read_header = async {
@@ -185,7 +185,7 @@ pub mod test {
 
         let writing_data = async move {
             let buf: &[u8] = &[1, 2, 3, 4, 5];
-            i.write(buf).await.unwrap();
+            i.write_all(buf).await.unwrap();
             drop(i);
         };
         let read_header = async {

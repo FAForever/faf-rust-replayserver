@@ -25,7 +25,7 @@ impl MergedReplayReader {
         loop {
             let data_read = reader.read(&mut *buf).unwrap();
             if data_read != 0 {
-                c.write(&buf[..data_read]).await?;
+                c.write_all(&buf[..data_read]).await?;
             } else {
                 let has_more_data = self.wait_for_more_data(reader.position()).await;
                 if !has_more_data {
@@ -35,3 +35,5 @@ impl MergedReplayReader {
         }
     }
 }
+
+// TODO tests

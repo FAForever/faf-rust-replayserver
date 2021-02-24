@@ -9,6 +9,7 @@ use super::{writer::write_replay, ReplayJsonHeader, SavedReplayDirectory};
 
 pub type ReplaySaver = Arc<InnerReplaySaver>;
 
+#[cfg_attr(test, faux::create)]
 pub struct InnerReplaySaver {
     db: Queries,
     save_dir: SavedReplayDirectory,
@@ -16,10 +17,17 @@ pub struct InnerReplaySaver {
 
 impl InnerReplaySaver {
     pub fn new(db: Database, config: Settings) -> Arc<Self> {
-        Arc::new(Self {
+        Arc::new(Self::new_inner(db, config))
+    }
+}
+
+#[cfg_attr(test, faux::methods)]
+impl InnerReplaySaver {
+    fn new_inner(db: Database, config: Settings) -> Self {
+        Self {
             db: Queries::new(db),
             save_dir: SavedReplayDirectory::new(config.server.replay_save_directory.as_ref()),
-        })
+        }
     }
     // TODO count and store ticks
     pub async fn save_replay(&self, replay: MReplayRef, replay_id: u64) {

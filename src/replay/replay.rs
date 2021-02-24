@@ -62,6 +62,7 @@ impl Replay {
         let cancellation = async {
             tokio::time::sleep(self.forced_timeout).await;
             self.replay_timeout_token.cancel();
+            log::debug!("Replay {} timed out", self.id);
         };
 
         // Return early if we got cancelled normally
@@ -69,21 +70,27 @@ impl Replay {
     }
 
     async fn wait_until_there_were_no_writers_for_a_while(&self) {
-        let wait = self.writer_connection_count
+        let wait = self
+            .writer_connection_count
             .wait_until_empty_for(self.time_with_zero_writers_to_end_replay);
         // We don't have to return when there are no writers, just when we shouldn't accept more.
         cancellable(wait, &self.replay_timeout_token).await;
     }
 
     async fn regular_lifetime(&self) {
+        log::debug!("Replay {} started", self.id);
         self.wait_until_there_were_no_writers_for_a_while().await;
         self.should_stop_accepting_connections.set(true);
+        log::debug!("Replay {} stopped accepting connections", self.id);
         self.writer_connection_count.wait_until_empty().await;
         self.merger.finalize();
+        log::debug!("Replay {} finished merging the replay", self.id);
         self.saver
             .save_replay(self.merger.get_merged_replay(), self.id)
             .await;
+        log::debug!("Replay {} saved the replay", self.id);
         self.reader_connection_count.wait_until_empty().await;
+        log::debug!("Replay {} is finished", self.id);
         // Cancel to return from timeout
         self.replay_timeout_token.cancel();
     }
@@ -120,15 +127,35 @@ impl Replay {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{Arc, Once};
+    use std::{
+        fs::File,
+        io::Read,
+        path::PathBuf,
+        sync::{Arc, Once},
+    };
+
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
-    use crate::{accept::header::ConnectionHeader, config::test::default_config, replay::save::InnerReplaySaver, server::connection::test::test_connection};
+    use crate::{
+        accept::header::ConnectionHeader, config::test::default_config,
+        replay::save::InnerReplaySaver, server::connection::test::test_connection,
+    };
 
     // TODO - copypasta. Initialize logging before tests pls.
     static INIT: Once = Once::new();
     fn setup() {
         INIT.call_once(env_logger::init);
+    }
+
+    // FIXME copypasted from replay/streams/header.rs
+    fn get_file(f: &str) -> Vec<u8> {
+        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        p.push("test/resources");
+        p.push(f);
+        let mut res = Vec::new();
+        File::open(p).unwrap().read_to_end(&mut res).unwrap();
+        res
     }
 
     #[tokio::test]
@@ -169,5 +196,74 @@ mod test {
         };
 
         join! { run_replay, check_result };
+    }
+
+    #[tokio::test]
+    async fn test_replay_one_writer_one_reader() {
+        setup();
+        tokio::time::pause();
+
+        let mut mock_saver = InnerReplaySaver::faux();
+        faux::when!(mock_saver.save_replay).then_do(|| ());
+        let token = CancellationToken::new();
+        let config = default_config();
+
+        let (mut c_read, mut reader, mut _w) = test_connection();
+        let (mut c_write, _r, mut writer) = test_connection();
+        c_write.set_header(ConnectionHeader {
+            type_: ConnectionType::WRITER,
+            id: 1,
+            name: "foo".into(),
+        });
+        c_read.set_header(ConnectionHeader {
+            type_: ConnectionType::READER,
+            id: 1,
+            name: "foo".into(),
+        });
+
+        let replay = Replay::new(1, token, Arc::new(config), Arc::new(mock_saver));
+        let run_replay = async {
+            join! {
+                replay.lifetime(),
+                replay.handle_connection(c_write),
+                async {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    replay.handle_connection(c_read).await;
+                }
+            };
+        };
+
+        let example_replay_file = get_file("example");
+        let replay_writing = async {
+            for data in example_replay_file.chunks(100) {
+                writer.write_all(data).await.unwrap();
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+            drop(writer);
+        };
+        let mut received_replay_file = Vec::<u8>::new();
+        let replay_reading = async {
+            reader.read_to_end(&mut received_replay_file).await.unwrap();
+        };
+
+        join! { run_replay, replay_reading, replay_writing };
+
+        // TODO make a utility method
+        if example_replay_file.len() != received_replay_file.len() {
+            panic!(
+                "Length mismatch: {} != {}",
+                example_replay_file.len(),
+                received_replay_file.len()
+            )
+        }
+        for (i, (c1, c2)) in example_replay_file
+            .iter()
+            .zip(received_replay_file.iter())
+            .enumerate()
+        {
+            if c1 != c2 {
+                panic!("Buffers differ at byte {}: {} != {}", i, c1, c2);
+            }
+        }
     }
 }
