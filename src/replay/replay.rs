@@ -69,9 +69,10 @@ impl Replay {
     }
 
     async fn wait_until_there_were_no_writers_for_a_while(&self) {
-        self.writer_connection_count
-            .wait_until_empty_for(self.time_with_zero_writers_to_end_replay)
-            .await;
+        let wait = self.writer_connection_count
+            .wait_until_empty_for(self.time_with_zero_writers_to_end_replay);
+        // We don't have to return when there are no writers, just when we shouldn't accept more.
+        cancellable(wait, &self.replay_timeout_token).await;
     }
 
     async fn regular_lifetime(&self) {
@@ -114,5 +115,59 @@ impl Replay {
                 self.reader_connection_count.dec();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::{Arc, Once};
+
+    use super::*;
+    use crate::{accept::header::ConnectionHeader, config::test::default_config, replay::save::InnerReplaySaver, server::connection::test::test_connection};
+
+    // TODO - copypasta. Initialize logging before tests pls.
+    static INIT: Once = Once::new();
+    fn setup() {
+        INIT.call_once(env_logger::init);
+    }
+
+    #[tokio::test]
+    async fn test_replay_forced_timeout() {
+        setup();
+        tokio::time::pause();
+
+        let mut mock_saver = InnerReplaySaver::faux();
+        faux::when!(mock_saver.save_replay).then_do(|| ());
+
+        let token = CancellationToken::new();
+        let mut config = default_config();
+        config.replay.forced_timeout_s = 3600;
+
+        let (mut c, _r, _w) = test_connection();
+        let c_header = ConnectionHeader {
+            type_: ConnectionType::WRITER,
+            id: 1,
+            name: "foo".into(),
+        };
+        c.set_header(c_header);
+
+        let replay = Replay::new(1, token, Arc::new(config), Arc::new(mock_saver));
+
+        let replay_ended = Cell::new(false);
+        let run_replay = async {
+            join! {
+                replay.lifetime(),
+                replay.handle_connection(c),
+            };
+            replay_ended.set(true);
+        };
+        let check_result = async {
+            tokio::time::sleep(Duration::from_secs(3599)).await;
+            assert!(!replay_ended.get());
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            assert!(replay_ended.get());
+        };
+
+        join! { run_replay, check_result };
     }
 }
