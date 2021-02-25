@@ -127,12 +127,7 @@ impl Replay {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        fs::File,
-        io::Read,
-        path::PathBuf,
-        sync::{Arc, Once},
-    };
+    use std::sync::Arc;
 
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -140,27 +135,12 @@ mod test {
     use crate::{
         accept::header::ConnectionHeader, config::test::default_config,
         replay::save::InnerReplaySaver, server::connection::test::test_connection,
+        util::test::{setup_logging, get_file}
     };
-
-    // TODO - copypasta. Initialize logging before tests pls.
-    static INIT: Once = Once::new();
-    fn setup() {
-        INIT.call_once(env_logger::init);
-    }
-
-    // FIXME copypasted from replay/streams/header.rs
-    fn get_file(f: &str) -> Vec<u8> {
-        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        p.push("test/resources");
-        p.push(f);
-        let mut res = Vec::new();
-        File::open(p).unwrap().read_to_end(&mut res).unwrap();
-        res
-    }
 
     #[tokio::test]
     async fn test_replay_forced_timeout() {
-        setup();
+        setup_logging();
         tokio::time::pause();
 
         let mut mock_saver = InnerReplaySaver::faux();
@@ -200,7 +180,7 @@ mod test {
 
     #[tokio::test]
     async fn test_replay_one_writer_one_reader() {
-        setup();
+        setup_logging();
         tokio::time::pause();
 
         let mut mock_saver = InnerReplaySaver::faux();

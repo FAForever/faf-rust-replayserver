@@ -91,8 +91,6 @@ impl ReplayHeader {
 
 #[cfg(test)]
 mod test {
-    use std::{fs::File, io::Read, path::PathBuf};
-
     use futures::Future;
     use tokio::{
         io::DuplexStream,
@@ -100,16 +98,9 @@ mod test {
         try_join,
     };
 
-    use super::*;
+    use crate::util::test::get_file;
 
-    fn get_file(f: &str) -> Vec<u8> {
-        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        p.push("test/resources");
-        p.push(f);
-        let mut res = Vec::new();
-        File::open(p).unwrap().read_to_end(&mut res).unwrap();
-        res
-    }
+    use super::*;
 
     async fn test_replay_on_data<F: Future<Output = ()>, FN>(data: &Vec<u8>, test: FN)
     where
