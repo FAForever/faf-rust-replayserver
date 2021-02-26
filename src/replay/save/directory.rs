@@ -59,4 +59,11 @@ mod test {
         let path_3 = dir.replay_path(5500550055);
         assert_eq!(path_3, PathBuf::from("./55/0/55/0"));
     }
+
+    #[test]
+    fn test_replay_path_uses_provided_directory() {
+        let dir = SavedReplayDirectory::new("/tmp/foo");
+        let path_1 = dir.replay_path(1234567);
+        assert_eq!(path_1, PathBuf::from("/tmp/foo/0/1/23/45"));
+    }
 }

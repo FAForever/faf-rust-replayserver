@@ -8,7 +8,7 @@ pub async fn write_replay(
     json_header: impl serde::Serialize,
     replay: MReplayRef,
 ) -> std::io::Result<()> {
-    debug_assert!(replay.borrow().get_header().is_none());
+    debug_assert!(replay.borrow().get_header().is_some());
     to.write_all(serde_json::to_string(&json_header)?.as_bytes())
         .await?;
     to.write_all("\n".as_bytes()).await?;

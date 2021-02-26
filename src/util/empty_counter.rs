@@ -9,10 +9,7 @@ pub struct EmptyCounter {
 impl EmptyCounter {
     pub fn new() -> Self {
         let (counter, watcher) = watch::channel(0);
-        Self {
-            counter,
-            watcher
-        }
+        Self { counter, watcher }
     }
 
     pub fn inc(&self) {
@@ -232,6 +229,7 @@ mod test {
                 counter_1,
                 wait_empty,
             };
-        }).await;
+        })
+        .await;
     }
 }

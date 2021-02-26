@@ -26,7 +26,7 @@ impl InnerReplaySaver {
     fn new_inner(db: Database, config: Settings) -> Self {
         Self {
             db: Queries::new(db),
-            save_dir: SavedReplayDirectory::new(config.server.replay_save_directory.as_ref()),
+            save_dir: SavedReplayDirectory::new(config.storage.vault_path.as_ref()),
         }
     }
     // TODO count and store ticks

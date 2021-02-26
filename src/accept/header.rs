@@ -76,10 +76,10 @@ pub mod header_reader {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use super::header_reader::read_and_set_connection_header;
-    use crate::{error::ConnectionError, server::connection::Connection};
+    use super::*;
     use crate::util::test::setup_logging;
+    use crate::{error::ConnectionError, server::connection::Connection};
     use std::io::Cursor;
     use tokio::io::BufReader;
 

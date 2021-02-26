@@ -133,9 +133,11 @@ mod test {
 
     use super::*;
     use crate::{
-        accept::header::ConnectionHeader, config::test::default_config,
-        replay::save::InnerReplaySaver, server::connection::test::test_connection,
-        util::test::{setup_logging, get_file}
+        accept::header::ConnectionHeader,
+        config::test::default_config,
+        replay::save::InnerReplaySaver,
+        server::connection::test::test_connection,
+        util::test::{get_file, setup_logging},
     };
 
     #[tokio::test]
