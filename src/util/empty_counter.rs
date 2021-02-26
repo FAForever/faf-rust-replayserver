@@ -1,147 +1,53 @@
 use futures::Future;
-use std::rc::Weak;
-use std::{cell::RefCell, rc::Rc, task::Waker};
-use tokio::time::{Duration, Instant};
+use tokio::{select, sync::watch, time::Duration};
 
-mod private {
-    use super::*;
-    pub struct Inner {
-        pub count: usize,
-        pub wakers: Vec<Weak<RefCell<Option<Waker>>>>,
-    }
-
-    impl Inner {
-        pub fn new() -> Self {
-            Self {
-                count: 0,
-                wakers: Vec::new(),
-            }
-        }
-
-        pub fn waker_token(&mut self) -> Rc<RefCell<Option<Waker>>> {
-            let maybe_waker = Rc::new(RefCell::new(None));
-            self.wakers.push(Rc::downgrade(&maybe_waker));
-            maybe_waker
-        }
-
-        pub fn wake(&mut self) {
-            self.wakers.retain(|w| match w.upgrade() {
-                None => false,
-                Some(p) => {
-                    if let Some(waker) = p.borrow_mut().take() {
-                        waker.wake();
-                    }
-                    true
-                }
-            });
-        }
-
-        pub fn is_empty(&self) -> bool {
-            self.count == 0
-        }
-
-        pub fn inc(&mut self) {
-            self.count += 1;
-            if self.count == 1 {
-                self.wake();
-            }
-        }
-
-        pub fn dec(&mut self) {
-            self.count -= 1;
-            if self.count == 0 {
-                self.wake();
-            }
-        }
-    }
+pub struct EmptyCounter {
+    counter: watch::Sender<usize>,
+    watcher: watch::Receiver<usize>,
 }
 
-use private::Inner;
-
-// Connection counter for writer connections.
-//
-// Writer coroutines call `guard` to count the total number of connections.
-// Connection merger uses `wait_until_empty_for` to wait until there have been no connections
-// for `timeout` time.
 impl EmptyCounter {
     pub fn new() -> Self {
+        let (counter, watcher) = watch::channel(0);
         Self {
-            inner: Rc::new(RefCell::new(Inner::new())),
+            counter,
+            watcher
         }
     }
 
     pub fn inc(&self) {
-        self.inner.borrow_mut().inc();
+        let old = *self.counter.borrow();
+        self.counter.send(old + 1).ok();
     }
 
     pub fn dec(&self) {
-        self.inner.borrow_mut().dec();
+        let old = *self.counter.borrow();
+        self.counter.send(old - 1).ok();
     }
 
-    pub fn wait_until_empty_for(&self, timeout: Duration) -> WaitForEmptyFuture {
-        return WaitForEmptyFuture::new(self.inner.clone(), timeout);
+    async fn await_new_count(watcher: &mut watch::Receiver<usize>) -> Option<usize> {
+        watcher.changed().await.ok().and(Some(*watcher.borrow()))
     }
 
-    pub fn wait_until_empty(&self) -> WaitForEmptyFuture {
-        return WaitForEmptyFuture::new(self.inner.clone(), Duration::from_secs(0));
-    }
-}
-
-pub struct EmptyCounter {
-    inner: Rc<RefCell<Inner>>,
-}
-
-pub struct WaitForEmptyFuture {
-    inner: Rc<RefCell<Inner>>,
-    waker: Rc<RefCell<Option<Waker>>>,
-    timeout: Duration,
-    // We can't drop the timer when we don't need it because of structural pinning. Guard it with a
-    // bool so we don't return when it times out but counter is not empty.
-    timer: tokio::time::Sleep,
-    counter_was_empty: bool,
-}
-
-impl WaitForEmptyFuture {
-    pub fn new(inner: Rc<RefCell<Inner>>, timeout: Duration) -> Self {
-        let waker = inner.borrow_mut().waker_token();
-        Self {
-            inner,
-            waker,
-            timeout,
-            timer: tokio::time::sleep(timeout),
-            counter_was_empty: false,
-        }
-    }
-}
-
-impl Future for WaitForEmptyFuture {
-    type Output = ();
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let me = unsafe { self.get_unchecked_mut() };
-
-        let mut waker = me.waker.borrow_mut();
-        let pinned_timer = unsafe { std::pin::Pin::new_unchecked(&mut me.timer) };
-        if waker.is_none() {
-            // Woken up by counter state changing.
-            *waker = Some(cx.waker().clone());
-            pinned_timer.reset(Instant::now() + me.timeout);
-            me.counter_was_empty = me.inner.borrow().is_empty();
-            std::task::Poll::Pending
-        } else {
-            // Woken up by timer.
-            if let std::task::Poll::Ready(_) = pinned_timer.poll(cx) {
-                if me.counter_was_empty {
-                    // We weren't woken up by counter for the whole duration of the timer, so it
-                    // was empty for around that long. We're done.
-                    return std::task::Poll::Ready(());
+    pub fn wait_until_empty_for(&self, timeout: Duration) -> impl Future<Output = ()> {
+        let mut watcher = self.watcher.clone();
+        async move {
+            let mut last_count = Some(*watcher.borrow());
+            while !last_count.is_none() {
+                if last_count != Some(0) {
+                    last_count = Self::await_new_count(&mut watcher).await;
+                } else {
+                    last_count = select! {
+                        r = Self::await_new_count(&mut watcher) => r,
+                        _ = tokio::time::sleep(timeout) => Some(*watcher.borrow()).filter(|c| *c != 0),
+                    }
                 }
             }
-            std::task::Poll::Pending
         }
+    }
+
+    pub fn wait_until_empty(&self) -> impl Future<Output = ()> {
+        self.wait_until_empty_for(Duration::from_secs(0))
     }
 }
 
@@ -303,5 +209,29 @@ mod test {
             };
         })
         .await
+    }
+
+    #[tokio::test]
+    async fn test_empty_counter_wait_twice() {
+        timeout(1000, async {
+            let counter = EmptyCounter::new();
+            let wait_empty = async {
+                let before = Instant::now();
+                counter
+                    .wait_until_empty_for(Duration::from_millis(100))
+                    .await;
+                counter.wait_until_empty().await;
+                let after = Instant::now();
+                assert!(after - before > Duration::from_millis(150));
+                assert!(after - before < Duration::from_millis(300));
+            };
+            let counter_1 = async {
+                hold_counter(&counter, 0, 100).await;
+            };
+            join! {
+                counter_1,
+                wait_empty,
+            };
+        }).await;
     }
 }
