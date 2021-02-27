@@ -1,7 +1,8 @@
-use std::{cell::Cell, time::Duration};
+use std::cell::Cell;
 
 use tokio::join;
 use tokio_util::sync::CancellationToken;
+use tokio::time::Duration;
 
 use crate::{
     accept::header::ConnectionType,
@@ -209,7 +210,7 @@ mod test {
                 replay.lifetime(),
                 replay.handle_connection(c_write),
                 async {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_millis(1)).await;
                     replay.handle_connection(c_read).await;
                 }
             };
@@ -219,7 +220,7 @@ mod test {
         let replay_writing = async {
             for data in example_replay_file.chunks(100) {
                 writer.write_all(data).await.unwrap();
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
             drop(writer);
         };

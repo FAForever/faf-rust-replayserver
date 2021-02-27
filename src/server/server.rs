@@ -59,8 +59,8 @@ pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
 
 #[cfg(test)]
 mod test {
-    use std::{sync::Arc, time::Duration};
-
+    use std::sync::Arc;
+    use tokio::time::Duration;
     use crate::{
         config::test::default_config,
         database::database::test::mock_database,

@@ -1,5 +1,5 @@
 use futures::Future;
-use std::time::Duration;
+use tokio::time::Duration;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 

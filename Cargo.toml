@@ -16,8 +16,8 @@ log = "0.4.11"
 env_logger = "0.8.2"
 thiserror = "1.0.22"
 async-stream = "0.3.0"
-tokio-util = "0.6.0"
-tokio-stream = "0.1.2"
+tokio-util = "0.6.3"
+tokio-stream = "0.1.3"
 weak-table = "0.3.0"
 serde = { version = "1.0.123", features = ["derive"] }
 serde_json = "1.0.61"
@@ -27,7 +27,7 @@ time = {version = "0.2.25", features = ["std"] }
 async-compression = { version = "0.3.7", features = ["tokio", "zstd"] }
 
 [dependencies.tokio]
-version = "1.0.1"
+version = "1.2.0"
 features = ["sync", "net", "io-util", "rt", "macros", "test-util", "time"]
 
 [dev-dependencies]

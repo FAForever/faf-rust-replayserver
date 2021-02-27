@@ -1,11 +1,11 @@
 use async_stream::stream;
 use futures::stream::StreamExt;
-use futures::{FutureExt, Stream};
+use futures::Stream;
 use std::{cell::RefCell, collections::VecDeque};
 
-use crate::replay::{position::StreamPosition, streams::WReplayRef};
+use crate::replay::streams::WReplayRef;
 
-use tokio::time::{sleep, Duration};
+use tokio::time::Duration;
 
 use super::merge_strategy::MergeStrategy;
 
@@ -14,6 +14,45 @@ pub enum StreamUpdates {
     NewHeader,
     DataUpdate,
     Finished,
+}
+
+pub struct StreamDelayQueue {
+    sleep_ms: u64,
+    history_size: usize,
+    queue: VecDeque<usize>,
+}
+
+impl StreamDelayQueue {
+    pub fn new(delay_s: u64, sleep_ms: u64) -> Self {
+        let history_size = Self::history_size(delay_s, sleep_ms);
+        Self { sleep_ms, history_size, queue: VecDeque::new() }
+    }
+
+    fn history_size(delay_s: u64, sleep_ms: u64) -> usize {
+        /* Right after placing a new value, Nth element in the deque (counting from 0) spent N
+         * sleep cycles in it. We want:
+         *     N * sleep_ms >= delay_s * 1000
+         *     N >= ceil(delay_s * 1000 / sleep_ms)
+         *     Deque size >= ceil(delay_s * 1000 / sleep_ms) + 1
+         *
+         */
+        let div = (delay_s * 1000) / sleep_ms;
+        let should_round_up = (delay_s * 1000) % sleep_ms != 0;
+        let round_up: u64 = should_round_up.into();
+        (div + round_up + 1) as usize
+    }
+
+    pub fn push_and_get_delayed(&mut self, current_len: usize) -> usize {
+        self.queue.push_back(current_len);
+        if self.queue.len() > self.history_size {
+            self.queue.pop_front();
+        }
+        *self.queue.front().unwrap()
+    }
+
+    pub async fn wait_cycle(&self) {
+        tokio::time::sleep(Duration::from_millis(self.sleep_ms)).await;
+    }
 }
 
 pub struct StreamDelay {
@@ -33,58 +72,30 @@ impl StreamDelay {
         Self { delay_s, sleep_ms }
     }
 
-    fn history_size(&self) -> usize {
-        /* Right after placing a new value, Nth element in the deque (counting from 0) spent N
-         * sleep cycles in it. We want:
-         *     N * sleep_ms >= delay_s * 1000
-         *     N >= ceil(delay_s * 1000 / sleep_ms)
-         *     Deque size >= ceil(delay_s * 1000 / sleep_ms) + 1
-         *
-         */
-        let div = (self.delay_s * 1000) / self.sleep_ms;
-        let should_round_up = (self.delay_s * 1000) % self.sleep_ms != 0;
-        let round_up: u64 = should_round_up.into();
-        (div + round_up + 1) as usize
-    }
-
     fn header_stream(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
-        async move {
-            // This guarantees that we emit HEADER positions exactly once.
-            let at_header = StreamPosition::DATA(0);
+        stream! {
             // Don't borrow across an await
-            let f = replay.borrow().wait(at_header);
+            let f = replay.borrow().wait_for_header();
             f.await;
-            StreamUpdates::NewHeader
+            yield StreamUpdates::NewHeader;
         }
-        .into_stream()
     }
 
     fn data_update_stream(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
-        let mut position_history: VecDeque<StreamPosition> = VecDeque::new();
-        let history_size = self.history_size();
-        let sleep_time = Duration::from_millis(self.sleep_ms);
-        let mut prev_current = StreamPosition::START;
-        let mut prev_delayed = StreamPosition::START;
+        let mut pos_queue = StreamDelayQueue::new(self.delay_s, self.sleep_ms);
+        let mut prev_current = 0;
+        let mut prev_delayed = 0;
         stream! {
             loop {
-                let current = replay.borrow().position();
-                position_history.push_back(current);
-                if position_history.len() > history_size {
-                    position_history.pop_front();
-                }
-                let delayed = *position_history.front().unwrap();
-
-                if current == prev_current || delayed == prev_delayed {
-                    continue;
-                }
-                if !matches!(current, StreamPosition::DATA(..)) {   // Sanity check
-                    continue;
+                let current = replay.borrow().data_len();
+                let delayed = pos_queue.push_and_get_delayed(current);
+                replay.borrow_mut().set_delayed_data_progress(delayed);
+                if (current, delayed) != (prev_current, prev_delayed) {
+                    yield StreamUpdates::DataUpdate;
                 }
                 prev_current = current;
                 prev_delayed = delayed;
-                replay.borrow_mut().set_delayed_data_progress(delayed.len());
-                yield StreamUpdates::DataUpdate;
-                sleep(sleep_time).await;
+                pos_queue.wait_cycle().await;
             }
         }
     }
@@ -92,27 +103,23 @@ impl StreamDelay {
     fn end_stream(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
         stream! {
             // Don't borrow across an await
-            let f = replay.borrow().wait(StreamPosition::FINISHED(0));
-            let finish = f.await;
-            replay.borrow_mut().set_delayed_data_progress(finish.len());
+            let f = replay.borrow().wait_until_finished();
+            f.await;
+            let final_len = replay.borrow_mut().data_len();
+            replay.borrow_mut().set_delayed_data_progress(final_len);
+            log::debug!("Final data len: {}", final_len);
             yield StreamUpdates::DataUpdate;
             yield StreamUpdates::Finished;
         }
     }
 
-    // Value order:
-    // * At most one NewHeader,
-    // * Any number of DataUpdate,
-    // * One DataUpdate after data reached final length,
-    // * One Finished.
-    // * NOTE: this modifies the delayed data position of the writer replay.
     fn track_delayed_progress(&self, replay: WReplayRef) -> impl Stream<Item = StreamUpdates> {
         let header_stream = self.header_stream(replay.clone());
         let data_stream = self.data_update_stream(replay.clone());
         let end_stream = self.end_stream(replay.clone());
 
         let header_and_data_stream = header_stream.chain(data_stream);
-        let replay_end = replay.borrow().wait(StreamPosition::FINISHED(0));
+        let replay_end = replay.borrow().wait_until_finished();
         let capped_stream = header_and_data_stream.take_until(replay_end);
         capped_stream.chain(end_stream)
     }

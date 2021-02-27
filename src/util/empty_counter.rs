@@ -50,10 +50,9 @@ impl EmptyCounter {
 
 #[cfg(test)]
 mod test {
-    use super::EmptyCounter;
-    use futures::Future;
+    use super::*;
     use std::{cell::Cell, cell::RefCell, rc::Rc};
-    use tokio::{join, time::sleep, time::Duration, time::Instant};
+    use tokio::{join, time::sleep, time::Instant};
 
     async fn hold_counter(c: &EmptyCounter, wait_ms: u64, hold_end_ms: u64) {
         sleep(Duration::from_millis(wait_ms)).await;

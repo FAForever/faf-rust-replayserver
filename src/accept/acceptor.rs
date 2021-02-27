@@ -1,4 +1,4 @@
-use std::time::Duration;
+use tokio::time::Duration;
 
 use crate::{config::Settings, error::ConnResult, error::ConnectionError};
 use crate::{server::connection::Connection, util::timeout::timeout};

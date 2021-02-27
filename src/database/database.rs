@@ -1,4 +1,4 @@
-use std::time::Duration;
+use tokio::time::Duration;
 
 use crate::{config::DatabaseSettings, error::SaveError};
 use sqlx::{mysql::MySqlConnectOptions, mysql::MySqlSslMode, types::time::OffsetDateTime};

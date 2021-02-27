@@ -1,13 +1,11 @@
 use std::{cell::RefCell, io::Write, rc::Rc};
 
 use futures::Future;
-use tokio::io::AsyncReadExt;
+use tokio::{io::AsyncReadExt, sync::Notify};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     error::ConnResult,
-    replay::position::PositionTracker,
-    replay::position::StreamPosition,
     server::connection::Connection,
     util::buf_deque::BufDeque,
     util::buf_traits::BufWithDiscard,
@@ -25,8 +23,10 @@ enum MaybeHeader {
 pub struct WriterReplay {
     header: MaybeHeader,
     data: BufDeque,
-    progress: PositionTracker,
     delayed_data_progress: usize,
+    header_notification: Rc<Notify>,
+    finished_notification: Rc<Notify>,
+    finished: bool,
 }
 
 impl WriterReplay {
@@ -34,14 +34,15 @@ impl WriterReplay {
         Self {
             header: MaybeHeader::None,
             data: BufDeque::new(),
-            progress: PositionTracker::new(),
             delayed_data_progress: 0,
+            header_notification: Rc::new(Notify::new()),
+            finished_notification: Rc::new(Notify::new()),
+            finished: false,
         }
     }
     pub fn add_header(&mut self, h: ReplayHeader) {
-        debug_assert!(self.progress.position() == StreamPosition::START);
         self.header = MaybeHeader::Some(h);
-        self.progress.advance(StreamPosition::DATA(0));
+        self.header_notification.notify_waiters();
     }
 
     pub fn take_header(&mut self) -> ReplayHeader {
@@ -59,10 +60,7 @@ impl WriterReplay {
     }
 
     pub fn add_data(&mut self, buf: &[u8]) {
-        debug_assert!(self.position() >= StreamPosition::DATA(0));
-        debug_assert!(self.position() < StreamPosition::FINISHED(0));
         self.data.write_all(buf).unwrap();
-        self.progress.advance(self.position() + buf.len());
     }
 
     pub fn get_data(&self) -> &impl DiscontiguousBuf {
@@ -87,20 +85,40 @@ impl WriterReplay {
     }
 
     pub fn finish(&mut self) {
-        let final_len = self.position().len();
-        self.progress.advance(StreamPosition::FINISHED(final_len));
+        self.finished = true;
+        self.finished_notification.notify_waiters();
     }
 
-    pub fn wait(&self, until: StreamPosition) -> impl Future<Output = StreamPosition> {
-        self.progress.wait(until)
+    pub fn wait_for_header(&self) -> impl Future<Output = ()> {
+        debug_assert!(!matches!(self.header, MaybeHeader::Discarded(..)));
+
+        let has_header = matches!(self.header, MaybeHeader::Some(..));
+        let wait = self.header_notification.clone();
+        async move {
+            if has_header {
+                return;
+            }
+            wait.notified().await
+        }
     }
 
-    pub fn position(&self) -> StreamPosition {
-        self.progress.position()
+    pub fn wait_until_finished(&self) -> impl Future<Output = ()> {
+        let finished = self.finished;
+        let wait = self.finished_notification.clone();
+        async move {
+            if finished {
+                return;
+            }
+            wait.notified().await
+        }
+    }
+
+    pub fn data_len(&self) -> usize {
+        self.data.len()
     }
 
     pub fn is_finished(&self) -> bool {
-        self.progress.position() >= StreamPosition::FINISHED(0)
+        self.finished
     }
 }
 

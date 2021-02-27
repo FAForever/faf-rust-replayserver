@@ -223,8 +223,10 @@ pub mod test {
     /* Connection, reader, writer */
     pub type MockConnection = (Connection, tokio::io::DuplexStream, tokio::io::DuplexStream);
     pub fn test_connection() -> MockConnection {
-        let (reader, conn_writer) = tokio::io::duplex(1024);
-        let (conn_reader, writer) = tokio::io::duplex(1024);
+        // NOTE: setting too small buffer sizes below interacts badly with tokio::time::pause.
+        // As long as they're larger than the largest possible read, everything seems OK.
+        let (reader, conn_writer) = tokio::io::duplex(10240);
+        let (conn_reader, writer) = tokio::io::duplex(10240);
         let c = Connection::test(Box::new(BufReader::new(conn_reader)), Box::new(conn_writer));
         (c, reader, writer)
     }

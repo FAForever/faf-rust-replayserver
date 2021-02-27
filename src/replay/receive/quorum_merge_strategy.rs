@@ -266,11 +266,10 @@ pub struct MergeStalemateState {
 // * Stalemate has a set Res and a map Cand.
 // * At any time between callbacks (ignoring changes we weren't yet notified of):
 //   * Replays in Cand are exactly those that match C and are longer than C.
-//   * Replays in Res are exactly those that are no longer than C and are not finished.
+//   * Replays in Res are no longer than C and are not finished.
 //   * All replays in neither either diverge from C, or are no longer than C and finished.
 //   * Notice that every replay satisfies at least one of the above.
 // * A stalemate state is constructed with a set of replays I, which is a subset of R.
-//   * For each replay r in I, r ~ C or r ? C.
 //   * For each replay r in R but not in I, r !~ C.
 //   * Set I is discarded / distributed between Cand and Res according to above rules.
 // * Whether a stalemate can be resolved is decided as follows:
@@ -433,8 +432,8 @@ pub struct MergeQuorumState {
 //   compared from the end of C and their common prefix is appended to C.
 //
 // * Whenever C's delayed position reaches its data length, a merging step is performed.
-// * If, between calls, C's delayed position equals its data length, quorum should transition to a
-//   stalemate.
+// * If, right after a merging step, C's delayed position still equals its data length, quorum
+//   should transition to a stalemate.
 // * Transitioning to a stalemate happens as follows:
 //   * Replays in Res that diverge from C are removed.
 //   * Replays from Q are added to Res.
@@ -679,9 +678,10 @@ impl MergeStrategy for QuorumMergeStrategy {
             Self::Swapping => panic!("Programmer error - we're swapping state right now!"),
             Self::Quorum(..) => panic!("Expected to finish merge strategy in a stalemate"),
             Self::Stalemate(s) => {
-                // Not in a quorum. Merged replay position must be equal to its merged data.
+                // Not in a quorum. Delayed replay position must be equal to its data len.
                 let data_len = s.s.merged_data_len();
                 let position = s.s.merged_delayed_position();
+                log::debug!("Final merged len: {}, delayed len: {}", data_len, position);
                 debug_assert_eq!(data_len, position);
                 // All replays are finished, so Res is empty.
                 debug_assert!(s.reserve.is_empty());
@@ -704,17 +704,15 @@ impl MergeStrategy for QuorumMergeStrategy {
 // reassure us of and reader to verify.
 //
 // Our first claim is that we don't loop infinitely in work_state_until stable. That's easy -
-// changing to stalemate always advances data by one byte, and we can't advance beyond data length
+// resolving a stalemate always advances data by one byte, and we can't advance beyond data length
 // of the longest replay.
 //
 // Our second claim is that once we're finished, the canonical replay C is equal to one of sent
-// replays. Check the finish() method above for a starting point.
-// To begin with, a case with no replays ever is trivial.
-// Otherwise, we end in a stalemate with empty Cand.
-// According to invariants, it means there are no replays that match C and are longer than C.
-// However, C is always a prefix of at least one replay (looking at its extension in quorum and
-// stalemate states). That replay matches C by definition, therefore it's not longer than C,
-// therefore it's equal to C. QED
+// replays. We start with assertions in the finish() method above. We skip the case with no replays
+// as trivial.
+// The final stalemate has empty Cand. According to invariants, it means there are no replays that
+// match C and are longer than C. However, C is always a prefix of at least one replay. That replay
+// matches C by definition, therefore it's not longer than C, therefore it's equal to C. QED
 //
 // Our third claim broadly says that C will never equal a replay that split off from others alone
 // with its own data. That's pretty easy.
@@ -732,8 +730,8 @@ impl MergeStrategy for QuorumMergeStrategy {
 // * We can assume quorum ends due to diverging data very few times, since every time it does, we
 //   discard at least one replay.
 // * Otherwise, the quorum ends because the delayed position caught up with the data for every
-//   replay. This can happen at most once per N minutes per replay, so on average we stay in the
-//   quorum ((N minutes * quorum size) / # of replays).
+//   replay. This event can happen at most once per N minutes per replay, so on average we stay in
+//   the quorum ((N minutes * quorum size) / # of replays) minutes.
 //
 // Fifth claim is memory usage. We always discard any data that's stream_cmp_distance behind canon.
 // In a quorum, we wait with merging until delayed data catches up, so we keep at most last N
@@ -762,7 +760,7 @@ impl MergeStrategy for QuorumMergeStrategy {
 //   change.
 //
 // This should still create consistent replays at a cost of rarely or never producing worse
-// quorums. Don't implement this unless you verify that the issue exists and that this fixes it.
+// quorums. Don't implement this unless we verify that the issue exists and that this fixes it.
 //
 
 // TODO - parametrize with stream cutoff and quorum once we make them configurable.

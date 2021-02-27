@@ -24,8 +24,8 @@ impl ReplaySender {
 
     async fn send_replay_to_connection(&self, c: &mut Connection) {
         let mut reader = MergedReplayReader::new(self.merged_replay.clone());
-        if let Err(..) = reader.write_to(c).await {
-            todo!(); /* log */
+        if let Err(e) = reader.write_to(c).await {
+            log::debug!("Replay send error: {}", e);
         };
     }
 }
