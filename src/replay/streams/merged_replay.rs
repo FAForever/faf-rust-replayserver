@@ -4,7 +4,7 @@ use futures::Future;
 use tokio::sync::Notify;
 
 use crate::{
-    util::buf_list::BufList, util::buf_traits::DiscontiguousBuf, util::buf_traits::ReadAt
+    util::buf_list::BufList, util::buf_traits::DiscontiguousBuf, util::buf_traits::ReadAt,
 };
 
 use super::{writer_replay::WriterReplay, ReplayHeader};

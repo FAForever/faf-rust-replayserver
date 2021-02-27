@@ -25,7 +25,11 @@ pub struct StreamDelayQueue {
 impl StreamDelayQueue {
     pub fn new(delay_s: u64, sleep_ms: u64) -> Self {
         let history_size = Self::history_size(delay_s, sleep_ms);
-        Self { sleep_ms, history_size, queue: VecDeque::new() }
+        Self {
+            sleep_ms,
+            history_size,
+            queue: VecDeque::new(),
+        }
     }
 
     fn history_size(delay_s: u64, sleep_ms: u64) -> usize {

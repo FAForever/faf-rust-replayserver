@@ -59,8 +59,6 @@ pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-    use tokio::time::Duration;
     use crate::{
         config::test::default_config,
         database::database::test::mock_database,
@@ -68,7 +66,9 @@ mod test {
         util::test::{get_file, setup_logging},
     };
     use async_stream::stream;
+    use std::sync::Arc;
     use tempfile::tempdir;
+    use tokio::time::Duration;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         join, select,

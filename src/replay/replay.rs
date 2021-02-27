@@ -1,8 +1,8 @@
 use std::cell::Cell;
 
 use tokio::join;
-use tokio_util::sync::CancellationToken;
 use tokio::time::Duration;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     accept::header::ConnectionType,

@@ -1,6 +1,6 @@
 use futures::Future;
-use tokio::time::Duration;
 use tokio::select;
+use tokio::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 pub async fn timeout<T, F: Future<Output = T>>(f: F, time: Duration) -> Option<T> {
