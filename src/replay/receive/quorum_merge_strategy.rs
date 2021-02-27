@@ -681,7 +681,6 @@ impl MergeStrategy for QuorumMergeStrategy {
                 // Not in a quorum. Delayed replay position must be equal to its data len.
                 let data_len = s.s.merged_data_len();
                 let position = s.s.merged_delayed_position();
-                log::debug!("Final merged len: {}, delayed len: {}", data_len, position);
                 debug_assert_eq!(data_len, position);
                 // All replays are finished, so Res is empty.
                 debug_assert!(s.reserve.is_empty());

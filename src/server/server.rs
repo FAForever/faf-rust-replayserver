@@ -115,6 +115,7 @@ mod test {
         //
         // Oh well, too bad. We can still test 90% of the important stuff by testing
         // Replay/Replays/Saver classes.
+        setup_logging();
 
         let (c_read, mut reader, mut read_writer) = test_connection();
         let (c_write, _reader, mut writer) = test_connection();
@@ -124,7 +125,6 @@ mod test {
         let tmp_dir = tempdir().unwrap();
 
         conf.storage.vault_path = tmp_dir.path().to_str().unwrap().into();
-        log::debug!("Path: {}", conf.storage.vault_path);
         conf.replay.time_with_zero_writers_to_end_replay_s = 1;
 
         let conn_source = stream! {

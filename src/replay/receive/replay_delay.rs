@@ -107,7 +107,6 @@ impl StreamDelay {
             f.await;
             let final_len = replay.borrow_mut().data_len();
             replay.borrow_mut().set_delayed_data_progress(final_len);
-            log::debug!("Final data len: {}", final_len);
             yield StreamUpdates::DataUpdate;
             yield StreamUpdates::Finished;
         }

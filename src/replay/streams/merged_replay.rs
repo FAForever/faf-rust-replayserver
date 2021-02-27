@@ -1,36 +1,20 @@
 use std::{cell::RefCell, io::Read, io::Write, rc::Rc};
 
 use futures::Future;
+use tokio::sync::Notify;
 
 use crate::{
-    util::buf_list::BufList, util::buf_traits::DiscontiguousBuf, util::buf_traits::ReadAt,
-    util::progress::ProgressKey, util::progress::ProgressTracker,
+    util::buf_list::BufList, util::buf_traits::DiscontiguousBuf, util::buf_traits::ReadAt
 };
 
 use super::{writer_replay::WriterReplay, ReplayHeader};
 
-// To merged replay readers we give an interface that merges header and data.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum MergedReplayPosition {
-    Data(usize),
-    Finished,
-}
-
-impl ProgressKey for MergedReplayPosition {
-    fn bottom() -> Self {
-        Self::Data(0)
-    }
-
-    fn top() -> Self {
-        Self::Finished
-    }
-}
-
 pub struct MergedReplay {
     data: BufList,
     header: Option<ReplayHeader>,
-    delayed_progress: ProgressTracker<MergedReplayPosition>,
     delayed_data_len: usize,
+    finished: bool,
+    delayed_data_notification: Rc<Notify>,
 }
 
 impl MergedReplay {
@@ -38,8 +22,9 @@ impl MergedReplay {
         Self {
             data: BufList::new(),
             header: None,
-            delayed_progress: ProgressTracker::new(),
             delayed_data_len: 0,
+            finished: false,
+            delayed_data_notification: Rc::new(Notify::new()),
         }
     }
 
@@ -56,21 +41,26 @@ impl MergedReplay {
         self.delayed_data_len + self.header_len()
     }
 
-    /* Counts both header and data bytes. */
-    pub fn wait_for_byte(&self, until: usize) -> impl Future<Output = ()> {
-        let f = self
-            .delayed_progress
-            .wait(MergedReplayPosition::Data(until));
-        async {
-            f.await;
+    pub fn is_finished(&self) -> bool {
+        self.finished
+    }
+
+    pub fn wait_for_more_data(&self) -> impl Future<Output = ()> {
+        let wait = self.delayed_data_notification.clone();
+        let finished = self.finished;
+        async move {
+            if finished {
+                return;
+            }
+            wait.notified().await;
         }
     }
 
     pub fn add_header(&mut self, header: ReplayHeader) {
-        debug_assert!(self.delayed_progress.position() == MergedReplayPosition::Data(0));
+        debug_assert!(!self.finished);
+        debug_assert!(self.data_len() == 0);
         self.header = Some(header);
-        self.delayed_progress
-            .advance(MergedReplayPosition::Data(self.header_len()));
+        self.delayed_data_notification.notify_waiters();
     }
 
     pub fn get_header(&self) -> Option<&ReplayHeader> {
@@ -78,7 +68,7 @@ impl MergedReplay {
     }
 
     pub fn add_data(&mut self, writer: &WriterReplay, until: usize) {
-        debug_assert!(self.delayed_progress.position() < MergedReplayPosition::Finished);
+        debug_assert!(!self.finished);
         debug_assert!(until <= writer.get_data().len());
 
         let writer_data = writer.get_data();
@@ -99,16 +89,14 @@ impl MergedReplay {
 
     pub fn advance_delayed_data(&mut self, len: usize) {
         debug_assert!(len <= self.data.len());
-        debug_assert!(self.delayed_progress.position() < MergedReplayPosition::Finished);
-
+        debug_assert!(!self.finished);
         self.delayed_data_len = len;
-        let pos = MergedReplayPosition::Data(self.header_len() + len);
-        self.delayed_progress.advance(pos);
+        self.delayed_data_notification.notify_waiters();
     }
 
     pub fn finish(&mut self) {
-        self.delayed_progress
-            .advance(MergedReplayPosition::Finished);
+        self.finished = true;
+        self.delayed_data_notification.notify_waiters();
     }
 }
 
