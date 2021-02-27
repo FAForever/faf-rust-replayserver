@@ -138,7 +138,7 @@ mod test {
         config::test::default_config,
         replay::save::InnerReplaySaver,
         server::connection::test::test_connection,
-        util::test::{get_file, setup_logging},
+        util::test::{get_file, setup_logging, compare_bufs},
     };
 
     #[tokio::test]
@@ -230,23 +230,6 @@ mod test {
         };
 
         join! { run_replay, replay_reading, replay_writing };
-
-        // TODO make a utility method
-        if example_replay_file.len() != received_replay_file.len() {
-            panic!(
-                "Length mismatch: {} != {}",
-                example_replay_file.len(),
-                received_replay_file.len()
-            )
-        }
-        for (i, (c1, c2)) in example_replay_file
-            .iter()
-            .zip(received_replay_file.iter())
-            .enumerate()
-        {
-            if c1 != c2 {
-                panic!("Buffers differ at byte {}: {} != {}", i, c1, c2);
-            }
-        }
+        compare_bufs(example_replay_file, received_replay_file);
     }
 }
