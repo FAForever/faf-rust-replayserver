@@ -539,9 +539,6 @@ impl MergeQuorumState {
         MergeStalemateState::from_quorum(s, reserve)
     }
 
-    // Note: we *could* use stream_cmp_distance to shorten comparisons in the optimistic case. I'm
-    // not sure if it's worth it, it might happen not even half the time and it's extra complexity
-    // if it fails.
     fn calculate_quorum_prefix(&mut self) -> usize {
         debug_assert!(!self.quorum.is_empty());
 

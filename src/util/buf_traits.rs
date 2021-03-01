@@ -56,8 +56,8 @@ impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
     }
 }
 
-/* For merging incoming replays we want a data structure that we can append bytes to and discard
- * bytes from front whenever we want. We accept responsibility to never read data we already
+/* For merging incoming replays we want a data structure that we can append bytes to front and
+ * discard bytes from back whenever we want. We accept responsibility to never read data we already
  * discarded.
  */
 pub trait BufWithDiscard {
@@ -74,8 +74,8 @@ pub trait BufWithDiscardExt: BufWithDiscard {
     }
 }
 
-/* Read that doesn't need to keep a reference to self. Needed when we use a mutably shared RefCell
- * in a task, so that we don't borrow across an await.
+/* Read that doesn't need to keep a reference to self. Used to implement Read for a value behind a
+ * RefCell.
  */
 pub trait ReadAt {
     fn read_at(&self, start: usize, buf: &mut [u8]) -> std::io::Result<usize>;
