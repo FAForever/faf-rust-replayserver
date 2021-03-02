@@ -1,5 +1,7 @@
 use std::{fs::File, io::Read, path::PathBuf, sync::Once};
 
+use time::{Date, OffsetDateTime, Time};
+
 static LOG: Once = Once::new();
 
 pub fn setup_logging() {
@@ -34,4 +36,8 @@ pub fn compare_bufs(br1: impl AsRef<[u8]>, br2: impl AsRef<[u8]>) {
             panic!("Buffers differ at byte {}: {} != {}", i, c1, c2);
         }
     }
+}
+
+pub fn dt(d: Date, t: Time) -> OffsetDateTime {
+    d.with_time(t).assume_utc()
 }

@@ -50,8 +50,7 @@ impl Queries {
         if stats.file_name.is_none() {
             log::warn!("Map name for replay {} is missing! Saving anyway.", id);
         }
-        let mapname = stats
-            .file_name
+        let mapname = stats.file_name
             .and_then(|f| f.rsplitn(2, '.').last().map(String::from))
             .and_then(|f| f.rsplitn(2, '/').nth(0).map(String::from))
             .unwrap_or("None".into());
@@ -82,5 +81,77 @@ impl Queries {
 
     pub async fn update_game_stats(&self, id: u64, replay_ticks: u64) -> Result<(), SaveError> {
         self.db.update_game_stats(id, replay_ticks).await
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use time::macros::{date, time};
+
+    use crate::database::database::test::mock_database;
+    use crate::database::database::GameStatRow;
+    use crate::util::test::dt;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_teams_in_game() {
+        let q = Queries::new(mock_database());
+        let teams = q.get_teams_in_game(1).await.unwrap();
+
+        assert!(teams.len() == 2);
+        let mut t1 = teams[&1].clone();
+        t1.sort();
+        assert_eq!(t1, vec![String::from("user1"), "user2".into()]);
+        let mut t2 = teams[&2].clone();
+        t2.sort();
+        assert_eq!(t2, vec![String::from("user3"), "user4".into()]);
+    }
+
+    #[tokio::test]
+    async fn test_usual_game_stats() {
+        let q = Queries::new(mock_database());
+        let stats = q.get_game_stats(1).await.unwrap();
+
+        // Check just a few interesting bits.
+        assert_eq!(stats.featured_mod, Some("faf".into()));
+        assert_eq!(stats.launched_at, 1262304000);   // 2010-01-01 00:00:00
+        assert_eq!(stats.game_end, 1262307600);   // 2010-01-01 01:00:00
+        assert_eq!(stats.mapname, "scmp_001");
+        assert_eq!(stats.num_players, 4);
+    }
+
+    #[tokio::test]
+    async fn test_game_stats_none_fields() {
+        let mut mdb = Database::faux();
+        let null_stats = || GameStatRow {
+            start_time: dt(date!(2010 - 01 - 01), time!(00:00:00)),
+            end_time: None,
+            game_type: "0".into(),
+            host: "user1".into(),
+            game_name: "2v2 Game".into(),
+            game_mod: Some("faf".into()),
+            file_name: None,
+        };
+        faux::when!(mdb.get_game_stat_row).safe_then(move |_| Ok(null_stats()));
+        faux::when!(mdb.get_player_count).safe_then(|_| Ok(4));
+
+        let q = Queries::new(mdb);
+        let stats = q.get_game_stats(1).await.unwrap();
+
+        assert_eq!(stats.mapname, "None");
+        // We only check if this is recent enough, only other way to check is use the same API we
+        // generated this with
+        assert!(stats.game_end > 1577836800);   // 2021-01-01 00:00:00
+    }
+
+    #[tokio::test]
+    async fn test_game_mod_versions() {
+        let q = Queries::new(mock_database());
+        let mods = q.get_mod_versions("foo").await.unwrap();
+        assert_eq!(mods.len(), 3);
+        assert_eq!(mods["50".into()], 3000);
+        assert_eq!(mods["60".into()], 3001);
+        assert_eq!(mods["70".into()], 3002);
     }
 }
