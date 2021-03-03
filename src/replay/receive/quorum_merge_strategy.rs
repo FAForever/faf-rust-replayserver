@@ -566,7 +566,9 @@ impl MergeQuorumState {
     }
 
     fn merge_more_data(&mut self) {
-        debug_assert!(self.can_merge_more_data());
+        if !self.can_merge_more_data() {
+            return;
+        }
 
         let common_prefix = self.calculate_quorum_prefix();
         let any_in_quorum = *self.quorum.iter().next().unwrap();
@@ -575,7 +577,6 @@ impl MergeQuorumState {
             self.s.get_mut_replay(*id).explicitly_set_matching();
         }
         self.update_delayed_position();
-        // We already merged, so there's no extra data to be gained.
     }
 
     fn update_delayed_position(&mut self) {
