@@ -66,7 +66,7 @@ impl Display for Connection {
             None => f.write_str("Initial connection"),
             Some(h) => write!(
                 f,
-                "{} '{}' for replay {}",
+                "{} connection '{}' for replay {}",
                 match h.type_ {
                     ConnectionType::READER => "Reader",
                     ConnectionType::WRITER => "Writer",

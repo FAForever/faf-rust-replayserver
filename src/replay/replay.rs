@@ -106,8 +106,8 @@ impl Replay {
     pub async fn handle_connection(&self, mut c: Connection) -> () {
         if self.should_stop_accepting_connections.get() {
             log::info!(
-                "Replay {} dropped a connection because its write phase is over",
-                self.id
+                "Replay {} dropped {} because its write phase is over",
+                self.id, c
             );
             return;
         }
@@ -133,6 +133,7 @@ mod test {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
+    use crate::util::test::sleep_s;
     use crate::{
         accept::header::ConnectionHeader,
         config::test::default_config,
@@ -231,5 +232,101 @@ mod test {
 
         join! { run_replay, replay_reading, replay_writing };
         compare_bufs(example_replay_file, received_replay_file);
+    }
+
+
+    #[tokio::test]
+    async fn test_replay_stops_accepting_connections() {
+        setup_logging();
+        tokio::time::pause();
+
+        let mut mock_saver = InnerReplaySaver::faux();
+        faux::when!(mock_saver.save_replay).then_do(|| ());
+        let token = CancellationToken::new();
+        let mut config = default_config();
+        config.replay.time_with_zero_writers_to_end_replay_s = 2;
+        let replay = Replay::new(1, token, Arc::new(config), Arc::new(mock_saver));
+
+        let (mut c1, _r1, mut w1) = test_connection();
+        let (mut c2, mut r2, w2) = test_connection();
+        let (mut c3, _r3, w3) = test_connection();
+        let (mut c4, mut r4, w4) = test_connection();
+        c1.set_header(ConnectionHeader { type_: ConnectionType::WRITER, id: 1, name: "foo".into() });
+        c2.set_header(ConnectionHeader { type_: ConnectionType::READER, id: 1, name: "foo".into() });
+        c3.set_header(ConnectionHeader { type_: ConnectionType::WRITER, id: 1, name: "foo".into() });
+        c4.set_header(ConnectionHeader { type_: ConnectionType::READER, id: 1, name: "foo".into() });
+
+        let example_replay_file = get_file("example");
+        let replay_is_over = std::cell::Cell::new(false);
+        let replay_lifetime = async {
+            replay.lifetime().await;
+            replay_is_over.set(true);
+        };
+
+        // TIMELINE:
+        // 0 - Writer (c1) arrives
+        // 5 - Reader (c2) arrives
+        // 7 - c1 writes all replay data
+        // 9 - Replay stops accepting new connections
+        // 15 - Writer (c3) arrives, is discarded
+        // 25 - Reader (c4) arrives, is discarded
+        // 35 - Reader (c2) ends
+        let events = async {
+            join! {
+                replay.handle_connection(c1),
+                async {
+                    sleep_s(2).await;
+                    assert_eq!(replay.writer_connection_count.count(), 1);
+                    assert_eq!(replay.reader_connection_count.count(), 0);
+                },
+                async {sleep_s(5).await; replay.handle_connection(c2).await;},
+                async {
+                    sleep_s(6).await;
+                    assert_eq!(replay.writer_connection_count.count(), 1);
+                    assert_eq!(replay.reader_connection_count.count(), 1);
+                },
+                async {sleep_s(7).await; w1.write_all(&example_replay_file).await.unwrap(); drop(w1);},
+                async {
+                    sleep_s(10).await;
+                    assert_eq!(replay.writer_connection_count.count(), 0);
+                    assert_eq!(replay.reader_connection_count.count(), 1);
+                },
+                async {sleep_s(15).await; replay.handle_connection(c3).await;},
+                async {
+                    sleep_s(16).await;
+                    assert_eq!(replay.writer_connection_count.count(), 0);
+                    assert_eq!(replay.reader_connection_count.count(), 1);
+                },
+                async {sleep_s(25).await; replay.handle_connection(c4).await;},
+                async {
+                    sleep_s(26).await;
+                    assert_eq!(replay.writer_connection_count.count(), 0);
+                    assert_eq!(replay.reader_connection_count.count(), 1);
+                    assert!(!replay_is_over.get());
+                },
+                async {
+                    sleep_s(30).await;
+                    let mut v = Vec::new();
+                    r2.read_to_end(&mut v).await.unwrap();
+                    let mut rejected = Vec::new();
+                    r4.read_to_end(&mut rejected).await.unwrap();
+                    assert!(rejected.is_empty());
+                    drop(w2);
+                    drop(w3);
+                    drop(w4);
+
+                    // FIXME https://github.com/tokio-rs/tokio/issues/3562
+                    sleep_s(5).await;
+                    assert_eq!(replay.writer_connection_count.count(), 0);
+                    assert_eq!(replay.reader_connection_count.count(), 0);
+                    assert!(replay_is_over.get());
+                },
+            }
+        };
+
+        join! {
+            replay_lifetime,
+            events,
+        };
     }
 }

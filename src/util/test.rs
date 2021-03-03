@@ -1,6 +1,7 @@
 use std::{fs::File, io::Read, path::PathBuf, sync::Once};
 
 use time::{Date, OffsetDateTime, Time};
+use tokio::time::Duration;
 
 static LOG: Once = Once::new();
 
@@ -40,4 +41,8 @@ pub fn compare_bufs(br1: impl AsRef<[u8]>, br2: impl AsRef<[u8]>) {
 
 pub fn dt(d: Date, t: Time) -> OffsetDateTime {
     d.with_time(t).assume_utc()
+}
+
+pub async fn sleep_s(s: u64) {
+    tokio::time::sleep(Duration::from_secs(s)).await;
 }

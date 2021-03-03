@@ -22,6 +22,12 @@ impl EmptyCounter {
         self.counter.send(old - 1).ok();
     }
 
+    // Little interface for introspection.
+    #[cfg(test)]
+    pub fn count(&self) -> usize {
+        *self.counter.borrow()
+    }
+
     async fn await_new_count(watcher: &mut watch::Receiver<usize>) -> Option<usize> {
         watcher.changed().await.ok().and(Some(*watcher.borrow()))
     }
