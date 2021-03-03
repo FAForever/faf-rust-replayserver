@@ -25,6 +25,8 @@ config = { version = "0.10.1", features = ["yaml"] }
 sqlx = { version = "0.5.1", features = ["runtime-tokio-rustls", "mysql", "time"] }
 time = { version = "0.2.25", features = ["std"] }
 async-compression = { version = "0.3.7", features = ["tokio", "zstd"] }
+prometheus_exporter = "0.8.0"
+lazy_static = "1.4.0"
 
 [dependencies.tokio]
 version = "1.2.0"

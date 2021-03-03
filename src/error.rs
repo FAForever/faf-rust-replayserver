@@ -1,7 +1,7 @@
 #[derive(thiserror::Error, Debug)]
 pub enum ConnectionError {
     #[error("Empty connection")]
-    NoData(),
+    NoData,
     #[error("Bad data: {0}")]
     BadData(String),
     #[error("IO error: {context}, {source}")]
@@ -10,7 +10,9 @@ pub enum ConnectionError {
         context: String,
     },
     #[error("Shutting down")]
-    ShuttingDown(),
+    ShuttingDown,
+    #[error("Could not assign connection to replay")]
+    CannotAssignToReplay,
 }
 
 impl ConnectionError {

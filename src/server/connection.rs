@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use crate::accept::header::{ConnectionHeader, ConnectionType};
+use crate::{
+    accept::header::{ConnectionHeader, ConnectionType},
+    metrics,
+};
 use tokio::{
     io::AsyncBufRead, io::AsyncBufReadExt, io::AsyncRead, io::AsyncWrite, io::BufReader,
     net::TcpStream,
@@ -26,26 +29,54 @@ impl Connection {
         let (r, w) = stream.into_split();
         let reader = Box::new(BufReader::new(r));
         let writer = Box::new(w);
-        Self {
+
+        let s = Self {
             reader,
             writer,
             header: None,
-        }
+        };
+        s.set_metric();
+        s
     }
 
     // Yes, test-specific code. Connection is just a wrapper for a few things, so I think it's
     // justified.
     #[cfg(test)]
     pub fn test(reader: ReaderType, writer: WriterType) -> Self {
-        Self {
+        let s = Self {
             reader,
             writer,
             header: None,
+        };
+        s.set_metric(); // FIXME repetition
+        s
+    }
+
+    fn header2label(&self) -> &str {
+        match &self.header {
+            None => "initial",
+            Some(h) => match h.type_ {
+                ConnectionType::READER => "reader",
+                ConnectionType::WRITER => "writer",
+            },
         }
     }
 
+    fn set_metric(&self) {
+        metrics::ACTIVE_CONNS
+            .with_label_values(&[self.header2label()])
+            .inc();
+    }
+    fn reset_metric(&self) {
+        metrics::ACTIVE_CONNS
+            .with_label_values(&[self.header2label()])
+            .dec();
+    }
+
     pub fn set_header(&mut self, header: ConnectionHeader) {
+        self.reset_metric();
         self.header = Some(header);
+        self.set_metric();
     }
 
     pub fn get_header(&self) -> ConnectionHeader {
@@ -75,6 +106,12 @@ impl Display for Connection {
                 h.id
             ),
         }
+    }
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        self.reset_metric();
     }
 }
 

@@ -58,7 +58,7 @@ pub mod header_reader {
     async fn read_connection_header(conn: &mut Connection) -> ConnResult<ConnectionHeader> {
         let type_ = read_type(conn).await.map_err(|e| match e {
             ConnectionError::IO { source: e, .. } if e.kind() == ErrorKind::UnexpectedEof => {
-                ConnectionError::NoData()
+                ConnectionError::NoData
             }
             e => e,
         })?;
@@ -114,7 +114,7 @@ mod test {
             setup_logging();
             let mut c = conn_from_read_data(short_data);
             let err = read_and_set_connection_header(&mut c).await.err().unwrap();
-            assert!(matches!(err, ConnectionError::NoData()));
+            assert!(matches!(err, ConnectionError::NoData));
         }
     }
 

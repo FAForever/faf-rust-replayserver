@@ -4,14 +4,16 @@ use tokio::join;
 use tokio::time::Duration;
 use tokio_util::sync::CancellationToken;
 
+use super::{receive::ReplayMerger, save::ReplaySaver, send::ReplaySender};
+use crate::error::ConnectionError;
 use crate::{
     accept::header::ConnectionType,
     config::Settings,
+    error::ConnResult,
+    metrics,
     server::connection::Connection,
     util::{empty_counter::EmptyCounter, timeout::cancellable},
 };
-
-use super::{receive::ReplayMerger, save::ReplaySaver, send::ReplaySender};
 
 pub struct Replay {
     id: u64,
@@ -80,20 +82,23 @@ impl Replay {
 
     async fn regular_lifetime(&self) {
         log::debug!("Replay {} started", self.id);
+        metrics::RUNNING_REPLAYS.inc();
         self.wait_until_there_were_no_writers_for_a_while().await;
         self.should_stop_accepting_connections.set(true);
         log::debug!("Replay {} stopped accepting connections", self.id);
         self.writer_connection_count.wait_until_empty().await;
         self.merger.finalize();
-        log::debug!("Replay {} finished merging the replay", self.id);
+        log::debug!("Replay {} finished merging data", self.id);
         self.saver
             .save_replay(self.merger.get_merged_replay(), self.id)
             .await;
-        log::debug!("Replay {} saved the replay", self.id);
+        log::debug!("Replay {} saved data on disk", self.id);
         self.reader_connection_count.wait_until_empty().await;
         log::debug!("Replay {} is finished", self.id);
         // Cancel to return from timeout
         self.replay_timeout_token.cancel();
+        metrics::RUNNING_REPLAYS.dec();
+        metrics::FINISHED_REPLAYS.inc();
     }
 
     pub async fn lifetime(&self) {
@@ -103,14 +108,14 @@ impl Replay {
         };
     }
 
-    pub async fn handle_connection(&self, mut c: Connection) -> () {
+    pub async fn handle_connection(&self, mut c: Connection) -> ConnResult<()> {
         if self.should_stop_accepting_connections.get() {
             log::info!(
                 "Replay {} dropped {} because its write phase is over",
                 self.id,
                 c
             );
-            return;
+            return Err(ConnectionError::CannotAssignToReplay);
         }
         match c.get_header().type_ {
             ConnectionType::WRITER => {
@@ -124,6 +129,7 @@ impl Replay {
                 self.reader_connection_count.dec();
             }
         }
+        Ok(())
     }
 }
 
@@ -167,10 +173,12 @@ mod test {
 
         let replay_ended = Cell::new(false);
         let run_replay = async {
-            join! {
+            (join! {
                 replay.lifetime(),
                 replay.handle_connection(c),
-            };
+            })
+            .1
+            .unwrap();
             replay_ended.set(true);
         };
         let check_result = async {
@@ -208,14 +216,16 @@ mod test {
 
         let replay = Replay::new(1, token, Arc::new(config), Arc::new(mock_saver));
         let run_replay = async {
-            join! {
+            (join! {
                 replay.lifetime(),
                 replay.handle_connection(c_write),
                 async {
                     tokio::time::sleep(Duration::from_millis(1)).await;
-                    replay.handle_connection(c_read).await;
+                    replay.handle_connection(c_read).await.unwrap();
                 }
-            };
+            })
+            .1
+            .unwrap();
         };
 
         let example_replay_file = get_file("example");
@@ -289,13 +299,20 @@ mod test {
         // 35 - Reader (c2) ends
         let events = async {
             join! {
-                replay.handle_connection(c1),
+                async {
+                    let res = replay.handle_connection(c1).await;
+                    assert!(matches!(res, Ok(..)));
+                },
                 async {
                     sleep_s(2).await;
                     assert_eq!(replay.writer_connection_count.count(), 1);
                     assert_eq!(replay.reader_connection_count.count(), 0);
                 },
-                async {sleep_s(5).await; replay.handle_connection(c2).await;},
+                async {
+                    sleep_s(5).await;
+                    let res = replay.handle_connection(c2).await;
+                    assert!(matches!(res, Ok(..)));
+                },
                 async {
                     sleep_s(6).await;
                     assert_eq!(replay.writer_connection_count.count(), 1);
@@ -307,13 +324,21 @@ mod test {
                     assert_eq!(replay.writer_connection_count.count(), 0);
                     assert_eq!(replay.reader_connection_count.count(), 1);
                 },
-                async {sleep_s(15).await; replay.handle_connection(c3).await;},
+                async {
+                    sleep_s(15).await;
+                    let res = replay.handle_connection(c3).await;
+                    assert!(matches!(res.unwrap_err(), ConnectionError::CannotAssignToReplay));
+                },
                 async {
                     sleep_s(16).await;
                     assert_eq!(replay.writer_connection_count.count(), 0);
                     assert_eq!(replay.reader_connection_count.count(), 1);
                 },
-                async {sleep_s(25).await; replay.handle_connection(c4).await;},
+                async {
+                    sleep_s(25).await;
+                    let res = replay.handle_connection(c4).await;
+                    assert!(matches!(res.unwrap_err(), ConnectionError::CannotAssignToReplay));
+                },
                 async {
                     sleep_s(26).await;
                     assert_eq!(replay.writer_connection_count.count(), 0);

@@ -1,4 +1,5 @@
 use super::connection::Connection;
+use crate::metrics;
 use crate::util::timeout::cancellable;
 use crate::worker_threads::ReplayThreadPool;
 use crate::{
@@ -38,7 +39,8 @@ pub async fn run_server_with_deps(
 
     let accept_connections = connections.for_each_concurrent(None, |mut c| async {
         if let Err(e) = acceptor.accept(&mut c).await {
-            info!("{}", e);
+            info!("Could not accept connection: {}", e);
+            metrics::inc_served_conns::<()>(&Err(e));
             return;
         }
         thread_pool.assign_connection(c).await;

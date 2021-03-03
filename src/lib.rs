@@ -4,6 +4,7 @@ use server::server::run_server;
 pub mod accept;
 pub mod config;
 pub mod database;
+pub mod metrics;
 pub mod replay;
 pub mod server;
 pub mod util;

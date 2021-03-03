@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    config::Settings, database::database::Database, database::queries::Queries,
+    config::Settings, database::database::Database, database::queries::Queries, metrics,
     replay::streams::MReplayRef,
 };
 
@@ -56,5 +56,6 @@ impl InnerReplaySaver {
         if let Err(e) = write_replay(target_file, json_header, replay).await {
             log::warn!("Failed to write out replay {}: {}", replay_id, e);
         }
+        metrics::SAVED_REPLAYS.inc();
     }
 }
