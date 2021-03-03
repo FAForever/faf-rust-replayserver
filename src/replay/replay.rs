@@ -107,7 +107,8 @@ impl Replay {
         if self.should_stop_accepting_connections.get() {
             log::info!(
                 "Replay {} dropped {} because its write phase is over",
-                self.id, c
+                self.id,
+                c
             );
             return;
         }
@@ -139,7 +140,7 @@ mod test {
         config::test::default_config,
         replay::save::InnerReplaySaver,
         server::connection::test::test_connection,
-        util::test::{get_file, setup_logging, compare_bufs},
+        util::test::{compare_bufs, get_file, setup_logging},
     };
 
     #[tokio::test]
@@ -234,7 +235,6 @@ mod test {
         compare_bufs(example_replay_file, received_replay_file);
     }
 
-
     #[tokio::test]
     async fn test_replay_stops_accepting_connections() {
         setup_logging();
@@ -251,10 +251,26 @@ mod test {
         let (mut c2, mut r2, w2) = test_connection();
         let (mut c3, _r3, w3) = test_connection();
         let (mut c4, mut r4, w4) = test_connection();
-        c1.set_header(ConnectionHeader { type_: ConnectionType::WRITER, id: 1, name: "foo".into() });
-        c2.set_header(ConnectionHeader { type_: ConnectionType::READER, id: 1, name: "foo".into() });
-        c3.set_header(ConnectionHeader { type_: ConnectionType::WRITER, id: 1, name: "foo".into() });
-        c4.set_header(ConnectionHeader { type_: ConnectionType::READER, id: 1, name: "foo".into() });
+        c1.set_header(ConnectionHeader {
+            type_: ConnectionType::WRITER,
+            id: 1,
+            name: "foo".into(),
+        });
+        c2.set_header(ConnectionHeader {
+            type_: ConnectionType::READER,
+            id: 1,
+            name: "foo".into(),
+        });
+        c3.set_header(ConnectionHeader {
+            type_: ConnectionType::WRITER,
+            id: 1,
+            name: "foo".into(),
+        });
+        c4.set_header(ConnectionHeader {
+            type_: ConnectionType::READER,
+            id: 1,
+            name: "foo".into(),
+        });
 
         let example_replay_file = get_file("example");
         let replay_is_over = std::cell::Cell::new(false);

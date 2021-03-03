@@ -22,17 +22,9 @@ pub fn compare_bufs(br1: impl AsRef<[u8]>, br2: impl AsRef<[u8]>) {
     let b1: &[u8] = br1.as_ref();
     let b2: &[u8] = br2.as_ref();
     if b1.len() != b2.len() {
-        panic!(
-            "Length mismatch: {} != {}",
-            b1.len(),
-            b2.len()
-        )
+        panic!("Length mismatch: {} != {}", b1.len(), b2.len())
     }
-    for (i, (c1, c2)) in b1
-        .iter()
-        .zip(b2.iter())
-        .enumerate()
-    {
+    for (i, (c1, c2)) in b1.iter().zip(b2.iter()).enumerate() {
         if c1 != c2 {
             panic!("Buffers differ at byte {}: {} != {}", i, c1, c2);
         }

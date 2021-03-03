@@ -185,8 +185,8 @@ impl Database {
 #[cfg(test)]
 pub mod test {
     // See db_unit_test_data.sql for data used here.
-    use std::collections::HashMap;
     use crate::util::test::dt;
+    use std::collections::HashMap;
     use time::macros::{date, time};
 
     use super::*;
@@ -431,18 +431,39 @@ pub mod test {
         faux::when!(mock_db.get_game_stat_row).safe_then(|_id| Ok(default_game_stats()));
         faux::when!(mock_db.get_team_players).safe_then(|_id| {
             Ok(vec![
-               TeamPlayerRow { login: "user1".into(), team: 1, },
-               TeamPlayerRow { login: "user2".into(), team: 1, },
-               TeamPlayerRow { login: "user3".into(), team: 2, },
-               TeamPlayerRow { login: "user4".into(), team: 2, },
-               ])
+                TeamPlayerRow {
+                    login: "user1".into(),
+                    team: 1,
+                },
+                TeamPlayerRow {
+                    login: "user2".into(),
+                    team: 1,
+                },
+                TeamPlayerRow {
+                    login: "user3".into(),
+                    team: 2,
+                },
+                TeamPlayerRow {
+                    login: "user4".into(),
+                    team: 2,
+                },
+            ])
         });
         faux::when!(mock_db.get_player_count).safe_then(|_id| Ok(4));
         faux::when!(mock_db.get_mod_version_list).then_do(|| {
             Ok(vec![
-               ModVersions { file_id: 50, version: 3000, },
-               ModVersions { file_id: 60, version: 3001, },
-               ModVersions { file_id: 70, version: 3002, },
+                ModVersions {
+                    file_id: 50,
+                    version: 3000,
+                },
+                ModVersions {
+                    file_id: 60,
+                    version: 3001,
+                },
+                ModVersions {
+                    file_id: 70,
+                    version: 3002,
+                },
             ])
         });
         mock_db

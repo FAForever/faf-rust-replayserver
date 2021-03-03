@@ -50,7 +50,8 @@ impl Queries {
         if stats.file_name.is_none() {
             log::warn!("Map name for replay {} is missing! Saving anyway.", id);
         }
-        let mapname = stats.file_name
+        let mapname = stats
+            .file_name
             .and_then(|f| f.rsplitn(2, '.').last().map(String::from))
             .and_then(|f| f.rsplitn(2, '/').nth(0).map(String::from))
             .unwrap_or("None".into());
@@ -115,8 +116,8 @@ mod test {
 
         // Check just a few interesting bits.
         assert_eq!(stats.featured_mod, Some("faf".into()));
-        assert_eq!(stats.launched_at, 1262304000);   // 2010-01-01 00:00:00
-        assert_eq!(stats.game_end, 1262307600);   // 2010-01-01 01:00:00
+        assert_eq!(stats.launched_at, 1262304000); // 2010-01-01 00:00:00
+        assert_eq!(stats.game_end, 1262307600); // 2010-01-01 01:00:00
         assert_eq!(stats.mapname, "scmp_001");
         assert_eq!(stats.num_players, 4);
     }
@@ -142,7 +143,7 @@ mod test {
         assert_eq!(stats.mapname, "None");
         // We only check if this is recent enough, only other way to check is use the same API we
         // generated this with
-        assert!(stats.game_end > 1577836800);   // 2021-01-01 00:00:00
+        assert!(stats.game_end > 1577836800); // 2021-01-01 00:00:00
     }
 
     #[tokio::test]
