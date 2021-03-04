@@ -8,6 +8,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServerSettings {
     pub port: u16,
+    pub prometheus_port: u16,
     pub worker_threads: u32,
     pub connection_accept_timeout_s: u64,
 }
@@ -72,6 +73,7 @@ pub mod test {
         InnerSettings {
             server: ServerSettings {
                 port: 15000,
+                prometheus_port: 8001,
                 worker_threads: 8,
                 connection_accept_timeout_s: 7200,
             },

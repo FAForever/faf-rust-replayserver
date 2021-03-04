@@ -26,6 +26,10 @@ async fn do_run_server() {
         }
         Ok(o) => o,
     };
+
+    if !start_prometheus_server(&config) {
+        return;
+    }
     let shutdown_token = CancellationToken::new();
     let f1 = run_server(config, shutdown_token.clone());
     let f2 = cancel_at_sigint(shutdown_token);
@@ -39,6 +43,24 @@ fn setup_process_exit_panic_hook() {
         orig_hook(panic_info);
         std::process::exit(1);
     }));
+}
+
+fn start_prometheus_server(config: &config::Settings) -> bool {
+    let addr = format!("localhost:{}", config.server.prometheus_port);
+    let parsed_addr = match addr.parse() {
+        Err(e) => {
+            log::error!("Failed to parse prometheus port: {}", e);
+            return false;
+        },
+        Ok(a) => a,
+    };
+    match prometheus_exporter::start(parsed_addr) {
+        Ok(..) => true,
+        Err(e) => {
+            log::debug!("Could not launch prometheus HTTP server: {}", e);
+            false
+        }
+    }
 }
 
 pub fn run() -> () {
