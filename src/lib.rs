@@ -51,7 +51,7 @@ fn start_prometheus_server(config: &config::Settings) -> bool {
         Err(e) => {
             log::error!("Failed to parse prometheus port: {}", e);
             return false;
-        },
+        }
         Ok(a) => a,
     };
     match prometheus_exporter::start(parsed_addr) {

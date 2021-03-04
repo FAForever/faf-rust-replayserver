@@ -167,7 +167,7 @@ impl Database {
         }
     }
 
-    pub async fn update_game_stats(&self, id: u64, replay_ticks: u64) -> Result<(), SaveError> {
+    pub async fn update_game_stats(&self, id: u64, replay_ticks: u32) -> Result<(), SaveError> {
         let query = "
             UPDATE `game_stats` SET
                 `game_stats`.`replay_ticks` = ?
@@ -414,6 +414,13 @@ pub mod test {
         assert!(mod_data.is_empty());
     }
 
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
+    async fn test_game_ticks() {
+        let db = get_db();
+        db.update_game_stats(1000, 515).await.unwrap();
+        // TODO fetch from db. Above at least verifies that sql is valid.
+    }
     fn default_game_stats() -> GameStatRow {
         GameStatRow {
             start_time: dt(date!(2010 - 01 - 01), time!(00:00:00)),

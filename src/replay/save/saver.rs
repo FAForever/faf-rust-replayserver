@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use crate::{
     config::Settings, database::database::Database, database::queries::Queries, metrics,
-    replay::streams::MReplayRef,
+    replay::streams::MReplayRef, util::buf_traits::ReadAtExt,
 };
 
 use super::{writer::write_replay, ReplayJsonHeader, SavedReplayDirectory};
+use faf_replay_parser::scfa;
 
 pub type ReplaySaver = Arc<InnerReplaySaver>;
 
@@ -29,12 +30,32 @@ impl InnerReplaySaver {
             save_dir: SavedReplayDirectory::new(config.storage.vault_path.as_ref()),
         }
     }
+
+    async fn count_and_store_ticks(&self, replay: MReplayRef, replay_id: u64) {
+        let maybe_ticks = scfa::parser::parse_body_ticks(&mut replay.reader());
+        let ticks = match maybe_ticks {
+            Err(_) => {
+                // FIXME doesn't implement display yet
+                log::info!("Failed to parse tick count for replay {}", replay_id);
+                return;
+            }
+            Ok(t) => t,
+        };
+        if let Err(e) = self.db.update_game_stats(replay_id, ticks).await {
+            log::info!(
+                "Failed to update game stats for replay {}: {}",
+                replay_id,
+                e
+            );
+        }
+    }
     // TODO count and store ticks
     pub async fn save_replay(&self, replay: MReplayRef, replay_id: u64) {
         if replay.borrow().get_header().is_none() {
             log::info!("Replay {} is empty, not saving.", replay_id);
             return;
         }
+        self.count_and_store_ticks(replay.clone(), replay_id).await;
         let json_header = match ReplayJsonHeader::from_id_and_db(&self.db, replay_id).await {
             Err(e) => {
                 log::warn!(

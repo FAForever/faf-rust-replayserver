@@ -7,8 +7,6 @@ edition = "2018"
 [features]
 local_db_tests = []
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 futures = "0.3.8"
 signal-hook = "0.3.0"
@@ -27,6 +25,8 @@ time = { version = "0.2.25", features = ["std"] }
 async-compression = { version = "0.3.7", features = ["tokio", "zstd"] }
 prometheus_exporter = "0.8.0"
 lazy_static = "1.4.0"
+# Grab version that accepts impl Read in body_ticks
+faf-replay-parser = { git = "https://gitlab.com/Askaholic/faf-replay-parser", rev = "5ee45ec1" }
 
 [dependencies.tokio]
 version = "1.2.0"

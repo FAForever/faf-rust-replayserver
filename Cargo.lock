@@ -354,6 +354,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "faf-replay-parser"
+version = "0.5.0"
+source = "git+https://gitlab.com/Askaholic/faf-replay-parser?rev=5ee45ec1#5ee45ec1e11efcdeeb2f3a5b100e90f8821f7ca1"
+dependencies = [
+ "byteorder",
+ "bytes",
+]
+
+[[package]]
 name = "faf-rust-replayserver"
 version = "0.1.0"
 dependencies = [
@@ -361,6 +370,7 @@ dependencies = [
  "async-stream",
  "config",
  "env_logger",
+ "faf-replay-parser",
  "faux",
  "futures",
  "lazy_static",
