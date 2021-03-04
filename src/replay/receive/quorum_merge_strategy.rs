@@ -405,16 +405,14 @@ impl MergeStalemateState {
 }
 
 // QUORUM:
-// Have a set of replays Q that matches C. Update C's delayed position as a minimum of Q's replays'
-// delayed positions. Whenever C's delayed position reaches end of its data, lazily merge replays
-// in Q and add more data to C. When a merge like this does not produce data beyond C's delayed
-// position, enter a stalemate.
+// Have a set of replays Q that matches C. When constructed, merge replays in quorum and add the
+// common prefix to C. Update C's delayed position as a minimum of Q's replays' delayed positions.
+// Once C's delayed position reaches end of its data, enter a stalemate.
 
 pub struct MergeQuorumState {
     s: SharedState,
     quorum: HashSet<u64>,
     reserve: HashSet<u64>,
-    quorum_diverges_at: Option<usize>,
 }
 
 // * A quorum has a set Q and a set Res.
@@ -424,21 +422,16 @@ pub struct MergeQuorumState {
 //   * C's delayed position is equal to a minimum of:
 //     * A minimum of delayed positions of replays in Q,
 //     * Its own data length.
-//   * Whenever C's delayed position is equal to its data length, C is the greatest common prefix
-//     of replays in Q.
 // * A quorum is constructed with a (non-empty) set of "good replays" G that match C and a reserve
 //   set Res. Q is populated with replays from G. Remaining replays in G are added into Res.
-// * A quorum can perform a "merging step" that adds data to C. In a merging step, replays in Q are
+// * When constructed, quorum performs a "merging step". In a merging step, replays in Q are
 //   compared from the end of C and their common prefix is appended to C.
+// * The quorum transitions to a stalemate when C's delayed position reaches its data length.
 //
-// * Whenever C's delayed position reaches its data length, a merging step is performed.
-// * If, right after a merging step, C's delayed position still equals its data length, quorum
-//   should transition to a stalemate.
 // * Transitioning to a stalemate happens as follows:
 //   * Replays in Res that diverge from C are removed.
 //   * Replays from Q are added to Res.
 //   * Stalemate is constructed with Res.
-
 impl MergeQuorumState {
     fn from_stalemate(
         shared: SharedState,
@@ -460,7 +453,6 @@ impl MergeQuorumState {
             s: shared,
             quorum: new_quorum,
             reserve,
-            quorum_diverges_at: None,
         };
         me.merge_more_data();
         me
@@ -479,9 +471,8 @@ impl MergeQuorumState {
     // immediately return it while quorum would merge a bit of data, then transition to stalemate
     // as the finished replay's delayed position points to the end of data. With a minimum, we'd
     // only move the delayed position to the end once all quorum replays finish.
-    // Using a minimum here is fine anyway. Delayed data always catches up with normal data, even
-    // if a replay stalls, so at the very least we'll switch to a stalemate in a reasonable amount
-    // of time.
+    // Using a minimum here is fine. Delayed data always catches up with normal data, even if a
+    // replay stalls, so we'll always eventually switch to a stalemate.
     fn quorum_delayed_position(&self) -> usize {
         self.quorum
             .iter()
@@ -493,9 +484,6 @@ impl MergeQuorumState {
     fn replay_data_updated(&mut self, id: u64) {
         if self.quorum.contains(&id) {
             self.update_delayed_position();
-            if self.need_to_merge_more_data() && self.can_merge_more_data() {
-                self.merge_more_data();
-            }
         }
     }
 
@@ -503,26 +491,8 @@ impl MergeQuorumState {
         // pass, we don't care
     }
 
-    fn need_to_merge_more_data(&self) -> bool {
-        self.s.merged_delayed_position() >= self.s.merged_data_len()
-    }
-
-    fn can_merge_more_data(&self) -> bool {
-        if let Some(..) = self.quorum_diverges_at {
-            return false;
-        }
-        // Do all quorum streams have some more data?
-        self.quorum
-            .iter()
-            .map(|id| self.s.get_replay(*id).data_len())
-            .min()
-            .unwrap()
-            > self.s.merged_data_len()
-    }
-
-    /* CAVEAT - only correct in-between calls! Never call from inside! */
     fn has_to_enter_stalemate(&self) -> bool {
-        self.need_to_merge_more_data()
+        self.s.merged_delayed_position() >= self.s.merged_data_len()
     }
 
     fn enter_stalemate(self) -> MergeStalemateState {
@@ -559,17 +529,10 @@ impl MergeQuorumState {
             let pfx = shortest.common_prefix_from(self.s.get_replay(*id), cmp_start);
             common_prefix = std::cmp::min(common_prefix, pfx);
         }
-        if common_prefix < shortest.data_len() {
-            self.quorum_diverges_at = Some(common_prefix);
-        }
         common_prefix
     }
 
     fn merge_more_data(&mut self) {
-        if !self.can_merge_more_data() {
-            return;
-        }
-
         let common_prefix = self.calculate_quorum_prefix();
         let any_in_quorum = *self.quorum.iter().next().unwrap();
         self.s.append_canon_data(any_in_quorum, common_prefix);
@@ -726,9 +689,11 @@ impl MergeStrategy for QuorumMergeStrategy {
 // and stalemate having to work for every single byte. Why does it not happen?
 // * We can assume quorum ends due to diverging data very few times, since every time it does, we
 //   discard at least one replay.
-// * Otherwise, the quorum ends because the delayed position caught up with the data for every
-//   replay. This event can happen at most once per N minutes per replay, so on average we stay in
-//   the quorum ((N minutes * quorum size) / # of replays) minutes.
+// * Otherwise, the quorum ends because the delayed position caught up with the data we merged. If
+//   that happened after K < N minutes, then the shortest replay has been stalling for N - K
+//   minutes at that position. Total replay stalling time can't exceed (replay count) minutes per
+//   minute, so we won't enter stalemate more often than (replay count + 1) times per N minutes,
+//   amortized.
 //
 // Fifth claim is memory usage. We always discard any data that's stream_cmp_distance behind canon.
 // In a quorum, we wait with merging until delayed data catches up, so we keep at most last N
