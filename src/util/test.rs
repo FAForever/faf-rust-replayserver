@@ -9,6 +9,13 @@ pub fn setup_logging() {
     LOG.call_once(env_logger::init);
 }
 
+pub fn get_file_path(f: &str) -> String {
+    let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    p.push("test/resources");
+    p.push(f);
+    p.into_os_string().into_string().unwrap()
+}
+
 pub fn get_file(f: &str) -> Vec<u8> {
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     p.push("test/resources");
