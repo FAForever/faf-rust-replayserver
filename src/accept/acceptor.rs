@@ -1,6 +1,6 @@
 use tokio::time::Duration;
 
-use crate::{config::Settings, error::ConnResult, error::ConnectionError};
+use crate::{config::Settings, error::ConnResult, error::bad_data};
 use crate::{server::connection::Connection, util::timeout::timeout};
 
 use super::header::header_reader::read_and_set_connection_header;
@@ -19,9 +19,7 @@ impl ConnectionAcceptor {
     pub async fn accept(&self, mut c: &mut Connection) -> ConnResult<()> {
         match timeout(read_and_set_connection_header(&mut c), self.timeout).await {
             Some(res) => res,
-            None => Err(ConnectionError::bad_data(
-                "Timed out while accepting connection",
-            )),
+            None => Err(bad_data("Timed out while accepting connection")),
         }
     }
 }

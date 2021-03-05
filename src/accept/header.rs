@@ -6,6 +6,7 @@ use tokio::io::AsyncReadExt;
 use crate::error::ConnResult;
 use crate::error::ConnectionError;
 use crate::error::SomeError;
+use crate::error::bad_data;
 use crate::server::connection::Connection;
 use crate::{server::connection::read_until_exact, some_error};
 
@@ -31,7 +32,7 @@ pub mod header_reader {
         match &buf {
             b"P/" => Ok(ConnectionType::WRITER),
             b"G/" => Ok(ConnectionType::READER),
-            _ => Err(format!("Invalid connection type: {:x?}", buf).into()),
+            _ => Err(bad_data(format!("Invalid connection type: {:x?}", buf))),
         }
     }
 
@@ -39,19 +40,19 @@ pub mod header_reader {
         let mut line = Vec::<u8>::new();
         read_until_exact(&mut conn.take(1024), b'\0', &mut line)
             .await
-            .map_err(|_| ConnectionError::bad_data("Connection header is incomplete"))?;
+            .map_err(|_| bad_data("Connection header is incomplete"))?;
 
         let pieces: Vec<&[u8]> = line[..].splitn(2, |c| c == &b'/').collect();
         if pieces.len() < 2 {
-            return Err(format!("Connection header has too few slashes: {}", pieces.len()).into());
+            return Err(bad_data(format!("Connection header has too few slashes: {}", pieces.len())));
         }
         let (id_bytes, name_bytes) = (pieces[0], pieces[1]);
         let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1]; // remove trailing '\0'
 
         let id = some_error!(from_utf8(id_bytes)?.parse::<u64>()?)
-            .map_err(|_| ConnectionError::bad_data("Failed to parse replay ID"))?;
+            .map_err(|_| bad_data("Failed to parse replay ID"))?;
         let name = some_error!(String::from(from_utf8(name_bytes)?))
-            .map_err(|_| ConnectionError::bad_data("Failed to decode connection string id"))?;
+            .map_err(|_| bad_data("Failed to decode connection string id"))?;
         Ok((id, name))
     }
 

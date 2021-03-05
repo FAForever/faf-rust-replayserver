@@ -15,22 +15,9 @@ pub enum ConnectionError {
     CannotAssignToReplay,
 }
 
-impl ConnectionError {
-    pub fn bad_data(what: impl Into<String>) -> Self {
-        Self::BadData(what.into())
-    }
-}
-// Usually we want to throw BadData.
-impl From<String> for ConnectionError {
-    fn from(s: String) -> Self {
-        Self::BadData(s)
-    }
-}
-
-impl From<&str> for ConnectionError {
-    fn from(s: &str) -> Self {
-        Self::BadData(String::from(s))
-    }
+// Little shortcut for less typing,
+pub fn bad_data(what: impl Into<String>) -> ConnectionError {
+    ConnectionError::BadData(what.into())
 }
 
 impl From<std::io::Error> for ConnectionError {
@@ -42,39 +29,7 @@ impl From<std::io::Error> for ConnectionError {
     }
 }
 
-impl ConnectionError {
-    pub fn context(self, s: String) -> Self {
-        match self {
-            Self::BadData(_) => Self::BadData(s),
-            Self::IO { source, .. } => Self::IO { source, context: s },
-            other => other,
-        }
-    }
-}
-
 pub type ConnResult<T> = Result<T, ConnectionError>;
-
-// Below is some magic for nicer handling of errors.
-
-// Add string context to errors.
-pub trait AddContext<T> {
-    fn context(self, c: T) -> Self;
-}
-
-impl<T> AddContext<String> for ConnResult<T> {
-    fn context(self, s: String) -> Self {
-        match self {
-            Err(e) => Err(e.context(s)),
-            ok => ok,
-        }
-    }
-}
-
-impl<T> AddContext<&str> for ConnResult<T> {
-    fn context(self, s: &str) -> Self {
-        self.context(String::from(s))
-    }
-}
 
 // Below code lets us handle errors we don't need the type of.
 pub struct SomeError {}
