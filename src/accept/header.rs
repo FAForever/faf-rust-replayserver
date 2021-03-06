@@ -86,7 +86,7 @@ mod test {
 
     fn conn_from_read_data(data: &'static [u8]) -> Connection {
         let r = Box::new(BufReader::new(Cursor::new(data)));
-        Connection::test(r, Box::new(tokio::io::sink()))
+        Connection::new_from(r, Box::new(tokio::io::sink()))
     }
 
     #[tokio::test]

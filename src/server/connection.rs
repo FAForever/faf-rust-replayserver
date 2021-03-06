@@ -29,20 +29,11 @@ impl Connection {
         let (r, w) = stream.into_split();
         let reader = Box::new(BufReader::new(r));
         let writer = Box::new(w);
-
-        let s = Self {
-            reader,
-            writer,
-            header: None,
-        };
-        s.set_metric();
-        s
+        Self::new_from(reader, writer)
     }
 
-    // Yes, test-specific code. Connection is just a wrapper for a few things, so I think it's
-    // justified.
-    #[cfg(test)]
-    pub fn test(reader: ReaderType, writer: WriterType) -> Self {
+    // Used for tests. Connection is just a wrapper for a few things, so I think it's justified.
+    pub fn new_from(reader: ReaderType, writer: WriterType) -> Self {
         let s = Self {
             reader,
             writer,
@@ -264,7 +255,7 @@ pub mod test {
         // As long as they're larger than the largest possible read, everything seems OK.
         let (reader, conn_writer) = tokio::io::duplex(10240);
         let (conn_reader, writer) = tokio::io::duplex(10240);
-        let c = Connection::test(Box::new(BufReader::new(conn_reader)), Box::new(conn_writer));
+        let c = Connection::new_from(Box::new(BufReader::new(conn_reader)), Box::new(conn_writer));
         (c, reader, writer)
     }
 }
