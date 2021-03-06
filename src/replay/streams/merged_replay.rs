@@ -28,11 +28,11 @@ impl MergedReplay {
         }
     }
 
-    // The three values below are *delayed* data.
-    fn header_len(&self) -> usize {
+    pub fn header_len(&self) -> usize {
         self.get_header().map_or(0, |h| h.data.len())
     }
 
+    // The two values below are *delayed* data.
     pub fn data_len(&self) -> usize {
         self.delayed_data_len
     }

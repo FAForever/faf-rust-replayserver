@@ -32,11 +32,12 @@ impl InnerReplaySaver {
     }
 
     async fn count_and_store_ticks(&self, replay: MReplayRef, replay_id: u64) {
-        let maybe_ticks = scfa::parser::parse_body_ticks(&mut replay.reader());
+        let header_len = replay.borrow().header_len();
+        let maybe_ticks = scfa::parser::parse_body_ticks(&mut replay.reader_from(header_len));
         let ticks = match maybe_ticks {
-            Err(_) => {
+            Err(e) => {
                 // FIXME doesn't implement display yet
-                log::info!("Failed to parse tick count for replay {}", replay_id);
+                log::info!("Failed to parse tick count for replay {}: {:?}", replay_id, e);
                 return;
             }
             Ok(t) => t,

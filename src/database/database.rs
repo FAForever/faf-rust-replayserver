@@ -477,6 +477,7 @@ pub mod test {
                 },
             ])
         });
+        faux::when!(mock_db.update_game_stats).safe_then(|(_id, _ticks)| Ok(()));
         mock_db
     }
 }
