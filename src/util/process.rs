@@ -6,7 +6,6 @@ use signal_hook::consts::signal::SIGINT;
 use std::os::unix::net::UnixStream;
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixStream as AsyncUnixStream;
-use tokio_util::sync::CancellationToken;
 
 pub fn setup_process_exit_on_panic() {
     let orig_hook = std::panic::take_hook();
