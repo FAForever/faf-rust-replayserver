@@ -60,7 +60,7 @@ impl InnerReplaySaver {
         let json_header = match ReplayJsonHeader::from_id_and_db(&self.db, replay_id).await {
             Err(e) => {
                 log::warn!(
-                    "Failed to fetch game {} stats from the database: {}",
+                    "Failed to fetch game {} stats from database: {}",
                     replay_id,
                     e
                 );
@@ -77,6 +77,7 @@ impl InnerReplaySaver {
         };
         if let Err(e) = write_replay(target_file, json_header, replay).await {
             log::warn!("Failed to write out replay {}: {}", replay_id, e);
+            return;
         }
         metrics::SAVED_REPLAYS.inc();
     }
