@@ -94,15 +94,6 @@ impl ReplayState {
         self.data_len() < self.canon_len() && !self.is_finished()
     }
 
-    fn matches_canon(&mut self) -> bool {
-        if self.falls_behind_canon() {
-            false
-        } else {
-            self.match_with_canon_stream();
-            !self.diverges
-        }
-    }
-
     fn diverges_from_canon(&mut self) -> bool {
         if self.falls_behind_canon() {
             false
