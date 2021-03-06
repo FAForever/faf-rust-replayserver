@@ -19,4 +19,5 @@ export RUSTDOCFLAGS="-Cpanic=abort"
 env CARGO_TARGET_DIR=./coverage_run cargo build
 env CARGO_TARGET_DIR=./coverage_run cargo test $@
 
-grcov . --binary-path ./coverage_run/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" -o ./coverage
+grcov . --ignore "src/process_test" --ignore "src/util/process.rs" \
+	--binary-path ./coverage_run/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" -o ./coverage
