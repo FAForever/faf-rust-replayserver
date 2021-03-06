@@ -384,6 +384,14 @@ pub mod test {
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
     #[tokio::test]
+    async fn test_db_mod_with_odd_characters() {
+        let db = get_db();
+        let mod_data = db.get_mod_version_list("blarg' OR 1=1--").await.unwrap();
+        assert!(mod_data.is_empty());
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test]
     async fn test_db_nonexistent_mod_is_empty() {
         let db = get_db();
         let mod_data = db.get_mod_version_list("blarlargwars").await.unwrap();
