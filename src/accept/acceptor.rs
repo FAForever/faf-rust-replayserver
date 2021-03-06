@@ -1,6 +1,6 @@
 use tokio::time::Duration;
 
-use crate::{config::Settings, error::ConnResult, error::bad_data};
+use crate::{config::Settings, error::bad_data, error::ConnResult};
 use crate::{server::connection::Connection, util::timeout::timeout};
 
 use super::header::header_reader::read_and_set_connection_header;

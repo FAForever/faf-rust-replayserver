@@ -1,4 +1,7 @@
-use std::{env::{self, VarError}, sync::Arc};
+use std::{
+    env::{self, VarError},
+    sync::Arc,
+};
 
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
@@ -54,8 +57,10 @@ impl InnerSettings {
         let db_pass_var = env::var("RS_DB_PASSWORD");
         Self::do_from_env(conf_var, db_pass_var).map(|x| Arc::new(x))
     }
-    fn do_from_env(conf_var: Result<String, VarError>,
-                   db_pass_var: Result<String, VarError>) -> Result<Self, ConfigError> {
+    fn do_from_env(
+        conf_var: Result<String, VarError>,
+        db_pass_var: Result<String, VarError>,
+    ) -> Result<Self, ConfigError> {
         let config_file = conf_var.map_err(|_| {
             ConfigError::Message(
                 "RS_CONFIG_FILE env var not set, place the path to the config file there.".into(),
@@ -109,7 +114,7 @@ pub mod test {
     #[test]
     fn test_example_config_load() {
         let conf_file = get_file_path("example_config.yml");
-        let password = String::from("banana");  // File does not have a password entry
+        let password = String::from("banana"); // File does not have a password entry
         let conf = InnerSettings::do_from_env(Ok(conf_file), Ok(password)).unwrap();
         assert_eq!(conf, default_config());
     }
@@ -117,12 +122,14 @@ pub mod test {
     #[test]
     fn test_config_needs_password() {
         let conf_file = get_file_path("example_config.yml");
-        InnerSettings::do_from_env(Ok(conf_file), Err(VarError::NotPresent)).expect_err("Config init should've failed");
+        InnerSettings::do_from_env(Ok(conf_file), Err(VarError::NotPresent))
+            .expect_err("Config init should've failed");
     }
 
     #[test]
     fn test_config_needs_file() {
-        let password = String::from("banana");  // File does not have a password entry
-        InnerSettings::do_from_env(Err(VarError::NotPresent), Ok(password)).expect_err("Config init should've failed");
+        let password = String::from("banana"); // File does not have a password entry
+        InnerSettings::do_from_env(Err(VarError::NotPresent), Ok(password))
+            .expect_err("Config init should've failed");
     }
 }

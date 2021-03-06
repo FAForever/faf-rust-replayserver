@@ -3,10 +3,10 @@ use std::str::from_utf8;
 
 use tokio::io::AsyncReadExt;
 
+use crate::error::bad_data;
 use crate::error::ConnResult;
 use crate::error::ConnectionError;
 use crate::error::SomeError;
-use crate::error::bad_data;
 use crate::server::connection::Connection;
 use crate::{server::connection::read_until_exact, some_error};
 
@@ -44,7 +44,10 @@ pub mod header_reader {
 
         let pieces: Vec<&[u8]> = line[..].splitn(2, |c| c == &b'/').collect();
         if pieces.len() < 2 {
-            return Err(bad_data(format!("Connection header has too few slashes: {}", pieces.len())));
+            return Err(bad_data(format!(
+                "Connection header has too few slashes: {}",
+                pieces.len()
+            )));
         }
         let (id_bytes, name_bytes) = (pieces[0], pieces[1]);
         let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1]; // remove trailing '\0'

@@ -1,6 +1,6 @@
 use server::server::run_server;
 use tokio::join;
-use util::process::{setup_process_exit_on_panic,wait_for_sigint};
+use util::process::{setup_process_exit_on_panic, wait_for_sigint};
 
 pub mod accept;
 pub mod config;

@@ -37,7 +37,11 @@ impl InnerReplaySaver {
         let ticks = match maybe_ticks {
             Err(e) => {
                 // FIXME doesn't implement display yet
-                log::info!("Failed to parse tick count for replay {}: {:?}", replay_id, e);
+                log::info!(
+                    "Failed to parse tick count for replay {}: {:?}",
+                    replay_id,
+                    e
+                );
                 return;
             }
             Ok(t) => t,
