@@ -58,10 +58,6 @@ impl Database {
         Self { pool }
     }
 
-    pub async fn close(&self) {
-        self.pool.close().await
-    }
-
     // TODO: use compile-time query checks once some integration with faf-stack is added.
     // I wonder if they interact badly with the language server.
 
