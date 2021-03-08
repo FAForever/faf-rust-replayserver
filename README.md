@@ -21,8 +21,13 @@ TODO
 Things that will turn into a real README
 ========================================
 
-Running database tests
-----------------------
+Usage
+-----
+
+See docs/usage.rst.
+
+Running extra tests
+-------------------
 
 To run database query unit tests, do the following:
 * Setup a local database from faf-stack. See [here](https://github.com/FAForever/db).
@@ -34,3 +39,18 @@ To run database query unit tests, do the following:
   ```
   env DB_HOST=<db_host> DB_PORT=<db_port> cargo test --features local_db_tests
   ```
+
+A few tests run outside `cargo test`, since they manipulate process-global
+state. You can run them like so:
+
+```
+cargo build --features process_tests
+./test/run_process_tests.sh
+```
+
+Coverage
+--------
+
+To do code coverage, first configure grcov, as described at
+https://github.com/mozilla/grcov. One this is done, run `test/run_coverage.sh`.
+Generated coverage is available under ./coverage.
