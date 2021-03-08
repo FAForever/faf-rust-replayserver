@@ -1,4 +1,7 @@
-#!/usr/bin/env -S bash -e -u -o pipefail -O inherit_errexit
+#!/bin/bash
+
+set -e -u -o pipefail
+shopt -s inherit_errexit
 
 if [ $# -eq 0 ] ; then
 	echo "This script passes args through to the mysql process."
@@ -38,4 +41,4 @@ mysql $@ -e "SET FOREIGN_KEY_CHECKS=0; \
              SET FOREIGN_KEY_CHECKS=1;"
 
 # Populate with test data.
-mysql $@ < db_unit_test_data.sql
+mysql $@ < test/db_unit_test_data.sql
