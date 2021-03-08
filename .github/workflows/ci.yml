@@ -8,14 +8,32 @@ on:
 jobs:
     build_and_test:
         runs-on: ubuntu-latest
+        env:
+            DB_HOST: localhost
+            DB_PORT: 3306
         steps:
             - uses: actions/checkout@v2
             - uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
             - uses: Swatinem/rust-cache@v1
+
+            # Setup faf-stack
+            - name: "Checkout faf-stack"
+              uses: actions/checkout@v2
+              with:
+                  repository: FAForever/faf-stack
+                  ref: v21.2.27
+                  path: faf-stack
+            - name: "Initialize faf-stack db"
+              run: |
+                cd faf-stack
+                cp -r config.template config
+                cp -r .env.template .env
+                ./scripts/init-db.sh
+            - run: ./test/clear_and_populate_db.sh -h 127.0.0.1 -P $DB_PORT --user=root --password=banana faf
+
             - uses: actions-rs/cargo@v1
               with:
                   command: test
-            # TODO setup docker db and enable db tests.
-
+                  args: --features local_db_tests
