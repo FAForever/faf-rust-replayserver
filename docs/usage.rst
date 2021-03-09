@@ -8,8 +8,11 @@ TODO: actually make the Dockerfile and integrate into faf-stack.
 
 The server is built with ``cargo build``, its executable is
 ``faf_rust_replayserver``. For deployment, you'll want to use the provided
-Dockerfile. The server is integrated into `faf-stack
-<https://github.com/FAForever/faf-stack>`_.
+Dockerfile, or better yet, a github release. The server is integrated into
+`faf-stack <https://github.com/FAForever/faf-stack>`_.
+
+To release a new version, just tag the commit and prepare a release on Github.
+A release Github action should do the rest.
 
 Configuration
 -------------
