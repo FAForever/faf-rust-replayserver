@@ -68,7 +68,7 @@ mod test {
         util::test::{get_file, setup_logging},
     };
     use async_stream::stream;
-    use std::sync::Arc;
+    use std::{cell::Cell, sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering}}};
     use tempfile::tempdir;
     use tokio::time::Duration;
     use tokio::{
@@ -163,5 +163,72 @@ mod test {
 
         assert_eq!(example_replay_file, received_replay_file);
         /* TODO check the replay saved on disk */
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_server_ends_quickly() {
+        setup_logging();
+
+        let (c_read, mut reader, mut read_writer) = test_connection();
+        let (c_write, _reader, mut writer) = test_connection();
+        let (c_empty, _empty_reader, empty_writer) = test_connection();
+        let mut conf = default_config();
+        let db = mock_database();
+        let token = CancellationToken::new();
+        let tmp_dir = tempdir().unwrap();
+
+        let server_ended = Arc::new(AtomicBool::new(false));
+
+        conf.storage.vault_path = tmp_dir.path().to_str().unwrap().into();
+        conf.replay.time_with_zero_writers_to_end_replay_s = 1;
+
+        let conn_source = stream! {
+            yield c_write;
+            yield c_empty;
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            yield c_read;
+        };
+        let token_c = token.clone();
+        let server_ended_c = server_ended.clone();
+        let server = async move {
+            run_server_with_deps(Arc::new(conf), token_c, conn_source, db).await;
+            server_ended_c.store(true, Ordering::Relaxed);
+        };
+
+        let example_replay_file = get_file("example");
+        let empty_replay = async {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            drop(empty_writer);
+        };
+        let replay_writing = async {
+            writer.write_all(b"P/2/foo\0").await.unwrap();
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            writer.write_all(&example_replay_file[..500]).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            drop(writer);
+        };
+        let mut received_replay_file = Vec::<u8>::new();
+        let replay_reading = async {
+            read_writer.write_all(b"G/2/foo\0").await.unwrap();
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            reader.read_to_end(&mut received_replay_file).await.unwrap();
+        };
+
+        let cancel_early = async {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            token.cancel();
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            assert!(server_ended.load(Ordering::Relaxed));
+        };
+
+        let server_thread = tokio::spawn(server);
+        let (_, _, _, _, res) = join! {
+            replay_reading,
+            replay_writing,
+            empty_replay,
+            cancel_early,
+            server_thread,
+        };
+        res.unwrap();
     }
 }
