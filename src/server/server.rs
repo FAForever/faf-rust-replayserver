@@ -68,15 +68,17 @@ mod test {
         util::test::{get_file, setup_logging},
     };
     use async_stream::stream;
-    use std::{cell::Cell, sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering}}};
+    use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
     use tempfile::tempdir;
-    use tokio::time::Duration;
+    use tokio::{fs::File, time::Duration};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         join, select,
     };
 
     use super::*;
+    use crate::replay::save::test::unpack_replay;
+    use crate::util::test::compare_bufs;
 
     #[tokio::test]
     async fn test_server_single_empty_connection() {
@@ -161,8 +163,14 @@ mod test {
         };
         res.unwrap();
 
-        assert_eq!(example_replay_file, received_replay_file);
-        /* TODO check the replay saved on disk */
+        let mut file_path = tmp_dir.path().to_owned();
+        file_path.push("0/0/0/0/2.fafreplay");
+        let replay_file = File::open(file_path).await.unwrap();
+        let (json, saved_replay) = unpack_replay(replay_file).await.unwrap();
+        assert!(json.len() > 0);
+        assert_eq!(json[0], b'{');
+        assert_eq!(json[json.len() - 1], b'\n');
+        compare_bufs(example_replay_file, saved_replay);
     }
 
     #[tokio::test(flavor = "multi_thread")]
