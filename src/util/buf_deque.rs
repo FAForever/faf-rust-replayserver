@@ -13,7 +13,7 @@ const CHUNK_SIZE: usize = 4096;
  * */
 pub struct BufDeque {
     chunks: VecDeque<Box<[u8; CHUNK_SIZE]>>,
-    discard_start: usize,
+    discarded_chunks: usize,
     end: usize,
 }
 
@@ -21,9 +21,17 @@ impl BufDeque {
     pub fn new() -> Self {
         Self {
             chunks: VecDeque::new(),
-            discard_start: 0,
+            discarded_chunks: 0,
             end: 0,
         }
+    }
+
+    fn discard_start(&self) -> usize {
+        self.discarded_chunks * CHUNK_SIZE
+    }
+
+    fn relative_end(&self) -> usize {
+        self.end - self.discard_start()
     }
 
     fn get_last_chunk(&mut self) -> &mut [u8; CHUNK_SIZE] {
@@ -31,7 +39,6 @@ impl BufDeque {
             let new_chunk = Box::new([0; CHUNK_SIZE]);
             self.chunks.push_back(new_chunk);
         }
-        debug_assert!(!self.chunks.is_empty());
         &mut **self.chunks.back_mut().unwrap()
     }
 
@@ -45,17 +52,16 @@ impl DiscontiguousBuf for BufDeque {
         self.end
     }
 
-    /* We slightly break contract here and panic if discarded data is accessed. */
-    fn get_chunk(&self, start: usize) -> &[u8] {
-        assert!(self.discard_start <= start && start < self.end);
+    /* We break contract here and potentially panic if discarded data is accessed. */
+    fn get_chunk(&self, mut start: usize) -> &[u8] {
+        assert!(self.discard_start() <= start && start < self.end);
+        start -= self.discard_start();
 
-        let first_chunk_idx = self.discard_start / CHUNK_SIZE;
-        let target_chunk_idx = start / CHUNK_SIZE;
-        let rel_idx = target_chunk_idx - first_chunk_idx;
+        let chunk_idx = start / CHUNK_SIZE;
         let chunk_start = start % CHUNK_SIZE;
-        let chunk_end = min(CHUNK_SIZE, self.end - (target_chunk_idx * CHUNK_SIZE));
+        let chunk_end = min(CHUNK_SIZE, self.relative_end() - (chunk_idx * CHUNK_SIZE));
 
-        let chunk = &**self.chunks.get(rel_idx).unwrap();
+        let chunk = &**self.chunks.get(chunk_idx).unwrap();
         &chunk[chunk_start..chunk_end]
     }
 
@@ -81,20 +87,13 @@ impl Write for BufDeque {
 }
 
 impl BufWithDiscard for BufDeque {
-    /* TODO - shrink_to_fit on vecdeque? It'll never be large anyway */
     fn discard(&mut self, until: usize) {
-        if until <= self.discard_start {
-            return;
-        }
-
-        let until_chunk_idx = until / CHUNK_SIZE;
-        let mut first_chunk_idx = self.discard_start / CHUNK_SIZE;
+        let until_chunk = until / CHUNK_SIZE;
         // Always keep at least one chunk.
-        while self.chunks.len() > 1 && first_chunk_idx < until_chunk_idx {
+        while self.chunks.len() > 1 && self.discarded_chunks < until_chunk {
             self.chunks.pop_front();
-            first_chunk_idx += 1;
+            self.discarded_chunks += 1;
         }
-        self.discard_start = until;
     }
 }
 
