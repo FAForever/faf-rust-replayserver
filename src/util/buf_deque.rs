@@ -6,11 +6,8 @@ use super::buf_traits::{BufWithDiscard, DiscontiguousBuf, DiscontiguousBufExt};
 const CHUNK_SIZE: usize = 4096;
 
 /* Buffer deque with discarding.
- * INVARIANTS:
- * * Total chunk length = max(0, end - discard_start).
- * * Each chunk is aligned to CHUNK_SIZE bytes.
- * * There are no empty chunks.
- * */
+ * TODO think about a way to do zero-copy stuff.
+ */
 pub struct BufDeque {
     chunks: VecDeque<Box<[u8; CHUNK_SIZE]>>,
     discarded_chunks: usize,

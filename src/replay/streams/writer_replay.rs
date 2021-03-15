@@ -129,23 +129,15 @@ async fn do_read_from_connection(
     me: &Rc<RefCell<WriterReplay>>,
     mut c: &mut Connection,
 ) -> ConnResult<()> {
-    // TODO dep injection?
     let header = ReplayHeader::from_connection(&mut c).await?;
-    {
-        me.borrow_mut().add_header(header);
-    }
-    /* We can't modify inner.data in-place, merging might use it in the meantime
-     * Maybe we could use a different structure? Can't be bothered rn
-     * */
+    me.borrow_mut().add_header(header);
     let mut buf: Box<[u8]> = Box::new([0; 4096]);
     loop {
         let read = c.read(&mut *buf).await?;
         if read == 0 {
             break;
         }
-        {
-            me.borrow_mut().add_data(&buf[0..read]);
-        }
+        me.borrow_mut().add_data(&buf[0..read]);
     }
     Ok(())
 }
