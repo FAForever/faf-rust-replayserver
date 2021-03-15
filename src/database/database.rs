@@ -169,11 +169,15 @@ impl Database {
                 `game_stats`.`replay_ticks` = ?
             WHERE `game_stats`.`id` = ?
         ";
-        sqlx::query(query)
+        let res = sqlx::query(query)
             .bind(replay_ticks)
             .bind(id)
             .execute(&self.pool)
-            .await?;
+            .await;
+        if let Err(e) = &res {
+            log::warn!("Failed to save ticks of game {}: {}", id, e);
+        }
+        res?;
         Ok(())
     }
 }

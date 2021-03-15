@@ -63,7 +63,7 @@ impl InnerReplaySaver {
         self.count_and_store_ticks(replay.clone(), replay_id).await;
         let json_header = match ReplayJsonHeader::from_id_and_db(&self.db, replay_id).await {
             Err(e) => {
-                log::warn!(
+                log::info!(
                     "Failed to fetch game {} stats from database: {}",
                     replay_id,
                     e

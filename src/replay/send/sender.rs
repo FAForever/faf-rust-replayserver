@@ -25,7 +25,7 @@ impl ReplaySender {
 
     async fn send_replay_to_connection(&self, c: &mut Connection) {
         if let Err(e) = self.do_send_replay_to_connection(c).await {
-            log::debug!("Replay send error: {}", e);
+            log::info!("Replay send error: {}", e);
         };
     }
 

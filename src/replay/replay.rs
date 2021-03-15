@@ -65,7 +65,7 @@ impl Replay {
         let cancellation = async {
             tokio::time::sleep(self.forced_timeout).await;
             self.replay_timeout_token.cancel();
-            log::debug!("Replay {} timed out", self.id);
+            log::info!("Replay {} timed out", self.id);
         };
 
         // Return early if we got cancelled normally
@@ -81,7 +81,7 @@ impl Replay {
     }
 
     async fn regular_lifetime(&self) {
-        log::debug!("Replay {} started", self.id);
+        log::info!("Replay {} started", self.id);
         metrics::RUNNING_REPLAYS.inc();
         self.wait_until_there_were_no_writers_for_a_while().await;
         self.should_stop_accepting_connections.set(true);
@@ -94,7 +94,7 @@ impl Replay {
             .await;
         log::debug!("Replay {} saved data on disk", self.id);
         self.reader_connection_count.wait_until_empty().await;
-        log::debug!("Replay {} is finished", self.id);
+        log::info!("Replay {} ended", self.id);
         // Cancel to return from timeout
         self.replay_timeout_token.cancel();
         metrics::RUNNING_REPLAYS.dec();
@@ -109,6 +109,7 @@ impl Replay {
     }
 
     pub async fn handle_connection(&self, mut c: Connection) -> ConnResult<()> {
+        log::debug!("Replay {} started handling {}", self.id, c);
         if self.should_stop_accepting_connections.get() {
             log::info!(
                 "Replay {} dropped {} because its write phase is over",
@@ -129,6 +130,7 @@ impl Replay {
                 self.reader_connection_count.dec();
             }
         }
+        log::debug!("Replay {} finished handling {}", self.id, c);
         Ok(())
     }
 }

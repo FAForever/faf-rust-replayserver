@@ -48,7 +48,7 @@ impl Queries {
         // Rust unix path handling is ugly and it really won't ever be anything else than this
         // (see MapService in API), so we just trim manually.
         if stats.file_name.is_none() {
-            log::warn!("Map name for replay {} is missing! Saving anyway.", id);
+            log::info!("Map name for replay {} is missing! Saving anyway.", id);
         }
         let mapname = stats
             .file_name
