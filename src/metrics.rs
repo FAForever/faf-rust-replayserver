@@ -43,7 +43,6 @@ pub fn inc_served_conns<T>(res: &ConnResult<T>) {
             ConnectionError::NoData => "Empty connection",
             ConnectionError::BadData(..) => "Bad data",
             ConnectionError::IO { .. } => "I/O error",
-            ConnectionError::ShuttingDown => "Server shutting down",
             ConnectionError::CannotAssignToReplay => "No replay matched",
         },
     };

@@ -9,8 +9,6 @@ pub enum ConnectionError {
         source: std::io::Error,
         context: String,
     },
-    #[error("Shutting down")]
-    ShuttingDown,
     #[error("Could not assign connection to replay")]
     CannotAssignToReplay,
 }
