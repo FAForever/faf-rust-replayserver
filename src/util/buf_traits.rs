@@ -4,8 +4,6 @@ use std::{cell::RefCell, io::Read, rc::Rc};
 
 // We slighly break rules for buffers we can discard from. Trying to access data that was already
 // discarded causes a panic.
-//
-// TODO split into mut / nonmut variants?
 pub trait DiscontiguousBuf {
     // Get a contiguous chunk starting from start. Panics if start >= len.
     fn get_chunk(&self, start: usize) -> &[u8];
