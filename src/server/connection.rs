@@ -39,7 +39,7 @@ impl Connection {
             writer,
             header: None,
         };
-        s.set_metric(); // FIXME repetition
+        s.set_metric();
         s
     }
 

@@ -356,7 +356,8 @@ dependencies = [
 [[package]]
 name = "faf-replay-parser"
 version = "0.5.0"
-source = "git+https://gitlab.com/Askaholic/faf-replay-parser?rev=5ee45ec1#5ee45ec1e11efcdeeb2f3a5b100e90f8821f7ca1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9c6c14a1745c646dbe7237079058308a4e3684f65a93fd34376ecee2d22469c"
 dependencies = [
  "byteorder",
  "bytes",
