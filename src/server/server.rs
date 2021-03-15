@@ -68,7 +68,10 @@ mod test {
         util::test::{get_file, setup_logging},
     };
     use async_stream::stream;
-    use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
     use tempfile::tempdir;
     use tokio::{fs::File, time::Duration};
     use tokio::{

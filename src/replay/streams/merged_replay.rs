@@ -3,7 +3,10 @@ use std::{cell::RefCell, io::Read, io::Write, rc::Rc};
 use futures::Future;
 use tokio::sync::Notify;
 
-use crate::{util::buf_traits::DiscontiguousBuf, util::{buf_deque::BufDeque, buf_traits::ReadAt}};
+use crate::{
+    util::buf_traits::DiscontiguousBuf,
+    util::{buf_deque::BufDeque, buf_traits::ReadAt},
+};
 
 use super::{writer_replay::WriterReplay, ReplayHeader};
 
