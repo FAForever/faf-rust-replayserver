@@ -1,30 +1,10 @@
 Third take on the FAF replay server, this time in Rust.
 
-TODO
-====
-
-* Documentation comparable to python server's
-  * Building & running tests
-  * Usage
-  * Architecture
-  * Other stuff?
-* Finish up tests
-  * Fix holes in coverage where it makes sense
-  * More exhausive merge strategy tests
-  * Some tests of server as a whole, maybe? I don't know
-  * Any other stuff I can think of
-* Dockerfile + CI
-* Proper README
-* Testing on the test server
-
-
-Things that will turn into a real README
-========================================
-
 Usage
 -----
 
-See docs/usage.rst.
+See docs/usage.rst. If you want to build the documentation, you'll need sphinx
+and [dia](http://dia-installer.de/).
 
 Running extra tests
 -------------------
@@ -54,3 +34,13 @@ Coverage
 To do code coverage, first configure grcov, as described at
 https://github.com/mozilla/grcov. One this is done, run `test/run_coverage.sh`.
 Generated coverage is available under ./coverage.
+
+TODOs
+-----
+
+* Finish up tests
+  * Fix holes in coverage where it makes sense
+  * More exhausive merge strategy tests
+  * Some tests of server as a whole, maybe? I don't know
+  * Any other stuff I can think of
+* Testing on the test server
