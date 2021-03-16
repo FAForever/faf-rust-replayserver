@@ -15,7 +15,7 @@ jobs:
               run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
 
             - name: Build and publish docker image
-              uses: docker/build-push-action@v1.1.1
+              uses: docker/build-push-action@v2
               with:
                   # FIXME change once we move to FAForever/
                   repository: Wesmania/faf-rust-replayserver
