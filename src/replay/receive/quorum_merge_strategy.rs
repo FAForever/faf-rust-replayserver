@@ -119,15 +119,13 @@ impl ReplayState {
         if self.data_matching_canon == self.common_len() {
             return;
         }
-        {
-            let match_start = self.canon_match_start(); // this borrows
-            let my_replay = self.replay.borrow();
-            let my_data = my_replay.get_data();
-            let canon_replay = self.canon_replay.borrow();
-            let canon_data = canon_replay.get_data();
-            self.data_matching_canon =
-                my_data.common_prefix_from(canon_data, match_start);
-        }
+
+        let match_start = self.canon_match_start(); // this borrows
+        self.data_matching_canon = self.replay
+            .borrow()
+            .get_data()
+            .common_prefix_from(self.canon_replay.borrow().get_data(), match_start);
+
         if self.data_matching_canon != self.common_len() {
             self.set_diverged();
         }
