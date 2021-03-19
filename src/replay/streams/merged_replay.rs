@@ -33,12 +33,11 @@ impl MergedReplay {
         self.get_header().map_or(0, |h| h.data.len())
     }
 
-    // The two values below are *delayed* data.
-    pub fn data_len(&self) -> usize {
+    pub fn delayed_data_len(&self) -> usize {
         self.delayed_data_len
     }
 
-    pub fn len(&self) -> usize {
+    fn delayed_len(&self) -> usize {
         self.delayed_data_len + self.header_len()
     }
 
@@ -59,7 +58,7 @@ impl MergedReplay {
 
     pub fn add_header(&mut self, header: ReplayHeader) {
         debug_assert!(!self.finished);
-        debug_assert!(self.data_len() == 0);
+        debug_assert!(self.get_data().len() == 0);
         self.header = Some(header);
         self.delayed_data_notification.notify_waiters();
     }
@@ -103,7 +102,7 @@ impl MergedReplay {
 
 impl ReadAt for MergedReplay {
     fn read_at(&self, mut start: usize, buf: &mut [u8]) -> std::io::Result<usize> {
-        if start >= self.len() {
+        if start >= self.delayed_len() {
             return Ok(0);
         }
         debug_assert!(self.header.is_some());
@@ -112,7 +111,7 @@ impl ReadAt for MergedReplay {
             data.read(buf)
         } else {
             start -= self.header_len();
-            let read_max = std::cmp::min(buf.len(), self.data_len() - start);
+            let read_max = std::cmp::min(buf.len(), self.delayed_data_len - start);
             self.data.read_at(start, &mut buf[..read_max])
         }
     }

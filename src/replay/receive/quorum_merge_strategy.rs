@@ -78,7 +78,7 @@ impl ReplayState {
     }
 
     fn delayed_data_len(&self) -> usize {
-        self.replay.borrow().get_delayed_data_progress()
+        self.replay.borrow().get_delayed_data_len()
     }
 
     fn is_finished(&self) -> bool {
@@ -202,8 +202,8 @@ impl SharedState {
         self.canonical_stream.borrow().get_data().len()
     }
 
-    fn merged_delayed_position(&self) -> usize {
-        self.canonical_stream.borrow().data_len()
+    fn merged_delayed_data_len(&self) -> usize {
+        self.canonical_stream.borrow().delayed_data_len()
     }
 
     fn append_canon_data(&mut self, id: u64, to: usize) {
@@ -217,9 +217,9 @@ impl SharedState {
         }
     }
 
-    fn update_merged_delayed_position(&mut self, mut hint: usize) {
+    fn update_merged_delayed_data_len(&mut self, mut hint: usize) {
         hint = std::cmp::min(hint, self.merged_data_len());
-        if hint <= self.merged_delayed_position() {
+        if hint <= self.merged_delayed_data_len() {
             return;
         }
         self.canonical_stream
@@ -475,7 +475,7 @@ impl MergeQuorumState {
     }
 
     fn has_to_enter_stalemate(&self) -> bool {
-        self.s.merged_delayed_position() >= self.s.merged_data_len()
+        self.s.merged_delayed_data_len() >= self.s.merged_data_len()
     }
 
     fn enter_stalemate(self) -> MergeStalemateState {
@@ -520,7 +520,7 @@ impl MergeQuorumState {
 
     fn update_delayed_position(&mut self) {
         self.s
-            .update_merged_delayed_position(self.quorum_delayed_position());
+            .update_merged_delayed_data_len(self.quorum_delayed_position());
     }
 }
 
@@ -617,7 +617,7 @@ impl MergeStrategy for QuorumMergeStrategy {
             Self::Stalemate(s) => {
                 // Not in a quorum. Delayed replay position must be equal to its data len.
                 let data_len = s.s.merged_data_len();
-                let position = s.s.merged_delayed_position();
+                let position = s.s.merged_delayed_data_len();
                 debug_assert_eq!(data_len, position);
                 // All replays are finished, so Res is empty.
                 debug_assert!(s.reserve.is_empty());
@@ -768,13 +768,13 @@ mod tests {
 
         stream1.borrow_mut().add_data(&[1, 2, 3, 4]);
         strat.replay_data_updated(token1);
-        stream1.borrow_mut().set_delayed_data_progress(4);
+        stream1.borrow_mut().set_delayed_data_len(4);
         strat.replay_data_updated(token1);
         stream1.borrow_mut().add_data(&[5, 6]);
-        stream1.borrow_mut().set_delayed_data_progress(5);
+        stream1.borrow_mut().set_delayed_data_len(5);
         strat.replay_data_updated(token1);
         stream1.borrow_mut().add_data(&[7, 8]);
-        stream1.borrow_mut().set_delayed_data_progress(8);
+        stream1.borrow_mut().set_delayed_data_len(8);
         strat.replay_data_updated(token1);
 
         stream1.borrow_mut().finish();
@@ -809,23 +809,23 @@ mod tests {
         strat.replay_header_added(token2);
 
         stream1.borrow_mut().add_data(&[1, 2, 3, 4]);
-        stream1.borrow_mut().set_delayed_data_progress(4);
+        stream1.borrow_mut().set_delayed_data_len(4);
         strat.replay_data_updated(token1);
 
         stream2.borrow_mut().add_data(&[1, 2]);
-        stream2.borrow_mut().set_delayed_data_progress(2);
+        stream2.borrow_mut().set_delayed_data_len(2);
         strat.replay_data_updated(token2);
 
         stream1.borrow_mut().add_data(&[5, 6]);
-        stream1.borrow_mut().set_delayed_data_progress(6);
+        stream1.borrow_mut().set_delayed_data_len(6);
         strat.replay_data_updated(token1);
 
         stream2.borrow_mut().add_data(&[3, 20, 21, 22, 23]);
-        stream2.borrow_mut().set_delayed_data_progress(7);
+        stream2.borrow_mut().set_delayed_data_len(7);
         strat.replay_data_updated(token2);
 
         stream1.borrow_mut().add_data(&[7, 8]);
-        stream1.borrow_mut().set_delayed_data_progress(8);
+        stream1.borrow_mut().set_delayed_data_len(8);
         strat.replay_data_updated(token1);
 
         stream1.borrow_mut().finish();
@@ -867,11 +867,11 @@ mod tests {
         strat.replay_header_added(token2);
 
         stream1.borrow_mut().add_data(&[1, 2, 3, 4]);
-        stream1.borrow_mut().set_delayed_data_progress(4);
+        stream1.borrow_mut().set_delayed_data_len(4);
         strat.replay_data_updated(token1);
 
         stream2.borrow_mut().add_data(&[1, 2, 3, 4, 5, 6]);
-        stream2.borrow_mut().set_delayed_data_progress(6);
+        stream2.borrow_mut().set_delayed_data_len(6);
         strat.replay_data_updated(token2);
 
         stream1.borrow_mut().finish();

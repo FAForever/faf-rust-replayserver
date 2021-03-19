@@ -23,7 +23,7 @@ enum MaybeHeader {
 pub struct WriterReplay {
     header: MaybeHeader,
     data: BufDeque,
-    delayed_data_progress: usize,
+    delayed_data_len: usize,
     header_notification: Rc<Notify>,
     finished_notification: Rc<Notify>,
     finished: bool,
@@ -34,7 +34,7 @@ impl WriterReplay {
         Self {
             header: MaybeHeader::None,
             data: BufDeque::new(),
-            delayed_data_progress: 0,
+            delayed_data_len: 0,
             header_notification: Rc::new(Notify::new()),
             finished_notification: Rc::new(Notify::new()),
             finished: false,
@@ -61,13 +61,13 @@ impl WriterReplay {
         &self.data
     }
 
-    pub fn set_delayed_data_progress(&mut self, new: usize) {
-        debug_assert!(self.delayed_data_progress <= new);
-        self.delayed_data_progress = new;
+    pub fn set_delayed_data_len(&mut self, new: usize) {
+        debug_assert!(self.delayed_data_len <= new);
+        self.delayed_data_len = new;
     }
 
-    pub fn get_delayed_data_progress(&self) -> usize {
-        self.delayed_data_progress
+    pub fn get_delayed_data_len(&self) -> usize {
+        self.delayed_data_len
     }
 
     pub fn discard(&mut self, until: usize) {

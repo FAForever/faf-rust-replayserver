@@ -93,7 +93,7 @@ impl StreamDelay {
             loop {
                 let current = replay.borrow().data_len();
                 let delayed = pos_queue.push_and_get_delayed(current);
-                replay.borrow_mut().set_delayed_data_progress(delayed);
+                replay.borrow_mut().set_delayed_data_len(delayed);
                 if (current, delayed) != (prev_current, prev_delayed) {
                     yield StreamUpdates::DataUpdate;
                 }
@@ -110,7 +110,7 @@ impl StreamDelay {
             let f = replay.borrow().wait_until_finished();
             f.await;
             let final_len = replay.borrow_mut().data_len();
-            replay.borrow_mut().set_delayed_data_progress(final_len);
+            replay.borrow_mut().set_delayed_data_len(final_len);
             yield StreamUpdates::DataUpdate;
             yield StreamUpdates::Finished;
         }
