@@ -23,8 +23,8 @@ use super::merge_strategy::MergeStrategy;
 // For a replay r in R, we define:
 // * r matches C (written r ~ C) iff C's data is a (non-strict) prefix of r's data.
 // * r in R diverges from C (written r !~ C) iff either:
-//   * r has at least as much data as C and C's data is not a prefix of r's data.
-//   * r has less data than R and r is finished,
+//   * r's data is not a prefix of C's data and C's data is not a prefix of r's data,
+//   * r has less data than R and r is finished.
 // * Iff neither is true, then r is behind canon (written r ? C), equivalently r has less data than
 //   R and is not finished.
 //
@@ -71,12 +71,16 @@ impl ReplayState {
         self.replay.borrow().get_data().len()
     }
 
-    fn delayed_data_len(&self) -> usize {
-        self.replay.borrow().get_delayed_data_progress()
-    }
-
     fn canon_len(&self) -> usize {
         self.canon_replay.borrow().get_data().len()
+    }
+
+    fn common_len(&self) -> usize {
+        std::cmp::min(self.canon_len(), self.data_len())
+    }
+
+    fn delayed_data_len(&self) -> usize {
+        self.replay.borrow().get_delayed_data_progress()
     }
 
     fn is_finished(&self) -> bool {
@@ -90,22 +94,15 @@ impl ReplayState {
             .common_prefix_from(other.replay.borrow().get_data(), start)
     }
 
-    fn falls_behind_canon(&self) -> bool {
-        self.data_len() < self.canon_len() && !self.is_finished()
-    }
-
     fn diverges_from_canon(&mut self) -> bool {
-        if self.falls_behind_canon() {
-            false
-        } else {
-            self.match_with_canon_stream();
-            self.diverges
-        }
+        self.match_with_canon_stream();
+        self.diverges
     }
 
     fn canon_match_start(&self) -> usize {
-        let match_distance = std::cmp::min(self.canon_len(), self.stream_cmp_distance);
-        std::cmp::max(self.canon_len() - match_distance, self.data_matching_canon)
+        debug_assert!(self.data_matching_canon <= self.common_len());
+        let optimized_match_start = self.common_len().saturating_sub(self.stream_cmp_distance);
+        std::cmp::max(self.data_matching_canon, optimized_match_start)
     }
 
     fn set_diverged(&mut self) {
@@ -114,28 +111,26 @@ impl ReplayState {
     }
 
     fn match_with_canon_stream(&mut self) {
-        debug_assert!(!self.falls_behind_canon());
-
         if self.diverges {
             return;
         }
-        if self.data_len() < self.canon_len() {
-            // We know that we're finished
+        if self.data_len() < self.canon_len() && self.is_finished() {
             self.set_diverged();
             return;
         }
-        if self.data_matching_canon == self.canon_len() {
+        if self.data_matching_canon == self.common_len() {
             return;
         }
         {
+            let match_start = self.canon_match_start(); // this borrows
             let my_replay = self.replay.borrow();
             let my_data = my_replay.get_data();
             let canon_replay = self.canon_replay.borrow();
             let canon_data = canon_replay.get_data();
             self.data_matching_canon =
-                my_data.common_prefix_from(canon_data, self.canon_match_start());
+                my_data.common_prefix_from(canon_data, match_start);
         }
-        if self.data_matching_canon < self.canon_len() {
+        if self.data_matching_canon != self.common_len() {
             self.set_diverged();
         }
 
@@ -148,7 +143,8 @@ impl ReplayState {
     fn discard_unneeded_data(&mut self) {
         // If we diverged, we already discarded everything
         if !self.diverges {
-            self.replay.borrow_mut().discard(self.canon_match_start());
+            let match_start = self.canon_match_start(); // this borrows
+            self.replay.borrow_mut().discard(match_start);
         }
     }
 
@@ -261,8 +257,8 @@ pub struct MergeStalemateState {
 //   * All replays in neither either diverge from C, or are no longer than C and finished.
 //   * Notice that every replay satisfies at least one of the above.
 // * A stalemate state is constructed with a set of replays I, which is a subset of R.
-//   * For each replay r in R but not in I, r !~ C.
-//   * Set I is discarded / distributed between Cand and Res according to above rules.
+//   * Every replay outside I diverges from C.
+//   * Replays from s I are discarded / distributed between Cand and Res according to above rules.
 // * Whether a stalemate can be resolved is decided as follows:
 //   * If no delayed positions have ever been set, it cannot. (This is a hack to prevent too eager
 //     stalemate resolution at the start, when replays are still being added.)
@@ -410,6 +406,7 @@ pub struct MergeQuorumState {
 // * At any time between callbacks (ignoring changes we weren't yet notified of):
 //   * Q has at most target_quorum_size members.
 //   * All replays in Q match C.
+//   * All replays outside Q and Res are diverged.
 //   * C's delayed position is equal to a minimum of:
 //     * A minimum of delayed positions of replays in Q,
 //     * Its own data length.
