@@ -417,7 +417,6 @@ pub struct MergeQuorumState {
 // * The quorum transitions to a stalemate when C's delayed position reaches its data length.
 //
 // * Transitioning to a stalemate happens as follows:
-//   * Replays in Res that diverge from C are removed.
 //   * Replays from Q are added to Res.
 //   * Stalemate is constructed with Res.
 impl MergeQuorumState {
@@ -484,15 +483,8 @@ impl MergeQuorumState {
     }
 
     fn enter_stalemate(self) -> MergeStalemateState {
-        let mut s = self.s;
-        let mut reserve: HashSet<u64> = self
-            .reserve
-            .into_iter()
-            .filter(|id| {
-                let r = s.get_mut_replay(*id);
-                !r.diverges_from_canon()
-            })
-            .collect();
+        let s = self.s;
+        let mut reserve = self.reserve;
         reserve.extend(self.quorum.iter());
         MergeStalemateState::from_quorum(s, reserve)
     }
