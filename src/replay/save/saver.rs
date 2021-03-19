@@ -31,45 +31,50 @@ impl InnerReplaySaver {
         }
     }
 
-    async fn count_and_store_ticks(&self, replay: MReplayRef, id: u64) {
-        let header_len = replay.borrow().header_len();
-        let maybe_ticks = scfa::parser::parse_body_ticks(&mut replay.reader_from(header_len));
-        let ticks = match maybe_ticks {
-            Err(e) => {
-                log::info!("Failed to parse tick count for replay {}: {}", id, e);
-                return;
-            }
-            Ok(t) => t,
-        };
-        if let Err(e) = self.db.update_game_stats(id, ticks).await {
-            log::info!("Failed to update game stats for replay {}: {}", id, e);
+    async fn count_ticks(&self, replay: MReplayRef, id: u64) -> Option<u32> {
+        if replay.borrow().get_header().is_none() {
+            return None;
         }
+        let header_len = replay.borrow().header_len();
+        let ticks = scfa::parser::parse_body_ticks(&mut replay.reader_from(header_len));
+        if let Err(e) = &ticks {
+            log::info!("Failed to parse tick count for replay {}: {}", id, e);
+        }
+        ticks.ok()
     }
-    // TODO count and store ticks
-    pub async fn save_replay(&self, replay: MReplayRef, id: u64) {
+
+    async fn save_replay_to_disk(&self, replay: MReplayRef, id: u64) -> bool {
         if replay.borrow().get_header().is_none() {
             log::info!("Replay {} is empty, not saving.", id);
-            return;
+            return false;
         }
-        self.count_and_store_ticks(replay.clone(), id).await;
         let json_header = match ReplayJsonHeader::from_id_and_db(&self.db, id).await {
             Err(e) => {
                 log::info!("Failed to fetch game {} stats from database: {}", id, e);
-                return;
+                return false;
             }
             Ok(r) => r,
         };
         let target_file = match self.save_dir.touch_and_return_file(id).await {
             Err(e) => {
                 log::warn!("Failed to create file for replay {}: {}", id, e);
-                return;
+                return false;
             }
             Ok(f) => f,
         };
         if let Err(e) = write_replay(target_file, json_header, replay).await {
             log::warn!("Failed to write out replay {}: {}", id, e);
-            return;
+            return false;
         }
         metrics::SAVED_REPLAYS.inc();
+        return true;
+    }
+    // TODO count and store ticks
+    pub async fn save_replay(&self, replay: MReplayRef, id: u64) {
+        let replay_saved = self.save_replay_to_disk(replay.clone(), id).await;
+        let ticks = self.count_ticks(replay, id).await;
+        if let Err(e) = self.db.update_game_stats(id, ticks, replay_saved).await {
+            log::info!("Failed to update game stats for replay {}: {}", id, e);
+        }
     }
 }

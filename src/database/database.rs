@@ -163,14 +163,16 @@ impl Database {
         }
     }
 
-    pub async fn update_game_stats(&self, id: u64, replay_ticks: u32) -> Result<(), SaveError> {
+    pub async fn update_game_stats(&self, id: u64, replay_ticks: Option<u32>, replay_available: bool) -> Result<(), SaveError> {
         let query = "
             UPDATE `game_stats` SET
-                `game_stats`.`replay_ticks` = ?
+                `game_stats`.`replay_ticks` = ?,
+                `game_stats`.`replay_available` = ?
             WHERE `game_stats`.`id` = ?
         ";
         let res = sqlx::query(query)
             .bind(replay_ticks)
+            .bind(replay_available)
             .bind(id)
             .execute(&self.pool)
             .await;
@@ -426,7 +428,8 @@ pub mod test {
     #[tokio::test]
     async fn test_game_ticks() {
         let db = get_db();
-        db.update_game_stats(1000, 515).await.unwrap();
+        db.update_game_stats(1000, Some(515), true).await.unwrap();
+        db.update_game_stats(1000, None, false).await.unwrap();
         // TODO fetch from db. Above at least verifies that sql is valid.
     }
     fn default_game_stats() -> GameStatRow {
@@ -481,7 +484,7 @@ pub mod test {
                 },
             ])
         });
-        faux::when!(mock_db.update_game_stats).safe_then(|(_id, _ticks)| Ok(()));
+        faux::when!(mock_db.update_game_stats).safe_then(|(_id, _ticks,_saved)| Ok(()));
         mock_db
     }
 }
