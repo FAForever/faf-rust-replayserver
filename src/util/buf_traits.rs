@@ -8,22 +8,14 @@ pub trait DiscontiguousBuf {
     // Get a contiguous chunk starting from start. Panics if start >= len.
     fn get_chunk(&self, start: usize) -> &[u8];
     fn len(&self) -> usize;
-    fn append_some(&mut self, buf: &[u8]) -> usize;
 }
 
 pub trait DiscontiguousBufExt {
-    fn append(&mut self, buf: &[u8]);
     fn common_prefix_from(&self, other: &impl DiscontiguousBuf, start: usize) -> usize;
     fn at(&self, pos: usize) -> u8;
 }
 
 impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
-    fn append(&mut self, mut buf: &[u8]) {
-        while buf.len() > 0 {
-            let off = self.append_some(buf);
-            buf = &buf[off..];
-        }
-    }
     // Compare with another buf from position start. Position end is the first position at which
     // the two streams differ (or end of one of the streams).
     //

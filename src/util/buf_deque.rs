@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::{cmp::min, collections::VecDeque};
 
-use super::buf_traits::{DiscontiguousBuf, DiscontiguousBufExt};
+use super::buf_traits::DiscontiguousBuf;
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -55,6 +55,15 @@ impl BufDeque {
             self.discarded_chunks += 1;
         }
     }
+
+    fn append(&mut self, buf: &[u8]) -> usize {
+        let offset = self.end % CHUNK_SIZE;
+        let mut chunk: &mut [u8] = self.get_last_chunk();
+        chunk = &mut chunk[offset..];
+        let written = chunk.write(buf).unwrap();
+        self.end += written;
+        written
+    }
 }
 
 impl DiscontiguousBuf for BufDeque {
@@ -74,21 +83,11 @@ impl DiscontiguousBuf for BufDeque {
         let chunk = &**self.chunks.get(chunk_idx).unwrap();
         &chunk[chunk_start..chunk_end]
     }
-
-    fn append_some(&mut self, buf: &[u8]) -> usize {
-        let offset = self.end % CHUNK_SIZE;
-        let mut chunk: &mut [u8] = self.get_last_chunk();
-        chunk = &mut chunk[offset..];
-        let written = chunk.write(buf).unwrap();
-        self.end += written;
-        written
-    }
 }
 
 impl Write for BufDeque {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.append(buf);
-        Ok(buf.len())
+        Ok(self.append(buf))
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
