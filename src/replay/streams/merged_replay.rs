@@ -37,7 +37,7 @@ impl MergedReplay {
         self.delayed_data_len
     }
 
-    fn delayed_len(&self) -> usize {
+    pub fn delayed_len(&self) -> usize {
         self.delayed_data_len + self.header_len()
     }
 

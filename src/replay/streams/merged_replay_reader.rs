@@ -16,18 +16,17 @@ impl MergedReplayReader {
     pub async fn write_to<T: AsyncWrite + Unpin>(&mut self, c: &mut T) -> std::io::Result<()> {
         let mut buf: Box<[u8]> = Box::new([0; 4096]);
         let mut reader = self.replay.reader();
-        let mut wrote_after_wait = true;
         loop {
             let data_read = reader.read(&mut *buf).unwrap();
             if data_read != 0 {
                 c.write_all(&buf[..data_read]).await?;
-                wrote_after_wait = true;
-            } else if wrote_after_wait {
+            } else {
                 let f = self.replay.borrow().wait_for_more_data();
                 f.await;
-                wrote_after_wait = false;
-            } else {
-                return Ok(());
+                let r = self.replay.borrow();
+                if r.delayed_len() <= reader.position() && r.is_finished() {
+                    return Ok(())
+                }
             }
         }
     }
