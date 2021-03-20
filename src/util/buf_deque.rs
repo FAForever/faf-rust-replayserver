@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::{cmp::min, collections::VecDeque};
 
-use super::buf_traits::{BufWithDiscard, DiscontiguousBuf, DiscontiguousBufExt};
+use super::buf_traits::{DiscontiguousBuf, DiscontiguousBufExt};
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -41,6 +41,19 @@ impl BufDeque {
 
     fn no_space_in_last_chunk(&self) -> bool {
         self.end % CHUNK_SIZE == 0 || self.chunks.is_empty()
+    }
+
+    /* Discard all data up to 'until'.
+     * Can discard beyond data end, in that case new writes will only increase the end value until
+     * it reaches discard point.
+     * */
+    pub fn discard(&mut self, until: usize) {
+        let until_chunk = until / CHUNK_SIZE;
+        // Always keep at least one chunk.
+        while self.chunks.len() > 1 && self.discarded_chunks < until_chunk {
+            self.chunks.pop_front();
+            self.discarded_chunks += 1;
+        }
     }
 }
 
@@ -83,21 +96,10 @@ impl Write for BufDeque {
     }
 }
 
-impl BufWithDiscard for BufDeque {
-    fn discard(&mut self, until: usize) {
-        let until_chunk = until / CHUNK_SIZE;
-        // Always keep at least one chunk.
-        while self.chunks.len() > 1 && self.discarded_chunks < until_chunk {
-            self.chunks.pop_front();
-            self.discarded_chunks += 1;
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::{BufDeque, CHUNK_SIZE};
-    use crate::util::buf_traits::{BufWithDiscard, DiscontiguousBuf};
+    use crate::util::buf_traits::DiscontiguousBuf;
     use std::io::Write;
 
     fn append_at(offset: usize) {

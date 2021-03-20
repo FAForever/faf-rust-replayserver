@@ -8,7 +8,6 @@ use crate::{
     error::ConnResult,
     server::connection::Connection,
     util::buf_deque::BufDeque,
-    util::buf_traits::BufWithDiscard,
     util::{buf_traits::DiscontiguousBuf, timeout::cancellable},
 };
 

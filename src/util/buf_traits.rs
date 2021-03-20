@@ -54,24 +54,6 @@ impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
     }
 }
 
-/* For merging incoming replays we want a data structure that we can append bytes to front and
- * discard bytes from back whenever we want. We accept responsibility to never read data we already
- * discarded.
- */
-pub trait BufWithDiscard {
-    /* Discard all data up to 'until'.
-     * Can discard beyond data end, in that case new writes will only increase the end value until
-     * it reaches discard point.
-     * */
-    fn discard(&mut self, until: usize);
-}
-
-pub trait BufWithDiscardExt: BufWithDiscard {
-    fn discard_all(&mut self) {
-        self.discard(usize::MAX);
-    }
-}
-
 /* Read that doesn't need to keep a reference to self. Used to implement Read for a value behind a
  * RefCell.
  */
