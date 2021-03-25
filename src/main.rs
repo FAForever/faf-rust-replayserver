@@ -1,6 +1,6 @@
 use server::server::run_server;
 use tokio::join;
-use util::process::{setup_process_exit_on_panic, wait_for_sigint};
+use util::process::{setup_process_exit_on_panic, wait_for_signals};
 
 pub mod accept;
 pub mod config;
@@ -40,8 +40,8 @@ async fn do_run_server() {
     let shutdown_token = CancellationToken::new();
     let f1 = run_server(config, shutdown_token.clone());
     let f2 = async {
-        wait_for_sigint().await;
-        log::debug!("Received a SIGINT, shutting down");
+        wait_for_signals().await;
+        log::debug!("Received a SIGINT or SIGTERM, shutting down");
         shutdown_token.cancel();
     };
     join!(f1, f2);
