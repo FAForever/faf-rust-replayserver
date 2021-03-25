@@ -71,6 +71,7 @@ pub fn main() {
     log::info!("Server version {}.", VERSION);
     setup_process_exit_on_panic();
     let local_loop = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
         .build()
         .unwrap();
     local_loop.block_on(do_run_server());
