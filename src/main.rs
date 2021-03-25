@@ -49,7 +49,7 @@ async fn do_run_server() {
 }
 
 fn start_prometheus_server(config: &config::Settings) -> bool {
-    let addr = format!("localhost:{}", config.server.prometheus_port);
+    let addr = format!("127.0.0.1:{}", config.server.prometheus_port);
     let parsed_addr = match addr.parse() {
         Err(e) => {
             log::error!("Failed to parse prometheus port: {}", e);
