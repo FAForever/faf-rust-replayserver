@@ -66,8 +66,16 @@ fn start_prometheus_server(config: &config::Settings) -> bool {
     }
 }
 
+fn configure_logging() {
+    // sqlx logs all queries as info, which is a bit too verbose. Only log warnings and above,
+    // we'll probably never need more, even for debugging.
+    env_logger::Builder::from_default_env()
+        .filter_module("sqlx", log::LevelFilter::Warn)
+        .init();
+}
+
 pub fn main() {
-    env_logger::init();
+    configure_logging();
     log::info!("Server version {}.", VERSION);
     setup_process_exit_on_panic();
     let local_loop = tokio::runtime::Builder::new_current_thread()
