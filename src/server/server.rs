@@ -11,8 +11,8 @@ use futures::{stream::StreamExt, Stream};
 use log::{debug, info};
 use tokio_util::sync::CancellationToken;
 
-fn real_server_deps(config: Settings) -> (impl Stream<Item = Connection>, Database) {
-    let connections = tcp_listen(format!("127.0.0.1:{}", config.server.port));
+async fn real_server_deps(config: Settings) -> (impl Stream<Item = Connection>, Database) {
+    let connections = tcp_listen(format!("127.0.0.1:{}", config.server.port)).await;
     let database = Database::new(&config.database);
     (connections, database)
 }
@@ -55,7 +55,7 @@ pub async fn run_server_with_deps(
 }
 
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
-    let (producer, database) = real_server_deps(config.clone());
+    let (producer, database) = real_server_deps(config.clone()).await;
     run_server_with_deps(config, shutdown_token, producer, database).await
 }
 
