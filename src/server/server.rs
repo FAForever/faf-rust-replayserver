@@ -12,7 +12,7 @@ use log::{debug, info};
 use tokio_util::sync::CancellationToken;
 
 async fn real_server_deps(config: Settings) -> (impl Stream<Item = Connection>, Database) {
-    let connections = tcp_listen(format!("127.0.0.1:{}", config.server.port)).await;
+    let connections = tcp_listen(format!("0.0.0.0:{}", config.server.port)).await;
     let database = Database::new(&config.database);
     (connections, database)
 }
