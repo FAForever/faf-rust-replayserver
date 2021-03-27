@@ -106,10 +106,6 @@ impl WriterReplay {
         }
     }
 
-    pub fn data_len(&self) -> usize {
-        self.data.len()
-    }
-
     pub fn is_finished(&self) -> bool {
         self.finished
     }
