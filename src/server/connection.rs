@@ -47,6 +47,7 @@ impl Connection {
             id,
         };
         s.set_metric();
+        log::debug!("New {}", s);
         s
     }
 
@@ -111,6 +112,7 @@ impl Display for Connection {
 impl Drop for Connection {
     fn drop(&mut self) {
         self.reset_metric();
+        log::debug!("{} ended", self);
     }
 }
 
