@@ -377,6 +377,7 @@ dependencies = [
  "lazy_static",
  "log",
  "prometheus_exporter",
+ "rand 0.8.3",
  "serde 1.0.123",
  "serde_json",
  "signal-hook",

@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use rand::Rng;
 
 use crate::{
     accept::header::{ConnectionHeader, ConnectionType},
@@ -22,6 +23,7 @@ pub struct Connection {
     reader: ReaderType,
     writer: WriterType,
     header: Option<ConnectionHeader>,
+    id: String,
 }
 
 impl Connection {
@@ -34,10 +36,15 @@ impl Connection {
 
     // Used for tests. Connection is just a wrapper for a few things, so I think it's justified.
     pub fn new_from(reader: ReaderType, writer: WriterType) -> Self {
+        let mut id = String::new();
+        for _ in 0..12 {
+            id.push(rand::thread_rng().gen_range('a'..'z'));
+        }
         let s = Self {
             reader,
             writer,
             header: None,
+            id,
         };
         s.set_metric();
         s
@@ -85,13 +92,14 @@ impl Connection {
 impl Display for Connection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.header {
-            None => f.write_str("Initial connection"),
+            None => write!(f, "Connection {}", self.id),
             Some(h) => write!(
                 f,
-                "{} connection '{}' for replay {}",
+                "Connection {}, {} '{}' for replay {}",
+                self.id,
                 match h.type_ {
-                    ConnectionType::READER => "Reader",
-                    ConnectionType::WRITER => "Writer",
+                    ConnectionType::READER => "reader",
+                    ConnectionType::WRITER => "writer",
                 },
                 h.name,
                 h.id
