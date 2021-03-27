@@ -28,6 +28,7 @@ impl BufDeque {
     }
 
     fn relative_end(&self) -> usize {
+        debug_assert!(self.end >= self.discard_start());
         self.end - self.discard_start()
     }
 
@@ -43,26 +44,42 @@ impl BufDeque {
         self.end % CHUNK_SIZE == 0 || self.chunks.is_empty()
     }
 
-    /* Discard all data up to 'until'.
+    /* Discard data at most up to 'until'.
      * Can discard beyond data end, in that case new writes will only increase the end value until
      * it reaches discard point.
      * */
     pub fn discard(&mut self, until: usize) {
-        let until_chunk = until / CHUNK_SIZE;
-        // Always keep at least one chunk.
-        while self.chunks.len() > 1 && self.discarded_chunks < until_chunk {
+        let discardable_chunks = until / CHUNK_SIZE;
+        while self.discarded_chunks < discardable_chunks && !self.chunks.is_empty() {
             self.chunks.pop_front();
             self.discarded_chunks += 1;
         }
+        self.discarded_chunks = std::cmp::max(discardable_chunks, self.discarded_chunks);
     }
 
-    fn append(&mut self, buf: &[u8]) -> usize {
-        let offset = self.end % CHUNK_SIZE;
-        let mut chunk: &mut [u8] = self.get_last_chunk();
-        chunk = &mut chunk[offset..];
-        let written = chunk.write(buf).unwrap();
-        self.end += written;
-        written
+    fn append(&mut self, mut buf: &[u8]) -> usize {
+        let mut written = 0;
+        let mut skipped = 0;
+
+        // If we discarded beyond end, cut off the start
+        if self.end < self.discard_start() {
+            let data_discarded_beyond_end = self.discard_start() - self.end;
+            let bytes_to_skip = std::cmp::min(data_discarded_beyond_end, buf.len());
+            skipped += bytes_to_skip;
+            self.end += skipped;
+            buf = &buf[bytes_to_skip..];
+        }
+
+        // If we still have bytes to write, write them
+        if buf.len() > 0 {
+            debug_assert!(self.discard_start() <= self.end);
+            let offset = self.end % CHUNK_SIZE;
+            let mut chunk: &mut [u8] = self.get_last_chunk();
+            chunk = &mut chunk[offset..];
+            written += chunk.write(buf).unwrap();
+            self.end += written;
+        }
+        skipped + written
     }
 }
 
@@ -154,5 +171,34 @@ mod test {
             assert_eq!(data, read);
             bl.discard((i + 1) * data.len());
         }
+    }
+
+    #[test]
+    fn test_chunks_are_discarded_beyond_end() {
+        let mut bl = BufDeque::new();
+        let data = [1; CHUNK_SIZE];
+        let data2 = [1; CHUNK_SIZE / 2];
+        bl.write_all(&data).unwrap();
+
+        bl.discard(CHUNK_SIZE * 2);
+        assert!(bl.chunks.is_empty());
+        bl.write_all(&data2).unwrap();
+        assert!(bl.chunks.is_empty());
+        bl.write_all(&data2).unwrap();
+        assert!(bl.chunks.is_empty());
+    }
+
+    #[test]
+    fn test_partial_write_after_discard() {
+        let mut bl = BufDeque::new();
+        let data1 = [1; CHUNK_SIZE - 4];
+        let data2 = [2; 8];
+        bl.write_all(&data1).unwrap();
+
+        bl.discard(CHUNK_SIZE);
+        bl.write_all(&data2).unwrap();
+        let mut read = Vec::new();
+        bl.reader_from(CHUNK_SIZE).read_to_end(&mut read).unwrap();
+        assert_eq!(read, vec![2; 4]);
     }
 }
