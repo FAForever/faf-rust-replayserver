@@ -98,27 +98,22 @@ impl Write for BufDeque {
 #[cfg(test)]
 mod test {
     use super::{BufDeque, CHUNK_SIZE};
-    use crate::util::buf_traits::DiscontiguousBuf;
-    use std::io::Write;
+    use crate::util::buf_traits::{DiscontiguousBuf, ReadAtExt};
+    use std::io::{Read, Write};
 
+    fn compare_eq(deque: &BufDeque, data: &Vec<u8>) {
+        let mut deque_data = Vec::new();
+        deque.reader().read_to_end(&mut deque_data).unwrap();
+        assert_eq!(&deque_data, data);
+    }
     fn append_at(offset: usize) {
-        let off: Box<[u8]> = vec![0 as u8; offset].into();
+        let mut off: Vec<u8> = vec![0 as u8; offset];
+        let mut data = vec![0, 1, 2, 3, 4, 5, 6, 7];
         let mut bl = BufDeque::new();
-        let data = [0, 1, 2, 3, 4, 5, 6, 7];
-        let total_len = offset + data.len();
         bl.write_all(&*off).unwrap();
         bl.write_all(&data).unwrap();
-        assert_eq!(bl.end, total_len);
-
-        let mut cursor = off.len();
-        while cursor < total_len {
-            let chunk = bl.get_chunk(cursor);
-            assert!(cursor + chunk.len() <= total_len);
-            for i in 0..chunk.len() {
-                assert_eq!(data[cursor - off.len() + i], chunk[i]);
-            }
-            cursor += chunk.len();
-        }
+        off.append(&mut data);
+        compare_eq(&bl, &off);
     }
 
     #[test]
@@ -130,16 +125,16 @@ mod test {
     }
 
     #[test]
-    fn simple_test() {
+    fn test_get_chunk() {
         let mut bl = BufDeque::new();
-        let data = [0, 1, 2, 3, 4, 5, 6, 7];
-        for i in 0..(CHUNK_SIZE * 3) {
+        let data = vec![0, 1, 2, 3, 4, 5, 6];
+        for i in 0..(CHUNK_SIZE * 8) {
             bl.write_all(&data).unwrap();
-            assert_eq!(bl.end, (i + 1) * data.len());
+            assert_eq!(bl.len(), (i + 1) * data.len());
         }
 
         let mut cursor = 0;
-        while cursor < CHUNK_SIZE * 3 * data.len() {
+        while cursor < CHUNK_SIZE * 8 * data.len() {
             let chunk = bl.get_chunk(cursor);
             for i in 0..chunk.len() {
                 assert_eq!(chunk[i], data[(cursor + i) % data.len()]);
@@ -149,20 +144,14 @@ mod test {
     }
 
     #[test]
-    fn test_remove_immediately() {
+    fn test_discard_data_immediately() {
         let mut bl = BufDeque::new();
-        let data = [0, 1, 2, 3, 4, 5, 6, 7];
-        let mut cursor = 0;
-        for i in 0..(CHUNK_SIZE * 3) {
+        let data = vec![0, 1, 2, 3, 4, 5, 6];
+        for i in 0..(CHUNK_SIZE * 8) {
             bl.write_all(&data).unwrap();
-            let end = (i + 1) * data.len();
-            while cursor < end {
-                let chunk = bl.get_chunk(cursor);
-                for j in 0..std::cmp::min(chunk.len(), end - cursor) {
-                    assert_eq!(chunk[j], data[(cursor + j) % data.len()]);
-                }
-                cursor += chunk.len();
-            }
+            let mut read = Vec::new();
+            bl.reader_from(i * data.len()).read_to_end(&mut read).unwrap();
+            assert_eq!(data, read);
             bl.discard((i + 1) * data.len());
         }
     }
