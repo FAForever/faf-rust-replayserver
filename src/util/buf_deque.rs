@@ -33,6 +33,7 @@ impl BufDeque {
     }
 
     fn get_last_chunk(&mut self) -> &mut [u8; CHUNK_SIZE] {
+        debug_assert!(self.discard_start() <= self.end);
         if self.no_space_in_last_chunk() {
             let new_chunk = Box::new([0; CHUNK_SIZE]);
             self.chunks.push_back(new_chunk);
@@ -41,6 +42,8 @@ impl BufDeque {
     }
 
     fn no_space_in_last_chunk(&self) -> bool {
+        // FIXME breaks if last chuck is a freshly appended empty chunk.
+        // Thankfully we always write something after grabbing an empty chunk.
         self.end % CHUNK_SIZE == 0 || self.chunks.is_empty()
     }
 
@@ -65,18 +68,17 @@ impl BufDeque {
         if self.end < self.discard_start() {
             let data_discarded_beyond_end = self.discard_start() - self.end;
             let bytes_to_skip = std::cmp::min(data_discarded_beyond_end, buf.len());
-            skipped += bytes_to_skip;
+            skipped = bytes_to_skip;
             self.end += skipped;
             buf = &buf[bytes_to_skip..];
         }
 
         // If we still have bytes to write, write them
         if buf.len() > 0 {
-            debug_assert!(self.discard_start() <= self.end);
             let offset = self.end % CHUNK_SIZE;
             let mut chunk: &mut [u8] = self.get_last_chunk();
             chunk = &mut chunk[offset..];
-            written += chunk.write(buf).unwrap();
+            written = chunk.write(buf).unwrap();
             self.end += written;
         }
         skipped + written
