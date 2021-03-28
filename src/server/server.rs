@@ -70,10 +70,11 @@ mod test {
         util::test::{get_file, setup_logging},
     };
     use async_stream::stream;
-    use std::sync::{
+    use futures::future::join_all;
+    use std::{rc::Rc, sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
-    };
+    }};
     use tempfile::{TempDir, tempdir};
     use tokio::{fs::File, time::Duration};
     use tokio::{
@@ -245,6 +246,91 @@ mod test {
             replay_writing,
             empty_replay,
             cancel_early,
+            server_thread,
+        };
+        res.unwrap();
+    }
+
+    #[cfg_attr(not(feature = "bench"), ignore)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_server_simple_benchmark() {
+        // Can't use pause here either.
+        const REPLAYS: usize = 100;
+        const CONNS_SIDE_PER_REPLAY: usize = 5;
+        let mut r_conns = Vec::new();
+        let mut w_conns = Vec::new();
+        let mut r_rw = Vec::new();
+        let mut w_readers = Vec::new();
+        let mut w_writers = Vec::new();
+
+        for _ in 0..(REPLAYS * CONNS_SIDE_PER_REPLAY) {
+            let (c, r, w) = test_connection();
+            r_conns.push(c);
+            r_rw.push((r, w));
+            let (c, r, w) = test_connection();
+            w_conns.push(c);
+            w_readers.push(r);
+            w_writers.push(w);
+        }
+
+        let mut conf = default_config();
+        let db = mock_database();
+        let token = CancellationToken::new();
+        let replay_dir = test_directory();
+        let example_replay_file = Rc::new(get_file("example"));
+
+        conf.replay.time_with_zero_writers_to_end_replay_s = 1;
+        conf.replay.delay_s = 1;
+        conf.replay.update_interval_ms = 100;
+
+        // faux panic when accessed from multiple threads despite being sync.
+        // We don't need multiple threads for this test anyway.
+        conf.server.worker_threads = 1;
+
+        let conn_source = stream! {
+            for c in w_conns.into_iter() {
+                yield c;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            for c in r_conns.into_iter() {
+                yield c;
+            }
+        };
+        let server = run_server_with_deps(Arc::new(conf), token.clone(), conn_source, db, replay_dir);
+
+        let replay_writing = |mut w: tokio::io::DuplexStream, i: usize| async move {
+            w.write_all(format!("P/{}/foo\0", i).into_bytes().as_ref()).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            for data in example_replay_file.chunks(100) {
+                w.write_all(data).await.unwrap();
+                tokio::time::sleep(Duration::from_millis(3)).await;
+            }
+            drop(w);
+        };
+        let replay_reading = |mut r: tokio::io::DuplexStream, mut w: tokio::io::DuplexStream, i: usize| async move {
+            let mut buf: Box<[u8]> = Box::new([0; 256]);
+            w.write_all(format!("G/{}/foo\0", i).into_bytes().as_ref()).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            loop {
+                let res = r.read(&mut *buf).await.unwrap();
+                if res == 0 {
+                    break;
+                }
+            }
+        };
+
+        let write_functions = w_writers.into_iter().enumerate().map(|e| {
+            let (i, w) = e;
+            replay_writing.clone()(w, (i / CONNS_SIDE_PER_REPLAY) + 1)
+        });
+        let read_functions = r_rw.into_iter().enumerate().map(|e| {
+            let (i, (r, w)) = e;
+            replay_reading(r, w, (i / CONNS_SIDE_PER_REPLAY) + 1)
+        });
+        let server_thread = tokio::spawn(server);
+        let (_, _, res) = join! {
+            join_all(write_functions),
+            join_all(read_functions),
             server_thread,
         };
         res.unwrap();
