@@ -3,18 +3,21 @@ use tokio::select;
 use tokio::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-pub async fn timeout<T, F: Future<Output = T>>(f: F, time: Duration) -> Option<T> {
+pub async fn until<T1, F1, T2, F2>(f1: F1, f2: F2) -> Option<T1>
+    where F1: Future<Output = T1>,
+          F2: Future<Output = T2> {
     select! {
-        res = f => Some(res),
-        _ = tokio::time::sleep(time) => None,
+        res = f1 => Some(res),
+        _ = f2 => None,
     }
 }
 
+pub async fn timeout<T, F: Future<Output = T>>(f: F, time: Duration) -> Option<T> {
+    until(f, tokio::time::sleep(time)).await
+}
+
 pub async fn cancellable<T, F: Future<Output = T>>(f: F, token: &CancellationToken) -> Option<T> {
-    select! {
-        res = f => Some(res),
-        _ = token.cancelled() => None,
-    }
+    until(f, token.cancelled()).await
 }
 
 #[cfg(test)]
