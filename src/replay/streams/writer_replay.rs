@@ -39,11 +39,36 @@ impl WriterReplay {
             finished: false,
         }
     }
+    // First, functions for connection data writing.
     pub fn add_header(&mut self, h: ReplayHeader) {
         self.header = MaybeHeader::Some(h);
         self.header_notification.notify_waiters();
     }
 
+    pub fn add_data(&mut self, buf: &[u8]) {
+        self.data.write_all(buf).unwrap();
+    }
+
+    pub fn finish(&mut self) {
+        self.finished = true;
+        self.finished_notification.notify_waiters();
+    }
+
+    // Second, functions for delayed data updating.
+    pub fn set_delayed_data_len(&mut self, new: usize) {
+        debug_assert!(self.delayed_data_len <= new);
+        self.delayed_data_len = new;
+    }
+
+    pub fn get_data(&self) -> &impl DiscontiguousBuf {
+        &self.data
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.finished
+    }
+
+    // Third, stuff used by the merge strategy.
     pub fn take_header(&mut self) -> ReplayHeader {
         if let MaybeHeader::Some(h) = std::mem::replace(&mut self.header, MaybeHeader::Discarded) {
             return h;
@@ -52,34 +77,8 @@ impl WriterReplay {
         }
     }
 
-    pub fn add_data(&mut self, buf: &[u8]) {
-        self.data.write_all(buf).unwrap();
-    }
-
-    pub fn get_data(&self) -> &impl DiscontiguousBuf {
-        &self.data
-    }
-
-    pub fn set_delayed_data_len(&mut self, new: usize) {
-        debug_assert!(self.delayed_data_len <= new);
-        self.delayed_data_len = new;
-    }
-
     pub fn get_delayed_data_len(&self) -> usize {
         self.delayed_data_len
-    }
-
-    pub fn discard(&mut self, until: usize) {
-        self.data.discard(until);
-    }
-
-    pub fn discard_all(&mut self) {
-        self.data.discard(usize::MAX);
-    }
-
-    pub fn finish(&mut self) {
-        self.finished = true;
-        self.finished_notification.notify_waiters();
     }
 
     pub fn wait_for_header(&self) -> impl Future<Output = ()> {
@@ -106,8 +105,12 @@ impl WriterReplay {
         }
     }
 
-    pub fn is_finished(&self) -> bool {
-        self.finished
+    pub fn discard(&mut self, until: usize) {
+        self.data.discard(until);
+    }
+
+    pub fn discard_all(&mut self) {
+        self.data.discard(usize::MAX);
     }
 }
 
