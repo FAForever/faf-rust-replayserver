@@ -49,7 +49,7 @@ impl SavedReplayDirectory {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use tokio::io::sink;
 
     use super::*;

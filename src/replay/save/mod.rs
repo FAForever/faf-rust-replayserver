@@ -1,4 +1,4 @@
-mod directory;
+pub mod directory;
 mod json_header;
 mod saver;
 mod writer;

@@ -1,5 +1,5 @@
 use super::connection::Connection;
-use crate::metrics;
+use crate::{metrics, replay::save::SavedReplayDirectory};
 use crate::util::timeout::cancellable;
 use crate::worker_threads::ReplayThreadPool;
 use crate::{
@@ -11,10 +11,11 @@ use futures::{stream::StreamExt, Stream};
 use log::{debug, info};
 use tokio_util::sync::CancellationToken;
 
-async fn real_server_deps(config: Settings) -> (impl Stream<Item = Connection>, Database) {
+async fn real_server_deps(config: Settings) -> (impl Stream<Item = Connection>, Database, SavedReplayDirectory) {
     let connections = tcp_listen(format!("0.0.0.0:{}", config.server.port)).await;
     let database = Database::new(&config.database);
-    (connections, database)
+    let save_dir = SavedReplayDirectory::new(config.storage.vault_path.as_ref());
+    (connections, database, save_dir)
 }
 
 fn server_thread_pool(
@@ -32,8 +33,9 @@ pub async fn run_server_with_deps(
     shutdown_token: CancellationToken,
     connections: impl Stream<Item = Connection>,
     database: Database,
+    replay_directory: SavedReplayDirectory
 ) {
-    let saver = InnerReplaySaver::new(database, config.clone());
+    let saver = InnerReplaySaver::new(database, replay_directory);
     let thread_pool = server_thread_pool(config.clone(), shutdown_token.clone(), saver);
     let acceptor = ConnectionAcceptor::new(config);
 
@@ -55,8 +57,8 @@ pub async fn run_server_with_deps(
 }
 
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
-    let (producer, database) = real_server_deps(config.clone()).await;
-    run_server_with_deps(config, shutdown_token, producer, database).await
+    let (producer, database, save_dir) = real_server_deps(config.clone()).await;
+    run_server_with_deps(config, shutdown_token, producer, database, save_dir).await
 }
 
 #[cfg(test)]
@@ -72,7 +74,7 @@ mod test {
         atomic::{AtomicBool, Ordering},
         Arc,
     };
-    use tempfile::tempdir;
+    use tempfile::{TempDir, tempdir};
     use tokio::{fs::File, time::Duration};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
@@ -81,7 +83,15 @@ mod test {
 
     use super::*;
     use crate::replay::save::test::unpack_replay;
+    use crate::replay::save::directory::test::test_directory;
     use crate::util::test::compare_bufs;
+
+    fn temp_replay_dir() -> (TempDir, SavedReplayDirectory) {
+        let tmp_dir = tempdir().unwrap();
+        let dir_str = tmp_dir.path().to_str().unwrap().into();
+        let dir = SavedReplayDirectory::new(dir_str);
+        (tmp_dir, dir)
+    }
 
     #[tokio::test]
     async fn test_server_single_empty_connection() {
@@ -92,12 +102,11 @@ mod test {
         let mut conf = default_config();
         let db = mock_database();
         let token = CancellationToken::new();
-        let tmp_dir = tempdir().unwrap();
+        let replay_dir = test_directory();
 
         conf.server.connection_accept_timeout_s = 20;
-        conf.storage.vault_path = tmp_dir.path().to_str().unwrap().into();
 
-        let server = run_server_with_deps(Arc::new(conf), token.clone(), stream! { yield c; }, db);
+        let server = run_server_with_deps(Arc::new(conf), token.clone(), stream! { yield c; }, db, replay_dir);
         let mut ended_too_early = true;
 
         let wait = async {
@@ -129,9 +138,8 @@ mod test {
         let mut conf = default_config();
         let db = mock_database();
         let token = CancellationToken::new();
-        let tmp_dir = tempdir().unwrap();
+        let (tmpdir, replay_dir) = temp_replay_dir();   // Use a real temp directory to verify path
 
-        conf.storage.vault_path = tmp_dir.path().to_str().unwrap().into();
         conf.replay.time_with_zero_writers_to_end_replay_s = 1;
 
         let conn_source = stream! {
@@ -139,7 +147,7 @@ mod test {
             tokio::time::sleep(Duration::from_millis(100)).await;
             yield c_read;
         };
-        let server = run_server_with_deps(Arc::new(conf), token.clone(), conn_source, db);
+        let server = run_server_with_deps(Arc::new(conf), token.clone(), conn_source, db, replay_dir);
 
         let example_replay_file = get_file("example");
         let replay_writing = async {
@@ -166,7 +174,7 @@ mod test {
         };
         res.unwrap();
 
-        let mut file_path = tmp_dir.path().to_owned();
+        let mut file_path = tmpdir.path().to_owned();
         file_path.push("0/0/0/0/2.fafreplay");
         let replay_file = File::open(file_path).await.unwrap();
         let (json, saved_replay) = unpack_replay(replay_file).await.unwrap();
@@ -186,11 +194,10 @@ mod test {
         let mut conf = default_config();
         let db = mock_database();
         let token = CancellationToken::new();
-        let tmp_dir = tempdir().unwrap();
+        let replay_dir = test_directory();
 
         let server_ended = Arc::new(AtomicBool::new(false));
 
-        conf.storage.vault_path = tmp_dir.path().to_str().unwrap().into();
         conf.replay.time_with_zero_writers_to_end_replay_s = 1;
 
         let conn_source = stream! {
@@ -202,7 +209,7 @@ mod test {
         let token_c = token.clone();
         let server_ended_c = server_ended.clone();
         let server = async move {
-            run_server_with_deps(Arc::new(conf), token_c, conn_source, db).await;
+            run_server_with_deps(Arc::new(conf), token_c, conn_source, db, replay_dir).await;
             server_ended_c.store(true, Ordering::Relaxed);
         };
 
