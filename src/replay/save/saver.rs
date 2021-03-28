@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    config::Settings, database::database::Database, database::queries::Queries, metrics,
+    database::database::Database, database::queries::Queries, metrics,
     replay::streams::MReplayRef, util::buf_traits::ReadAtExt,
 };
 
@@ -17,17 +17,17 @@ pub struct InnerReplaySaver {
 }
 
 impl InnerReplaySaver {
-    pub fn new(db: Database, config: Settings) -> Arc<Self> {
-        Arc::new(Self::new_inner(db, config))
+    pub fn new(db: Database, save_dir: SavedReplayDirectory) -> Arc<Self> {
+        Arc::new(Self::new_inner(db, save_dir))
     }
 }
 
 #[cfg_attr(test, faux::methods)]
 impl InnerReplaySaver {
-    fn new_inner(db: Database, config: Settings) -> Self {
+    fn new_inner(db: Database, save_dir: SavedReplayDirectory) -> Self {
         Self {
             db: Queries::new(db),
-            save_dir: SavedReplayDirectory::new(config.storage.vault_path.as_ref()),
+            save_dir,
         }
     }
 
