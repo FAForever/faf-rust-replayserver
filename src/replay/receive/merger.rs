@@ -39,7 +39,7 @@ impl ReplayMerger {
         let replay = Rc::new(RefCell::new(WriterReplay::new()));
         join! {
             read_from_connection(replay.clone(), c, self.shutdown_token.clone()),
-            self.stream_delay.update_delayed_data_and_drive_merge_strategy(replay, &self.merge_strategy),
+            self.stream_delay.update_delayed_data_and_drive_merge_strategy(&replay, &self.merge_strategy),
         };
     }
 
