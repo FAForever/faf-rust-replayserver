@@ -13,11 +13,11 @@ use crate::replay::{streams::MReplayRef, streams::WReplayRef};
 //   * A replay has a header, data and a delayed position in the data. A header can be added, data
 //     can be appended, delayed position can increase.
 //   * The strategy is called when a replay is added, finished, a replay's header is added, a
-//     replay's data or delayed data changes. Note that, because of task scheduler, we can only
-//     guarantee that e.g. replay does have a header, or did finish. At each call, state of every
-//     replay could've advanced arbitrarily.
-//   * A replay is first added, then its header is added, then its data and delayed data change,
-//     then it is marked as finished.
+//     replay's data or delayed data changes. Callbacks are called quickly but not immediately, a
+//     replay could've received more data or finished before its data updated/finished callback was
+//     called.
+//   * A replay is added, then (optionally) its header is added and its data changes, then it is
+//     finished.
 //   * Before calling replay_removed(), replay_data_update() will be called one last time with all
 //     replay data present.
 // * We define a canonical replay C.
