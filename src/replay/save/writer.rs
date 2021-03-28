@@ -1,10 +1,10 @@
 use crate::replay::streams::MReplayRef;
 use crate::replay::streams::MergedReplayReader;
 use async_compression::tokio::write::ZstdEncoder;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 pub async fn write_replay(
-    mut to: tokio::fs::File,
+    mut to: impl AsyncWrite + Unpin,
     json_header: impl serde::Serialize,
     replay: MReplayRef,
 ) -> std::io::Result<()> {
@@ -21,9 +21,9 @@ pub async fn write_replay(
 #[cfg(test)]
 pub mod test {
     use async_compression::tokio::bufread::ZstdDecoder;
-    use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+    use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 
-    pub async fn unpack_replay(from: tokio::fs::File) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
+    pub async fn unpack_replay(from: impl AsyncRead + Unpin) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
         let mut read = BufReader::new(from);
         let mut json = Vec::new();
         let mut unc_replay = Vec::new();
