@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use tokio::io::AsyncWrite;
+
 pub struct SavedReplayDirectory {
     root: PathBuf,
 }
@@ -30,7 +32,7 @@ impl SavedReplayDirectory {
         })
     }
 
-    pub async fn touch_and_return_file(&self, replay_id: u64) -> std::io::Result<tokio::fs::File> {
+    pub async fn touch_and_return_file(&self, replay_id: u64) -> std::io::Result<impl AsyncWrite + Unpin> {
         let mut target = self.replay_path(replay_id);
         std::fs::create_dir_all(&target)?;
 
