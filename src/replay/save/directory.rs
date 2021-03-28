@@ -2,10 +2,12 @@ use std::path::PathBuf;
 
 use tokio::io::AsyncWrite;
 
+#[cfg_attr(test, faux::create)]
 pub struct SavedReplayDirectory {
     root: PathBuf,
 }
 
+#[cfg_attr(test, faux::methods)]
 impl SavedReplayDirectory {
     pub fn new(root: &str) -> Self {
         Self {
@@ -32,22 +34,24 @@ impl SavedReplayDirectory {
         })
     }
 
-    pub async fn touch_and_return_file(&self, replay_id: u64) -> std::io::Result<impl AsyncWrite + Unpin> {
+    pub async fn touch_and_return_file(&self, replay_id: u64) -> std::io::Result<Box<dyn AsyncWrite + Unpin>> {
         let mut target = self.replay_path(replay_id);
-        std::fs::create_dir_all(&target)?;
+        tokio::fs::create_dir_all(&target).await?;
 
         let basename = format!("{}.fafreplay", replay_id);
         target.push(basename);
-        tokio::fs::OpenOptions::new()
+        Ok(Box::new(tokio::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(target)
-            .await
+            .await?))
     }
 }
 
 #[cfg(test)]
 mod test {
+    use tokio::io::sink;
+
     use super::*;
     #[test]
     fn test_replay_path_works_as_intended() {
@@ -67,5 +71,13 @@ mod test {
         let dir = SavedReplayDirectory::new("/tmp/foo");
         let path_1 = dir.replay_path(1234567);
         assert_eq!(path_1, PathBuf::from("/tmp/foo/0/1/23/45"));
+    }
+
+    pub fn test_directory() -> SavedReplayDirectory {
+        let mut f = SavedReplayDirectory::faux();
+        faux::when!(f.touch_and_return_file).then_do(|| {
+            Ok(Box::new(sink()))
+        });
+        f
     }
 }
