@@ -34,17 +34,22 @@ impl SavedReplayDirectory {
         })
     }
 
-    pub async fn touch_and_return_file(&self, replay_id: u64) -> std::io::Result<Box<dyn AsyncWrite + Unpin>> {
+    pub async fn touch_and_return_file(
+        &self,
+        replay_id: u64,
+    ) -> std::io::Result<Box<dyn AsyncWrite + Unpin>> {
         let mut target = self.replay_path(replay_id);
         tokio::fs::create_dir_all(&target).await?;
 
         let basename = format!("{}.fafreplay", replay_id);
         target.push(basename);
-        Ok(Box::new(tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(target)
-            .await?))
+        Ok(Box::new(
+            tokio::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(target)
+                .await?,
+        ))
     }
 }
 
@@ -75,9 +80,7 @@ pub mod test {
 
     pub fn test_directory() -> SavedReplayDirectory {
         let mut f = SavedReplayDirectory::faux();
-        faux::when!(f.touch_and_return_file).then_do(|| {
-            Ok(Box::new(sink()))
-        });
+        faux::when!(f.touch_and_return_file).then_do(|| Ok(Box::new(sink())));
         f
     }
 }

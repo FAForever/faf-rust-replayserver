@@ -25,7 +25,7 @@ impl MergedReplayReader {
                 f.await;
                 let r = self.replay.borrow();
                 if r.delayed_len() <= reader.position() && r.is_finished() {
-                    return Ok(())
+                    return Ok(());
                 }
             }
         }

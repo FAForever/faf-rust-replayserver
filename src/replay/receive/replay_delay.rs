@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::VecDeque};
 
-use crate::{replay::streams::WReplayRef, util::timeout::until};
 use crate::util::buf_traits::DiscontiguousBuf;
+use crate::{replay::streams::WReplayRef, util::timeout::until};
 
 use tokio::time::Duration;
 
@@ -70,7 +70,7 @@ impl StreamDelay {
     pub async fn update_delayed_data_and_drive_merge_strategy(
         &self,
         replay: &WReplayRef,
-        strategy: &RefCell<impl MergeStrategy>
+        strategy: &RefCell<impl MergeStrategy>,
     ) {
         let driver = StreamDelayContext::new(self, replay, strategy);
         driver.update_delayed_data_and_drive_merge_strategy().await;
@@ -82,7 +82,7 @@ struct StreamDelayContext<'a, T: MergeStrategy> {
     sleep_ms: u64,
     replay: &'a WReplayRef,
     strategy: &'a RefCell<T>,
-    token: u64
+    token: u64,
 }
 
 impl<'a, T: MergeStrategy> StreamDelayContext<'a, T> {
@@ -93,7 +93,7 @@ impl<'a, T: MergeStrategy> StreamDelayContext<'a, T> {
             sleep_ms: delay.sleep_ms,
             replay,
             strategy,
-            token
+            token,
         }
     }
 
@@ -128,14 +128,16 @@ impl<'a, T: MergeStrategy> StreamDelayContext<'a, T> {
         s.replay_removed(self.token);
     }
 
-    async fn update_delayed_data_and_drive_merge_strategy(
-        &self,
-    ) {
+    async fn update_delayed_data_and_drive_merge_strategy(&self) {
         let replay_end = self.replay.borrow().wait_until_finished();
-        until(async {
-            self.notify_on_header().await;
-            self.update_delayed_data().await;
-        }, replay_end).await;
+        until(
+            async {
+                self.notify_on_header().await;
+                self.update_delayed_data().await;
+            },
+            replay_end,
+        )
+        .await;
         self.after_finished().await;
     }
 }

@@ -23,7 +23,9 @@ pub mod test {
     use async_compression::tokio::bufread::ZstdDecoder;
     use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 
-    pub async fn unpack_replay(from: impl AsyncRead + Unpin) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
+    pub async fn unpack_replay(
+        from: impl AsyncRead + Unpin,
+    ) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
         let mut read = BufReader::new(from);
         let mut json = Vec::new();
         let mut unc_replay = Vec::new();

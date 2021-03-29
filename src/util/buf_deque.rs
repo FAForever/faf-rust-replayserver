@@ -169,7 +169,9 @@ mod test {
         for i in 0..(CHUNK_SIZE * 8) {
             bl.write_all(&data).unwrap();
             let mut read = Vec::new();
-            bl.reader_from(i * data.len()).read_to_end(&mut read).unwrap();
+            bl.reader_from(i * data.len())
+                .read_to_end(&mut read)
+                .unwrap();
             assert_eq!(data, read);
             bl.discard((i + 1) * data.len());
         }

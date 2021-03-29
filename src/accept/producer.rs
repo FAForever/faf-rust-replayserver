@@ -11,7 +11,7 @@ pub async fn tcp_listen(addr: String) -> impl Stream<Item = Connection> {
                 log::info!("Failed to accept connection: {}", e);
                 None
             }
-            Ok(s) => Some(Connection::new(s))
+            Ok(s) => Some(Connection::new(s)),
         }
     })
 }

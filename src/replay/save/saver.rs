@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    database::database::Database, database::queries::Queries, metrics,
-    replay::streams::MReplayRef, util::buf_traits::ReadAtExt,
+    database::database::Database, database::queries::Queries, metrics, replay::streams::MReplayRef,
+    util::buf_traits::ReadAtExt,
 };
 
 use super::{writer::write_replay, ReplayJsonHeader, SavedReplayDirectory};

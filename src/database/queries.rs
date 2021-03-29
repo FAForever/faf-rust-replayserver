@@ -80,8 +80,15 @@ impl Queries {
         Ok(ret)
     }
 
-    pub async fn update_game_stats(&self, id: u64, replay_ticks: Option<u32>, replay_available: bool) -> Result<(), SaveError> {
-        self.db.update_game_stats(id, replay_ticks, replay_available).await
+    pub async fn update_game_stats(
+        &self,
+        id: u64,
+        replay_ticks: Option<u32>,
+        replay_available: bool,
+    ) -> Result<(), SaveError> {
+        self.db
+            .update_game_stats(id, replay_ticks, replay_available)
+            .await
     }
 }
 

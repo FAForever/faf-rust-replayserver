@@ -1,5 +1,5 @@
-use std::fmt::Display;
 use rand::Rng;
+use std::fmt::Display;
 
 use crate::{
     accept::header::{ConnectionHeader, ConnectionType},

@@ -121,7 +121,8 @@ impl ReplayState {
         }
 
         let match_start = self.canon_match_start(); // this borrows
-        self.data_matching_canon = self.replay
+        self.data_matching_canon = self
+            .replay
             .borrow()
             .get_data()
             .common_prefix_from(self.canon_replay.borrow().get_data(), match_start);

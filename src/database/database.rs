@@ -163,7 +163,12 @@ impl Database {
         }
     }
 
-    pub async fn update_game_stats(&self, id: u64, replay_ticks: Option<u32>, replay_available: bool) -> Result<(), SaveError> {
+    pub async fn update_game_stats(
+        &self,
+        id: u64,
+        replay_ticks: Option<u32>,
+        replay_available: bool,
+    ) -> Result<(), SaveError> {
         let query = "
             UPDATE `game_stats` SET
                 `game_stats`.`replay_ticks` = ?,
@@ -484,7 +489,7 @@ pub mod test {
                 },
             ])
         });
-        faux::when!(mock_db.update_game_stats).safe_then(|(_id, _ticks,_saved)| Ok(()));
+        faux::when!(mock_db.update_game_stats).safe_then(|(_id, _ticks, _saved)| Ok(()));
         mock_db
     }
 }
