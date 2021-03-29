@@ -74,7 +74,7 @@ impl BufDeque {
         }
 
         // If we still have bytes to write, write them
-        if buf.len() > 0 {
+        if !buf.is_empty() {
             let offset = self.end % CHUNK_SIZE;
             let mut chunk: &mut [u8] = self.get_last_chunk();
             chunk = &mut chunk[offset..];

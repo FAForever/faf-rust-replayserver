@@ -119,12 +119,12 @@ impl Replay {
             return Err(ConnectionError::CannotAssignToReplay);
         }
         match c.get_header().type_ {
-            ConnectionType::WRITER => {
+            ConnectionType::Writer => {
                 self.writer_connection_count.inc();
                 self.merger.handle_connection(&mut c).await;
                 self.writer_connection_count.dec();
             }
-            ConnectionType::READER => {
+            ConnectionType::Reader => {
                 self.reader_connection_count.inc();
                 self.sender.handle_connection(&mut c).await;
                 self.reader_connection_count.dec();
@@ -165,7 +165,7 @@ mod test {
 
         let (mut c, _r, _w) = test_connection();
         let c_header = ConnectionHeader {
-            type_: ConnectionType::WRITER,
+            type_: ConnectionType::Writer,
             id: 1,
             name: "foo".into(),
         };
@@ -206,12 +206,12 @@ mod test {
         let (mut c_read, mut reader, mut _w) = test_connection();
         let (mut c_write, _r, mut writer) = test_connection();
         c_write.set_header(ConnectionHeader {
-            type_: ConnectionType::WRITER,
+            type_: ConnectionType::Writer,
             id: 1,
             name: "foo".into(),
         });
         c_read.set_header(ConnectionHeader {
-            type_: ConnectionType::READER,
+            type_: ConnectionType::Reader,
             id: 1,
             name: "foo".into(),
         });
@@ -264,22 +264,22 @@ mod test {
         let (mut c3, _r3, w3) = test_connection();
         let (mut c4, mut r4, w4) = test_connection();
         c1.set_header(ConnectionHeader {
-            type_: ConnectionType::WRITER,
+            type_: ConnectionType::Writer,
             id: 1,
             name: "foo".into(),
         });
         c2.set_header(ConnectionHeader {
-            type_: ConnectionType::READER,
+            type_: ConnectionType::Reader,
             id: 1,
             name: "foo".into(),
         });
         c3.set_header(ConnectionHeader {
-            type_: ConnectionType::WRITER,
+            type_: ConnectionType::Writer,
             id: 1,
             name: "foo".into(),
         });
         c4.set_header(ConnectionHeader {
-            type_: ConnectionType::READER,
+            type_: ConnectionType::Reader,
             id: 1,
             name: "foo".into(),
         });

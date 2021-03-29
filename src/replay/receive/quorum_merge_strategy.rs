@@ -373,7 +373,7 @@ impl MergeStalemateState {
         let good_replays = self.candidates.remove(&best_byte).unwrap();
 
         // Advance replay by 1 byte
-        let good_replay = *good_replays.iter().next().unwrap();
+        let good_replay = *good_replays.get(0).unwrap();
         let byte_pos = self.s.merged_data_len();
         self.s.append_canon_data(good_replay, byte_pos + 1);
         for id in good_replays.iter() {

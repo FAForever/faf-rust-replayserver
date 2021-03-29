@@ -36,7 +36,7 @@ impl EmptyCounter {
         let mut watcher = self.watcher.clone();
         async move {
             let mut last_count = Some(*watcher.borrow());
-            while !last_count.is_none() {
+            while last_count.is_some() {
                 if last_count != Some(0) {
                     last_count = Self::await_new_count(&mut watcher).await;
                 } else {

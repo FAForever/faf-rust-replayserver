@@ -88,15 +88,15 @@ impl<'a, T: ReadAt + ?Sized> Read for ReadAtCursor<'a, T> {
 }
 
 pub trait ReadAtExt: ReadAt {
-    fn reader_from<'a>(&'a self, start: usize) -> ReadAtCursor<'a, Self>;
-    fn reader<'a>(&'a self) -> ReadAtCursor<'a, Self>;
+    fn reader_from(&self, start: usize) -> ReadAtCursor<'_, Self>;
+    fn reader(&self) -> ReadAtCursor<'_, Self>;
 }
 
 impl<T: ReadAt> ReadAtExt for T {
-    fn reader_from<'a>(&'a self, start: usize) -> ReadAtCursor<'a, Self> {
+    fn reader_from(&self, start: usize) -> ReadAtCursor<'_, Self> {
         ReadAtCursor { src: self, start }
     }
-    fn reader<'a>(&'a self) -> ReadAtCursor<'a, Self> {
+    fn reader(&self) -> ReadAtCursor<'_, Self> {
         self.reader_from(0)
     }
 }

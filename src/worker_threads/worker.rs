@@ -10,7 +10,7 @@ pub struct ReplayThread {
 }
 
 impl ReplayThread {
-    pub fn new(work: impl Fn(Receiver<Connection>) -> () + Send + 'static + Clone) -> Self {
+    pub fn new(work: impl Fn(Receiver<Connection>) + Send + 'static + Clone) -> Self {
         let (s, r) = channel(1);
         let handle = thread::spawn(move || work(r));
         Self {

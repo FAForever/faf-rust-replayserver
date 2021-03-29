@@ -31,10 +31,8 @@ impl Queries {
         let players = self.db.get_team_players(id).await?;
         let mut res = GameTeams::new();
         for p in players.into_iter() {
-            if !res.contains_key(&p.team) {
-                res.insert(p.team, Vec::new());
-            }
-            res.get_mut(&p.team).unwrap().push(p.login);
+            let plist = res.entry(p.team).or_insert_with(Vec::new);
+            plist.push(p.login);
         }
         Ok(res)
     }
@@ -53,8 +51,8 @@ impl Queries {
         let mapname = stats
             .file_name
             .and_then(|f| f.rsplitn(2, '.').last().map(String::from))
-            .and_then(|f| f.rsplitn(2, '/').nth(0).map(String::from))
-            .unwrap_or("None".into());
+            .and_then(|f| f.rsplitn(2, '/').next().map(String::from))
+            .unwrap_or_else(|| "None".into());
 
         Ok(GameStats {
             featured_mod: stats.game_mod,
@@ -63,7 +61,7 @@ impl Queries {
             launched_at: stats.start_time.unix_timestamp(),
             game_end: stats
                 .end_time
-                .unwrap_or(OffsetDateTime::now_utc())
+                .unwrap_or_else(OffsetDateTime::now_utc)
                 .unix_timestamp(),
             title: stats.game_name,
             mapname,

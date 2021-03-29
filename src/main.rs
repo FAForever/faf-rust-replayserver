@@ -17,7 +17,7 @@ pub mod error;
 use crate::config::InnerSettings;
 use tokio_util::sync::CancellationToken;
 
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 async fn do_run_server() {
     let maybe_config = InnerSettings::from_env();

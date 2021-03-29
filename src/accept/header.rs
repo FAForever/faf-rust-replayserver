@@ -12,8 +12,8 @@ use crate::{server::connection::read_until_exact, some_error};
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum ConnectionType {
-    READER = 1,
-    WRITER = 2,
+    Reader = 1,
+    Writer = 2,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -30,8 +30,8 @@ pub mod header_reader {
         let mut buf: [u8; 2] = [0; 2];
         conn.read_exact(&mut buf).await?;
         match &buf {
-            b"P/" => Ok(ConnectionType::WRITER),
-            b"G/" => Ok(ConnectionType::READER),
+            b"P/" => Ok(ConnectionType::Writer),
+            b"G/" => Ok(ConnectionType::Reader),
             _ => Err(bad_data(format!("Invalid connection type: {:x?}", buf))),
         }
     }
@@ -97,11 +97,11 @@ mod test {
         setup_logging();
         let mut c = conn_from_read_data(b"P/1/foo\0");
         read_and_set_connection_header(&mut c).await.unwrap();
-        assert!(c.get_header().type_ == ConnectionType::WRITER);
+        assert!(c.get_header().type_ == ConnectionType::Writer);
 
         c = conn_from_read_data(b"G/1/foo\0");
         read_and_set_connection_header(&mut c).await.unwrap();
-        assert!(c.get_header().type_ == ConnectionType::READER);
+        assert!(c.get_header().type_ == ConnectionType::Reader);
     }
 
     #[tokio::test]

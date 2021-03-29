@@ -124,9 +124,9 @@ impl Database {
         // We have to build table name dynamically, that's just how the DB is.
         // Since we know what existing tables look like, we do very restrictive validation.
         for c in game_mod.chars() {
-            if !((c >= 'a' && c <= 'z')
-                || (c >= 'A' && c <= 'Z')
-                || (c >= '0' && c <= '9')
+            if !(('a'..='z').contains(&c)
+                || ('A'..='Z').contains(&c)
+                || ('0'..='9').contains(&c)
                 || "_-".contains(c))
             {
                 log::info!(

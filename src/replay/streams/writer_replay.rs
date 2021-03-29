@@ -71,7 +71,7 @@ impl WriterReplay {
     // Third, stuff used by the merge strategy.
     pub fn take_header(&mut self) -> ReplayHeader {
         if let MaybeHeader::Some(h) = std::mem::replace(&mut self.header, MaybeHeader::Discarded) {
-            return h;
+            h
         } else {
             panic!("Cannot take header");
         }

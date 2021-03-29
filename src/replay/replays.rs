@@ -41,7 +41,7 @@ impl Replays {
         let maybe_replay = match self.replays.get(&conn_header.id) {
             Some(r) => Ok(r),
             None => {
-                if conn_header.type_ == ConnectionType::READER {
+                if conn_header.type_ == ConnectionType::Reader {
                     log::debug!("Replay id {} not found for {}", conn_header.id, c);
                     Err(ConnectionError::CannotAssignToReplay)
                 } else {

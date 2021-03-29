@@ -32,9 +32,8 @@ impl InnerReplaySaver {
     }
 
     async fn count_ticks(&self, replay: MReplayRef, id: u64) -> Option<u32> {
-        if replay.borrow().get_header().is_none() {
-            return None;
-        }
+        replay.borrow().get_header()?;
+
         let header_len = replay.borrow().header_len();
         let ticks = scfa::parser::parse_body_ticks(&mut replay.reader_from(header_len));
         if let Err(e) = &ticks {

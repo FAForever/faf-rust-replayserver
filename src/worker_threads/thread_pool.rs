@@ -13,7 +13,7 @@ pub struct ReplayThreadPool {
 }
 
 impl ReplayThreadPool {
-    fn new(work: impl Fn(Receiver<Connection>) -> () + Send + 'static + Clone, count: u32) -> Self {
+    fn new(work: impl Fn(Receiver<Connection>) + Send + 'static + Clone, count: u32) -> Self {
         let mut replay_workers = Vec::new();
         for _ in 0..count {
             let worker = ReplayThread::new(work.clone());

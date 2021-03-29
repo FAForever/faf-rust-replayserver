@@ -55,8 +55,8 @@ impl Connection {
         match &self.header {
             None => "initial",
             Some(h) => match h.type_ {
-                ConnectionType::READER => "reader",
-                ConnectionType::WRITER => "writer",
+                ConnectionType::Reader => "reader",
+                ConnectionType::Writer => "writer",
             },
         }
     }
@@ -99,8 +99,8 @@ impl Display for Connection {
                 "Connection {}, {} '{}' for replay {}",
                 self.id,
                 match h.type_ {
-                    ConnectionType::READER => "reader",
-                    ConnectionType::WRITER => "writer",
+                    ConnectionType::Reader => "reader",
+                    ConnectionType::Writer => "writer",
                 },
                 h.name,
                 h.id

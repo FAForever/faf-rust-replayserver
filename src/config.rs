@@ -55,7 +55,7 @@ impl InnerSettings {
     pub fn from_env() -> Result<Arc<Self>, ConfigError> {
         let conf_var = env::var("RS_CONFIG_FILE");
         let db_pass_var = env::var("RS_DB_PASSWORD");
-        Self::do_from_env(conf_var, db_pass_var).map(|x| Arc::new(x))
+        Self::do_from_env(conf_var, db_pass_var).map(Arc::new)
     }
     fn do_from_env(
         conf_var: Result<String, VarError>,
