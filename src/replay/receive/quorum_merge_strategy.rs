@@ -344,15 +344,17 @@ impl MergeStalemateState {
     }
 
     fn can_exit_stalemate(&self) -> bool {
-        if !self.s.delayed_data_started {
-            false
-        } else if self.candidates.is_empty() {
-            false
-        } else if self.reserve.is_empty() {
-            true
-        } else {
-            self.candidates.values().map(|c| c.len()).max().unwrap() >= self.s.target_quorum_size
+        if !self.s.delayed_data_started {   // Wait as long as we can at the start
+            return false;
         }
+        if self.candidates.is_empty() {     // We have no candidates yet
+            return false;
+        }
+        if self.reserve.is_empty() {        // We ran out of reserve replays, pick *something*
+            return true;
+        }
+        // Is any candidate set big enough?
+        self.candidates.values().map(|c| c.len()).max().unwrap() >= self.s.target_quorum_size
     }
 
     fn exit_stalemate(mut self) -> MergeQuorumState {
