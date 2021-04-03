@@ -271,7 +271,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_server_simple_benchmark() {
         // Can't use pause here either.
-        const REPLAYS: usize = 100;
+        const REPLAYS: usize = 500;
         const CONNS_SIDE_PER_REPLAY: usize = 5;
         let mut r_conns = Vec::new();
         let mut w_conns = Vec::new();
