@@ -92,7 +92,6 @@ impl Replay {
         self.saver
             .save_replay(self.merger.get_merged_replay(), self.id)
             .await;
-        log::debug!("Replay {} saved data on disk", self.id);
         self.reader_connection_count.wait_until_empty().await;
         log::info!("Replay {} ended", self.id);
         // Cancel to return from timeout
