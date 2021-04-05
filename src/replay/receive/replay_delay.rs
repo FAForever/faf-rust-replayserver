@@ -7,13 +7,13 @@ use tokio::time::Duration;
 
 use super::merge_strategy::MergeStrategy;
 
-pub struct StreamDelayQueue {
+pub struct PositionHistory {
     sleep_ms: u64,
     history_size: usize,
     queue: VecDeque<usize>,
 }
 
-impl StreamDelayQueue {
+impl PositionHistory {
     pub fn new(delay_s: u64, sleep_ms: u64) -> Self {
         let history_size = Self::history_size(delay_s, sleep_ms);
         Self {
@@ -104,7 +104,7 @@ impl<'a, T: MergeStrategy> StreamDelayContext<'a, T> {
     }
 
     async fn update_delayed_data(&self) -> ! {
-        let mut pos_queue = StreamDelayQueue::new(self.delay_s, self.sleep_ms);
+        let mut pos_queue = PositionHistory::new(self.delay_s, self.sleep_ms);
         let mut prev_current = 0;
         let mut prev_delayed = 0;
         loop {
