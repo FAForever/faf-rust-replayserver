@@ -343,13 +343,16 @@ impl MergeStalemateState {
     }
 
     fn can_exit_stalemate(&self) -> bool {
-        if !self.s.delayed_data_started {   // Wait as long as we can at the start
+        if !self.s.delayed_data_started {
+            // Wait as long as we can at the start
             return false;
         }
-        if self.candidates.is_empty() {     // We have no candidates yet
+        if self.candidates.is_empty() {
+            // We have no candidates yet
             return false;
         }
-        if self.reserve.is_empty() {        // We ran out of reserve replays, pick *something*
+        if self.reserve.is_empty() {
+            // We ran out of reserve replays, pick *something*
             return true;
         }
         // Is any candidate set big enough?
