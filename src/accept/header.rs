@@ -2,11 +2,13 @@ use std::io::ErrorKind;
 use std::str::from_utf8;
 
 use tokio::io::AsyncReadExt;
+use tokio::time::Duration;
 
 use crate::error::bad_data;
 use crate::error::ConnResult;
 use crate::error::ConnectionError;
 use crate::error::SomeError;
+use crate::util::timeout::timeout;
 use crate::server::connection::Connection;
 use crate::{server::connection::read_until_exact, some_error};
 
@@ -75,6 +77,14 @@ pub mod header_reader {
         let header = read_connection_header(conn).await?;
         conn.set_header(header);
         Ok(())
+    }
+}
+
+pub async fn read_initial_header(conn: &mut Connection, until: Duration) -> ConnResult<()>
+{
+    match timeout(header_reader::read_and_set_connection_header(conn), until).await {
+        Some(res) => res,
+        None => Err(bad_data("Timed out while accepting connection")),
     }
 }
 

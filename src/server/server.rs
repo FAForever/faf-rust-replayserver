@@ -5,8 +5,9 @@ use crate::{
     accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver,
     worker_threads::ReplayThreadContext,
 };
-use crate::{accept::ConnectionAcceptor, database::database::Database, replay::save::ReplaySaver};
+use crate::{database::database::Database, replay::save::ReplaySaver};
 use crate::{metrics, replay::save::SavedReplayDirectory};
+use crate::accept::header::read_initial_header;
 use futures::{stream::StreamExt, Stream};
 use log::{debug, info};
 use tokio_util::sync::CancellationToken;
@@ -43,15 +44,16 @@ pub async fn run_server_with_deps(
 ) {
     let saver = InnerReplaySaver::new(database, replay_directory);
     let thread_pool = server_thread_pool(config.clone(), shutdown_token.clone(), saver);
-    let acceptor = ConnectionAcceptor::new(config);
 
     let accept_connections = connections.for_each_concurrent(None, |mut c| async {
-        if let Err(e) = acceptor.accept(&mut c).await {
-            info!("Could not accept connection: {}", e);
-            metrics::inc_served_conns::<()>(&Err(e));
-            return;
+        let initial_timeout = config.server.connection_accept_timeout_s;
+        match read_initial_header(&mut c, initial_timeout).await {
+            Err(e) => {
+                info!("Could not accept connection: {}", e);
+                metrics::inc_served_conns::<()>(&Err(e));
+            }
+            Ok(_) => thread_pool.assign_connection(c).await
         }
-        thread_pool.assign_connection(c).await;
     });
 
     match cancellable(accept_connections, &shutdown_token).await {
