@@ -38,9 +38,8 @@ impl Replay {
         let writer_connection_count = EmptyCounter::new();
         let reader_connection_count = EmptyCounter::new();
         let should_stop_accepting_connections = Cell::new(false);
-        let time_with_zero_writers_to_end_replay =
-            Duration::from_secs(config.replay.time_with_zero_writers_to_end_replay_s);
-        let forced_timeout = Duration::from_secs(config.replay.forced_timeout_s);
+        let time_with_zero_writers_to_end_replay = config.replay.time_with_zero_writers_to_end_replay_s;
+        let forced_timeout = config.replay.forced_timeout_s;
         let replay_timeout_token = shutdown_token.child_token();
 
         let merger = ReplayMerger::new(replay_timeout_token.clone(), config);
@@ -160,7 +159,7 @@ mod test {
 
         let token = CancellationToken::new();
         let mut config = default_config();
-        config.replay.forced_timeout_s = 3600;
+        config.replay.forced_timeout_s = Duration::from_secs(3600);
 
         let (mut c, _r, _w) = test_connection();
         let c_header = ConnectionHeader {
@@ -255,7 +254,7 @@ mod test {
         faux::when!(mock_saver.save_replay).then_do(|| ());
         let token = CancellationToken::new();
         let mut config = default_config();
-        config.replay.time_with_zero_writers_to_end_replay_s = 2;
+        config.replay.time_with_zero_writers_to_end_replay_s = Duration::from_secs(2);
         let replay = Replay::new(1, token, Arc::new(config), Arc::new(mock_saver));
 
         let (mut c1, _r1, mut w1) = test_connection();

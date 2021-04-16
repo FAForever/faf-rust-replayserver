@@ -1,3 +1,5 @@
+# All time or duration arguments accept floating point numbers for sub-second
+# precision.
 server:
         # The port on which the server accepts FA connections.
         port: 15000
@@ -36,13 +38,13 @@ replay:
         # our replay merging algorithm relies on having some space to merge
         # replays.
         delay_s: 300
-        # Interval, in miliseconds, between updates to received replays' delayed
+        # Interval, in seconds, between updates to received replays' delayed
         # data position. This also affects how often we call the merging
         # algorithm, and (in practice) how often we send new data to replay
         # readers.
-        # 1000 miliseconds should be good, setting this too low will probably
-        # degrade performance.
-        update_interval_ms: 1000
+        # 1 second should be good, setting this too low will probably degrade
+        # performance.
+        update_interval_s: 1000
         # The number of replays that need to agree on the data before the
         # merging algorithm adds it to the "canonical" replay.
         # 2 works well in practice. See the Architecture section for details.

@@ -8,33 +8,29 @@ use tokio::time::Duration;
 use super::merge_strategy::MergeStrategy;
 
 pub struct PositionHistory {
-    sleep_ms: u64,
+    sleep_s: Duration,
     history_size: usize,
     queue: VecDeque<usize>,
 }
 
 impl PositionHistory {
-    pub fn new(delay_s: u64, sleep_ms: u64) -> Self {
-        let history_size = Self::history_size(delay_s, sleep_ms);
+    pub fn new(delay_s: Duration, sleep_s: Duration) -> Self {
+        let history_size = Self::history_size(delay_s, sleep_s);
         Self {
-            sleep_ms,
+            sleep_s,
             history_size,
             queue: VecDeque::new(),
         }
     }
 
-    fn history_size(delay_s: u64, sleep_ms: u64) -> usize {
+    fn history_size(delay_s: Duration, sleep_s: Duration) -> usize {
         /* Right after placing a new value, Nth element in the deque (counting from 0) spent N
          * sleep cycles in it. We want:
-         *     N * sleep_ms >= delay_s * 1000
-         *     N >= ceil(delay_s * 1000 / sleep_ms)
-         *     Deque size >= ceil(delay_s * 1000 / sleep_ms) + 1
-         *
+         *     N * sleep_s >= delay_s
+         *     N >= ceil(delay_s / sleep_s)
+         *     Deque size >= ceil(delay_s / sleep_s) + 1
          */
-        let div = (delay_s * 1000) / sleep_ms;
-        let should_round_up = (delay_s * 1000) % sleep_ms != 0;
-        let round_up: u64 = should_round_up.into();
-        (div + round_up + 1) as usize
+        (delay_s.as_secs_f64() / sleep_s.as_secs_f64()).ceil() as usize + 1
     }
 
     /* Push current data position and receive a position from delay_s seconds back. */
@@ -47,24 +43,24 @@ impl PositionHistory {
     }
 
     pub async fn wait_cycle(&self) {
-        tokio::time::sleep(Duration::from_millis(self.sleep_ms)).await;
+        tokio::time::sleep(self.sleep_s).await;
     }
 }
 
 pub struct StreamDelay {
-    delay_s: u64,
-    sleep_ms: u64,
+    delay_s: Duration,
+    sleep_s: Duration,
 }
 
 // This does two things:
-// * Sets writer stream's delayed data position. The position is updated roughly each sleep_ms
-//   miliseconds and is set to data position delay_s seconds ago. Once the replay ends, the delayed
+// * Sets writer stream's delayed data position. The position is updated roughly each sleep_s
+//   seconds and is set to data position delay_s seconds ago. Once the replay ends, the delayed
 //   position is set to real data position (since we don't need to anti-spoiler a replay that
 //   already ended).
 // * Calls merge strategy functions at the right times.
 impl StreamDelay {
-    pub fn new(delay_s: u64, sleep_ms: u64) -> Self {
-        Self { delay_s, sleep_ms }
+    pub fn new(delay_s: Duration, sleep_s: Duration) -> Self {
+        Self { delay_s, sleep_s }
     }
 
     pub async fn update_delayed_data_and_drive_merge_strategy(
@@ -78,8 +74,8 @@ impl StreamDelay {
 }
 
 struct StreamDelayContext<'a, T: MergeStrategy> {
-    delay_s: u64,
-    sleep_ms: u64,
+    delay_s: Duration,
+    sleep_s: Duration,
     replay: &'a WReplayRef,
     strategy: &'a RefCell<T>,
     token: u64,
@@ -90,7 +86,7 @@ impl<'a, T: MergeStrategy> StreamDelayContext<'a, T> {
         let token = strategy.borrow_mut().replay_added(replay.clone());
         Self {
             delay_s: delay.delay_s,
-            sleep_ms: delay.sleep_ms,
+            sleep_s: delay.sleep_s,
             replay,
             strategy,
             token,
@@ -104,7 +100,7 @@ impl<'a, T: MergeStrategy> StreamDelayContext<'a, T> {
     }
 
     async fn update_delayed_data(&self) -> ! {
-        let mut pos_queue = PositionHistory::new(self.delay_s, self.sleep_ms);
+        let mut pos_queue = PositionHistory::new(self.delay_s, self.sleep_s);
         let mut prev_current = 0;
         let mut prev_delayed = 0;
         loop {

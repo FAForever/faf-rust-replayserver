@@ -11,7 +11,7 @@ pub struct ConnectionAcceptor {
 
 impl ConnectionAcceptor {
     pub fn new(config: Settings) -> Self {
-        let timeout = Duration::from_secs(config.server.connection_accept_timeout_s);
+        let timeout = config.server.connection_accept_timeout_s;
         Self { timeout }
     }
 

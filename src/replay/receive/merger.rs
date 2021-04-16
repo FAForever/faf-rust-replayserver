@@ -23,7 +23,7 @@ pub struct ReplayMerger {
 impl ReplayMerger {
     pub fn new(shutdown_token: CancellationToken, config: Settings) -> Self {
         let stream_delay =
-            StreamDelay::new(config.replay.delay_s, config.replay.update_interval_ms);
+            StreamDelay::new(config.replay.delay_s, config.replay.update_interval_s);
         let merge_strategy = RefCell::new(QuorumMergeStrategy::new(
             config.replay.merge_quorum_size,
             config.replay.stream_comparison_distance_b,

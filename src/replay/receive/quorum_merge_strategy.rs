@@ -23,19 +23,18 @@ use super::merge_strategy::MergeStrategy;
 // For a replay r in R, we define:
 // * r matches C iff C's data is a (non-strict) prefix of r's data.
 // * r in R diverges from C iff either:
-//   * r's data is not a prefix of C's data and C's data is not a prefix of r's data,
+//   * Common prefix of r and C is not equal to either r or C,
 //   * r has less data than C and r is finished.
-// * It's possible that neither is true. In that case, r has less data than C, is a prefix of C and
-//   is not finished.
 //
 // Intuitively:
 //  * r matching C means that its data "agrees" with all canonical data.
 //  * r diverging from C means that either r's data doesn't match C's at some point or r ended
 //    early, so we can't use it for further merging.
+// * If neither is true, then r has the same data as C, but has less of it and is not finished.
 //
 // In order to avoid matching a lot of data, we make a following "shortcut" assumption:
-// * Let r have at least as much data as C. As long as, every time we check, r and C's data is
-//   equal at a suffix of stream_cmp_distance bytes of C, r matches C.
+// * As long as, every time we check, r and C's data is equal at a suffix of stream_cmp_distance
+//   bytes of C, r does not diverge from C.
 // In other words, whenever we lazily check if r diverges from C, we can check just the last
 // stream_cmp_distance bytes.
 //
