@@ -58,7 +58,7 @@ impl BufDeque {
         self.discarded_chunks = std::cmp::max(discardable_chunks, self.discarded_chunks);
     }
 
-    fn append(&mut self, mut buf: &[u8]) -> usize {
+    fn append_some(&mut self, mut buf: &[u8]) -> usize {
         let mut written = 0;
         let mut skipped = 0;
 
@@ -104,7 +104,7 @@ impl DiscontiguousBuf for BufDeque {
 
 impl Write for BufDeque {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        Ok(self.append(buf))
+        Ok(self.append_some(buf))
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
