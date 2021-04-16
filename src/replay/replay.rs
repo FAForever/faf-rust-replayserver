@@ -38,7 +38,8 @@ impl Replay {
         let writer_connection_count = EmptyCounter::new();
         let reader_connection_count = EmptyCounter::new();
         let should_stop_accepting_connections = Cell::new(false);
-        let time_with_zero_writers_to_end_replay = config.replay.time_with_zero_writers_to_end_replay_s;
+        let time_with_zero_writers_to_end_replay =
+            config.replay.time_with_zero_writers_to_end_replay_s;
         let forced_timeout = config.replay.forced_timeout_s;
         let replay_timeout_token = shutdown_token.child_token();
 

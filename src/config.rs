@@ -1,4 +1,8 @@
-use std::{env::{self, VarError}, sync::Arc, time::Duration};
+use std::{
+    env::{self, VarError},
+    sync::Arc,
+    time::Duration,
+};
 
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
@@ -7,7 +11,7 @@ use serde::Deserialize;
 
 mod float_to_duration {
     use super::*;
-    use serde::{Deserialize, Deserializer, de::Unexpected};
+    use serde::{de::Unexpected, Deserialize, Deserializer};
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
     where
@@ -15,7 +19,10 @@ mod float_to_duration {
     {
         let duration = f64::deserialize(deserializer)?;
         if duration <= 0f64 {
-            return Err(serde::de::Error::invalid_value(Unexpected::Float(duration), &"Positive number"));
+            return Err(serde::de::Error::invalid_value(
+                Unexpected::Float(duration),
+                &"Positive number",
+            ));
         }
         Ok(Duration::from_secs_f64(duration))
     }
