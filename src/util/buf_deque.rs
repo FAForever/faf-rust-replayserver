@@ -28,12 +28,11 @@ impl BufDeque {
     }
 
     fn relative_end(&self) -> usize {
-        debug_assert!(self.end >= self.discard_start());
+        assert!(self.discard_start() <= self.end);
         self.end - self.discard_start()
     }
 
     fn get_last_chunk(&mut self) -> &mut [u8; CHUNK_SIZE] {
-        debug_assert!(self.discard_start() <= self.end);
         if self.no_space_in_last_chunk() {
             let new_chunk = Box::new([0; CHUNK_SIZE]);
             self.chunks.push_back(new_chunk);
@@ -42,9 +41,8 @@ impl BufDeque {
     }
 
     fn no_space_in_last_chunk(&self) -> bool {
-        // FIXME breaks if last chuck is a freshly appended empty chunk.
-        // Thankfully we always write something after grabbing an empty chunk.
-        self.end % CHUNK_SIZE == 0 || self.chunks.is_empty()
+        assert!(self.discard_start() <= self.end);
+        self.relative_end() == self.chunks.len() * CHUNK_SIZE
     }
 
     /* Discard data at most up to 'until'.
