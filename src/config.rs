@@ -1,19 +1,33 @@
-use std::{
-    env::{self, VarError},
-    sync::Arc,
-};
+use std::{env::{self, VarError}, sync::Arc, time::Duration};
 
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
 
 // TODO - implement some validation.
 
+mod float_to_duration {
+    use super::*;
+    use serde::{Deserialize, Deserializer, de::Unexpected};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let duration = f64::deserialize(deserializer)?;
+        if duration <= 0f64 {
+            return Err(serde::de::Error::invalid_value(Unexpected::Float(duration), &"Positive number"));
+        }
+        Ok(Duration::from_secs_f64(duration))
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct ServerSettings {
     pub port: u16,
     pub prometheus_port: u16,
     pub worker_threads: u32,
-    pub connection_accept_timeout_s: u64,
+    #[serde(with = "float_to_duration")]
+    pub connection_accept_timeout_s: Duration,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
@@ -33,10 +47,14 @@ pub struct StorageSettings {
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct ReplaySettings {
-    pub forced_timeout_s: u64,
-    pub time_with_zero_writers_to_end_replay_s: u64,
-    pub delay_s: u64,
-    pub update_interval_ms: u64,
+    #[serde(with = "float_to_duration")]
+    pub forced_timeout_s: Duration,
+    #[serde(with = "float_to_duration")]
+    pub time_with_zero_writers_to_end_replay_s: Duration,
+    #[serde(with = "float_to_duration")]
+    pub delay_s: Duration,
+    #[serde(with = "float_to_duration")]
+    pub update_interval_s: Duration,
     pub merge_quorum_size: usize,
     pub stream_comparison_distance_b: usize,
 }
@@ -87,7 +105,7 @@ pub mod test {
                 port: 15000,
                 prometheus_port: 8001,
                 worker_threads: 8,
-                connection_accept_timeout_s: 7200,
+                connection_accept_timeout_s: Duration::from_secs(7200),
             },
             database: DatabaseSettings {
                 pool_size: 8,
@@ -101,10 +119,10 @@ pub mod test {
                 vault_path: "/tmp/foo".into(),
             },
             replay: ReplaySettings {
-                forced_timeout_s: 3600 * 6,
-                time_with_zero_writers_to_end_replay_s: 10,
-                delay_s: 60 * 5,
-                update_interval_ms: 1000,
+                forced_timeout_s: Duration::from_secs(3600 * 6),
+                time_with_zero_writers_to_end_replay_s: Duration::from_secs(10),
+                delay_s: Duration::from_secs(60 * 5),
+                update_interval_s: Duration::from_secs(1),
                 merge_quorum_size: 2,
                 stream_comparison_distance_b: 4096,
             },

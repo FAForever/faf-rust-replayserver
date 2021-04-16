@@ -114,7 +114,7 @@ mod test {
         let token = CancellationToken::new();
         let replay_dir = test_directory();
 
-        conf.server.connection_accept_timeout_s = 20;
+        conf.server.connection_accept_timeout_s = Duration::from_secs(20);
 
         let server = run_server_with_deps(
             Arc::new(conf),
@@ -156,7 +156,7 @@ mod test {
         let token = CancellationToken::new();
         let (tmpdir, replay_dir) = temp_replay_dir(); // Use a real temp directory to verify path
 
-        conf.replay.time_with_zero_writers_to_end_replay_s = 1;
+        conf.replay.time_with_zero_writers_to_end_replay_s = Duration::from_secs(1);
 
         let conn_source = stream! {
             yield c_write;
@@ -215,7 +215,7 @@ mod test {
 
         let server_ended = Arc::new(AtomicBool::new(false));
 
-        conf.replay.time_with_zero_writers_to_end_replay_s = 1;
+        conf.replay.time_with_zero_writers_to_end_replay_s = Duration::from_secs(1);
 
         let conn_source = stream! {
             yield c_write;
@@ -295,9 +295,9 @@ mod test {
         let replay_dir = test_directory();
         let example_replay_file = Rc::new(get_file("example"));
 
-        conf.replay.time_with_zero_writers_to_end_replay_s = 1;
-        conf.replay.delay_s = 1;
-        conf.replay.update_interval_ms = 100;
+        conf.replay.time_with_zero_writers_to_end_replay_s = Duration::from_secs(1);
+        conf.replay.delay_s = Duration::from_secs(1);
+        conf.replay.update_interval_s = Duration::from_millis(100);
 
         // faux panic when accessed from multiple threads despite being sync.
         // We don't need multiple threads for this test anyway.
