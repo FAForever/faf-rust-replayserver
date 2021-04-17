@@ -183,9 +183,9 @@ mod test {
             replay_ended.set(true);
         };
         let check_result = async {
-            tokio::time::sleep(Duration::from_secs(3599)).await;
+            sleep_s(3599).await;
             assert!(!replay_ended.get());
-            tokio::time::sleep(Duration::from_secs(2)).await;
+            sleep_s(2).await;
             assert!(replay_ended.get());
         };
 

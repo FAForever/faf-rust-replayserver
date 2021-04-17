@@ -86,7 +86,7 @@ mod test {
         config::test::default_config,
         database::database::test::mock_database,
         server::connection::test::test_connection,
-        util::test::{get_file, setup_logging},
+        util::test::{get_file, setup_logging, sleep_s},
     };
     use async_stream::stream;
     use futures::future::join_all;
@@ -140,9 +140,9 @@ mod test {
         let mut ended_too_early = true;
 
         let wait = async {
-            tokio::time::sleep(Duration::from_secs(19)).await;
+            sleep_s(19).await;
             ended_too_early = false;
-            tokio::time::sleep(Duration::from_secs(2)).await;
+            sleep_s(2).await;
         };
 
         select! {
