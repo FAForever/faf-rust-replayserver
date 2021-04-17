@@ -1,14 +1,14 @@
 use std::{cell::RefCell, rc::Rc};
 
-use tokio::select;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     config::Settings,
+    error::ConnResult,
     replay::streams::MReplayRef,
     replay::streams::{read_data, read_header, WriterReplay},
     server::connection::Connection,
-    util::timeout::cancellable,
+    util::timeout::{cancellable, until},
 };
 
 use super::{
@@ -47,10 +47,13 @@ impl ReplayMerger {
         let read_from_connection = async {
             read_header(replay.clone(), c).await?;
             self.merge_strategy.borrow_mut().replay_header_added(token);
-            select! {
-                res = read_data(replay.clone(), c) => res,
-                _ = self.stream_delay.track(&replay, &self.merge_strategy, token) => Ok(()),
-            }
+            until(
+                self.stream_delay
+                    .track(&replay, &self.merge_strategy, token),
+                read_data(replay.clone(), c),
+            )
+            .await;
+            ConnResult::Ok(())
         };
         cancellable(read_from_connection, &self.shutdown_token).await;
 
