@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::VecDeque};
 
-use crate::util::buf_traits::DiscontiguousBuf;
 use crate::replay::streams::WReplayRef;
+use crate::util::buf_traits::DiscontiguousBuf;
 
 use tokio::time::Duration;
 
@@ -61,7 +61,7 @@ impl StreamDelay {
         &self,
         replay: &WReplayRef,
         strategy: &RefCell<impl MergeStrategy>,
-        token: u64
+        token: u64,
     ) {
         let mut pos_queue = PositionHistory::new(self.delay_s, self.sleep_s);
         let mut prev_current = 0;
@@ -83,7 +83,7 @@ impl StreamDelay {
         &self,
         replay: &WReplayRef,
         strategy: &RefCell<impl MergeStrategy>,
-        token: u64
+        token: u64,
     ) {
         let final_len = replay.borrow_mut().get_data().len();
         let last_delayed_len = replay.borrow_mut().get_delayed_data_len();

@@ -1,4 +1,5 @@
 use super::connection::Connection;
+use crate::accept::header::read_initial_header;
 use crate::util::timeout::cancellable;
 use crate::worker_threads::ReplayThreadPool;
 use crate::{
@@ -7,7 +8,6 @@ use crate::{
 };
 use crate::{database::database::Database, replay::save::ReplaySaver};
 use crate::{metrics, replay::save::SavedReplayDirectory};
-use crate::accept::header::read_initial_header;
 use futures::{stream::StreamExt, Stream};
 use log::{debug, info};
 use tokio_util::sync::CancellationToken;
@@ -52,7 +52,7 @@ pub async fn run_server_with_deps(
                 info!("Could not accept connection: {}", e);
                 metrics::inc_served_conns::<()>(&Err(e));
             }
-            Ok(_) => thread_pool.assign_connection(c).await
+            Ok(_) => thread_pool.assign_connection(c).await,
         }
     });
 

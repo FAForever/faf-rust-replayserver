@@ -3,9 +3,7 @@ use std::{cell::RefCell, io::Write, rc::Rc};
 use tokio::io::AsyncReadExt;
 
 use crate::{
-    error::ConnResult,
-    server::connection::Connection,
-    util::buf_deque::BufDeque,
+    error::ConnResult, server::connection::Connection, util::buf_deque::BufDeque,
     util::buf_traits::DiscontiguousBuf,
 };
 
@@ -72,15 +70,13 @@ impl WriterReplay {
 
 pub type WReplayRef = Rc<RefCell<WriterReplay>>;
 
-pub async fn read_header(me: WReplayRef, c: &mut Connection) -> ConnResult<()>
-{
+pub async fn read_header(me: WReplayRef, c: &mut Connection) -> ConnResult<()> {
     let header = ReplayHeader::from_connection(c).await?;
     me.borrow_mut().add_header(header);
     Ok(())
 }
 
-pub async fn read_data(me: WReplayRef, c: &mut Connection) -> ConnResult<()>
-{
+pub async fn read_data(me: WReplayRef, c: &mut Connection) -> ConnResult<()> {
     let mut buf: Box<[u8]> = Box::new([0; 4096]);
     loop {
         let read = c.read(&mut *buf).await?;

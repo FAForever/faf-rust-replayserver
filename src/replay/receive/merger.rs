@@ -3,7 +3,13 @@ use std::{cell::RefCell, rc::Rc};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 
-use crate::{config::Settings, replay::streams::MReplayRef, replay::streams::{WriterReplay, read_data, read_header}, server::connection::Connection, util::timeout::cancellable};
+use crate::{
+    config::Settings,
+    replay::streams::MReplayRef,
+    replay::streams::{read_data, read_header, WriterReplay},
+    server::connection::Connection,
+    util::timeout::cancellable,
+};
 
 use super::{
     merge_strategy::MergeStrategy, quorum_merge_strategy::QuorumMergeStrategy,
@@ -33,7 +39,10 @@ impl ReplayMerger {
 
     pub async fn handle_connection(&self, c: &mut Connection) {
         let replay = Rc::new(RefCell::new(WriterReplay::new()));
-        let token = self.merge_strategy.borrow_mut().replay_added(replay.clone());
+        let token = self
+            .merge_strategy
+            .borrow_mut()
+            .replay_added(replay.clone());
 
         let read_from_connection = async {
             read_header(replay.clone(), c).await?;
@@ -45,7 +54,8 @@ impl ReplayMerger {
         };
         cancellable(read_from_connection, &self.shutdown_token).await;
 
-        self.stream_delay.set_to_end(&replay, &self.merge_strategy, token);
+        self.stream_delay
+            .set_to_end(&replay, &self.merge_strategy, token);
         replay.borrow_mut().finish();
         self.merge_strategy.borrow_mut().replay_removed(token);
     }
