@@ -1,12 +1,12 @@
 use super::connection::Connection;
 use crate::accept::header::read_initial_header;
+use crate::database::database::Database;
 use crate::util::timeout::cancellable;
-use crate::worker_threads::ReplayThreadPool;
+use crate::worker_threads::WorkerThreadPool;
 use crate::{
     accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver,
-    worker_threads::ReplayThreadContext,
+    worker_threads::WorkerThreadWork,
 };
-use crate::{database::database::Database, replay::save::ReplaySaver};
 use crate::{metrics, replay::save::SavedReplayDirectory};
 use futures::{stream::StreamExt, Stream};
 use log::{debug, info};
@@ -39,8 +39,9 @@ impl<C: Stream<Item = Connection>> Server<C> {
 
     async fn run(self) {
         let saver = InnerReplaySaver::new(self.db, self.dir);
-        let thread_pool =
-            server_thread_pool(self.config.clone(), self.shutdown_token.clone(), saver);
+        let replay_work =
+            WorkerThreadWork::new(self.config.clone(), self.shutdown_token.clone(), saver);
+        let thread_pool = WorkerThreadPool::new(replay_work, self.config.server.worker_threads);
 
         let initial_timeout = self.config.server.connection_accept_timeout_s;
         let accept_connections = self.connections.for_each_concurrent(None, |mut c| async {
@@ -69,23 +70,7 @@ async fn server_with_real_deps(
     let connections = tcp_listen(format!("0.0.0.0:{}", config.server.port)).await;
     let db = Database::new(&config.database);
     let dir = SavedReplayDirectory::new(config.storage.vault_path.as_ref());
-    Server {
-        config,
-        shutdown_token,
-        connections,
-        db,
-        dir,
-    }
-}
-
-fn server_thread_pool(
-    config: Settings,
-    shutdown_token: CancellationToken,
-    saver: ReplaySaver,
-) -> ReplayThreadPool {
-    let thread_count = config.server.worker_threads;
-    let context = ReplayThreadContext::new(config, shutdown_token, saver);
-    ReplayThreadPool::from_context(context, thread_count)
+    Server::new(config, shutdown_token, connections, db, dir)
 }
 
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {

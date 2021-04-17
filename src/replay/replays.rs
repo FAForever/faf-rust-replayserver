@@ -17,21 +17,17 @@ enum Assignment {
 
 pub struct Replays {
     replays: WeakValueHashMap<u64, Weak<Replay>>,
-    replay_builder: Box<dyn Fn(u64) -> Replay>,
+    new_replay: Box<dyn Fn(u64) -> Replay>,
 }
 
 impl Replays {
-    pub fn new(replay_builder: Box<dyn Fn(u64) -> Replay>) -> Self {
-        Self {
-            replays: WeakValueHashMap::new(),
-            replay_builder,
-        }
-    }
-
-    pub fn build(shutdown_token: CancellationToken, config: Settings, saver: ReplaySaver) -> Self {
+    pub fn new(shutdown_token: CancellationToken, config: Settings, saver: ReplaySaver) -> Self {
         let replay_builder =
             move |rid| Replay::new(rid, shutdown_token.clone(), config.clone(), saver.clone());
-        Self::new(Box::new(replay_builder))
+        Self {
+            replays: WeakValueHashMap::new(),
+            new_replay: Box::new(replay_builder),
+        }
     }
 
     fn assign_connection_to_replay(&mut self, c: Connection) -> impl Stream<Item = Assignment> {
@@ -45,7 +41,7 @@ impl Replays {
                     log::debug!("Replay id {} not found for {}", conn_header.id, c);
                     Err(ConnectionError::CannotAssignToReplay)
                 } else {
-                    let r = Rc::new((self.replay_builder)(conn_header.id));
+                    let r = Rc::new((self.new_replay)(conn_header.id));
                     self.replays.insert(conn_header.id, r.clone());
                     replay_is_newly_created = true;
                     Ok(r)
