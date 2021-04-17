@@ -12,17 +12,70 @@ use futures::{stream::StreamExt, Stream};
 use log::{debug, info};
 use tokio_util::sync::CancellationToken;
 
-async fn real_server_deps(
+struct Server<C: Stream<Item = Connection>> {
     config: Settings,
-) -> (
-    impl Stream<Item = Connection>,
-    Database,
-    SavedReplayDirectory,
-) {
+    shutdown_token: CancellationToken,
+    connections: C,
+    db: Database,
+    dir: SavedReplayDirectory,
+}
+
+impl<C: Stream<Item = Connection>> Server<C> {
+    fn new(
+        config: Settings,
+        shutdown_token: CancellationToken,
+        connections: C,
+        db: Database,
+        dir: SavedReplayDirectory,
+    ) -> Self {
+        Self {
+            config,
+            shutdown_token,
+            connections,
+            db,
+            dir,
+        }
+    }
+
+    async fn run(self) {
+        let saver = InnerReplaySaver::new(self.db, self.dir);
+        let thread_pool =
+            server_thread_pool(self.config.clone(), self.shutdown_token.clone(), saver);
+
+        let initial_timeout = self.config.server.connection_accept_timeout_s;
+        let accept_connections = self.connections.for_each_concurrent(None, |mut c| async {
+            match read_initial_header(&mut c, initial_timeout).await {
+                Err(e) => {
+                    info!("Could not accept connection: {}", e);
+                    metrics::inc_served_conns::<()>(&Err(e));
+                }
+                Ok(_) => thread_pool.assign_connection(c).await,
+            }
+        });
+
+        match cancellable(accept_connections, &self.shutdown_token).await {
+            Some(_) => debug!("Server stopped accepting connections for some reason!"),
+            None => debug!("Server shutting down"),
+        }
+
+        thread_pool.join();
+    }
+}
+
+async fn server_with_real_deps(
+    config: Settings,
+    shutdown_token: CancellationToken,
+) -> Server<impl Stream<Item = Connection>> {
     let connections = tcp_listen(format!("0.0.0.0:{}", config.server.port)).await;
-    let database = Database::new(&config.database);
-    let save_dir = SavedReplayDirectory::new(config.storage.vault_path.as_ref());
-    (connections, database, save_dir)
+    let db = Database::new(&config.database);
+    let dir = SavedReplayDirectory::new(config.storage.vault_path.as_ref());
+    Server {
+        config,
+        shutdown_token,
+        connections,
+        db,
+        dir,
+    }
 }
 
 fn server_thread_pool(
@@ -35,38 +88,11 @@ fn server_thread_pool(
     ReplayThreadPool::from_context(context, thread_count)
 }
 
-pub async fn run_server_with_deps(
-    config: Settings,
-    shutdown_token: CancellationToken,
-    connections: impl Stream<Item = Connection>,
-    database: Database,
-    replay_directory: SavedReplayDirectory,
-) {
-    let saver = InnerReplaySaver::new(database, replay_directory);
-    let thread_pool = server_thread_pool(config.clone(), shutdown_token.clone(), saver);
-
-    let accept_connections = connections.for_each_concurrent(None, |mut c| async {
-        let initial_timeout = config.server.connection_accept_timeout_s;
-        match read_initial_header(&mut c, initial_timeout).await {
-            Err(e) => {
-                info!("Could not accept connection: {}", e);
-                metrics::inc_served_conns::<()>(&Err(e));
-            }
-            Ok(_) => thread_pool.assign_connection(c).await,
-        }
-    });
-
-    match cancellable(accept_connections, &shutdown_token).await {
-        Some(_) => debug!("Server stopped accepting connections for some reason!"),
-        None => debug!("Server shutting down"),
-    }
-
-    thread_pool.join();
-}
-
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
-    let (producer, database, save_dir) = real_server_deps(config.clone()).await;
-    run_server_with_deps(config, shutdown_token, producer, database, save_dir).await
+    server_with_real_deps(config, shutdown_token)
+        .await
+        .run()
+        .await;
 }
 
 #[cfg(test)]
@@ -118,13 +144,14 @@ mod test {
 
         conf.server.connection_accept_timeout_s = Duration::from_secs(20);
 
-        let server = run_server_with_deps(
+        let server = Server::new(
             Arc::new(conf),
             token.clone(),
             stream! { yield c; },
             db,
             replay_dir,
-        );
+        )
+        .run();
         let mut ended_too_early = true;
 
         let wait = async {
@@ -165,8 +192,7 @@ mod test {
             tokio::time::sleep(Duration::from_millis(100)).await;
             yield c_read;
         };
-        let server =
-            run_server_with_deps(Arc::new(conf), token.clone(), conn_source, db, replay_dir);
+        let server = Server::new(Arc::new(conf), token.clone(), conn_source, db, replay_dir).run();
 
         let example_replay_file = get_file("example");
         let replay_writing = async {
@@ -228,7 +254,9 @@ mod test {
         let token_c = token.clone();
         let server_ended_c = server_ended.clone();
         let server = async move {
-            run_server_with_deps(Arc::new(conf), token_c, conn_source, db, replay_dir).await;
+            Server::new(Arc::new(conf), token_c, conn_source, db, replay_dir)
+                .run()
+                .await;
             server_ended_c.store(true, Ordering::Relaxed);
         };
 
@@ -314,8 +342,7 @@ mod test {
                 yield c;
             }
         };
-        let server =
-            run_server_with_deps(Arc::new(conf), token.clone(), conn_source, db, replay_dir);
+        let server = Server::new(Arc::new(conf), token.clone(), conn_source, db, replay_dir).run();
 
         let replay_writing = |mut w: tokio::io::DuplexStream, i: usize| async move {
             w.write_all(format!("P/{}/foo\0", i).into_bytes().as_ref())
