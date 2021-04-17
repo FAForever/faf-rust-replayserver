@@ -3,8 +3,7 @@ use std::{cell::RefCell, io::Write, rc::Rc};
 use tokio::io::AsyncReadExt;
 
 use crate::{
-    error::ConnResult, server::connection::Connection, util::buf_deque::BufDeque,
-    util::buf_traits::DiscontiguousBuf,
+    error::ConnResult, server::connection::Connection, util::buf_deque::BufDeque, util::buf_traits::DiscontiguousBuf,
 };
 
 use super::ReplayHeader;

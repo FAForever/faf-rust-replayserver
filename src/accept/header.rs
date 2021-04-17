@@ -54,8 +54,8 @@ pub mod header_reader {
         let (id_bytes, name_bytes) = (pieces[0], pieces[1]);
         let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1]; // remove trailing '\0'
 
-        let id = some_error!(from_utf8(id_bytes)?.parse::<u64>()?)
-            .map_err(|_| bad_data("Failed to parse replay ID"))?;
+        let id =
+            some_error!(from_utf8(id_bytes)?.parse::<u64>()?).map_err(|_| bad_data("Failed to parse replay ID"))?;
         let name = some_error!(String::from(from_utf8(name_bytes)?))
             .map_err(|_| bad_data("Failed to decode connection string id"))?;
         Ok((id, name))
@@ -63,9 +63,7 @@ pub mod header_reader {
 
     async fn read_connection_header(conn: &mut Connection) -> ConnResult<ConnectionHeader> {
         let type_ = read_type(conn).await.map_err(|e| match e {
-            ConnectionError::IO { source: e, .. } if e.kind() == ErrorKind::UnexpectedEof => {
-                ConnectionError::NoData
-            }
+            ConnectionError::IO { source: e, .. } if e.kind() == ErrorKind::UnexpectedEof => ConnectionError::NoData,
             e => e,
         })?;
         let (id, name) = read_game_data(conn).await?;

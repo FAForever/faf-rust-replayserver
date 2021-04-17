@@ -59,10 +59,7 @@ impl Queries {
             game_type: stats.game_type,
             host: stats.host,
             launched_at: stats.start_time.unix_timestamp(),
-            game_end: stats
-                .end_time
-                .unwrap_or_else(OffsetDateTime::now_utc)
-                .unix_timestamp(),
+            game_end: stats.end_time.unwrap_or_else(OffsetDateTime::now_utc).unix_timestamp(),
             title: stats.game_name,
             mapname,
             num_players: player_count,
@@ -84,9 +81,7 @@ impl Queries {
         replay_ticks: Option<u32>,
         replay_available: bool,
     ) -> Result<(), SaveError> {
-        self.db
-            .update_game_stats(id, replay_ticks, replay_available)
-            .await
+        self.db.update_game_stats(id, replay_ticks, replay_available).await
     }
 }
 

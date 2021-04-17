@@ -11,10 +11,7 @@ use crate::{
     util::timeout::{cancellable, until},
 };
 
-use super::{
-    merge_strategy::MergeStrategy, quorum_merge_strategy::QuorumMergeStrategy,
-    replay_delay::StreamDelay,
-};
+use super::{merge_strategy::MergeStrategy, quorum_merge_strategy::QuorumMergeStrategy, replay_delay::StreamDelay};
 
 pub struct ReplayMerger {
     shutdown_token: CancellationToken,
@@ -39,17 +36,13 @@ impl ReplayMerger {
 
     pub async fn handle_connection(&self, c: &mut Connection) {
         let replay = Rc::new(RefCell::new(WriterReplay::new()));
-        let token = self
-            .merge_strategy
-            .borrow_mut()
-            .replay_added(replay.clone());
+        let token = self.merge_strategy.borrow_mut().replay_added(replay.clone());
 
         let read_from_connection = async {
             read_header(replay.clone(), c).await?;
             self.merge_strategy.borrow_mut().replay_header_added(token);
             until(
-                self.stream_delay
-                    .track(&replay, &self.merge_strategy, token),
+                self.stream_delay.track(&replay, &self.merge_strategy, token),
                 read_data(replay.clone(), c),
             )
             .await;
@@ -57,8 +50,7 @@ impl ReplayMerger {
         };
         cancellable(read_from_connection, &self.shutdown_token).await;
 
-        self.stream_delay
-            .set_to_end(&replay, &self.merge_strategy, token);
+        self.stream_delay.set_to_end(&replay, &self.merge_strategy, token);
         replay.borrow_mut().finish();
         self.merge_strategy.borrow_mut().replay_removed(token);
     }

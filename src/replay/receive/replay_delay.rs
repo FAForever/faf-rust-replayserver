@@ -57,12 +57,7 @@ impl StreamDelay {
         Self { delay_s, sleep_s }
     }
 
-    pub async fn track(
-        &self,
-        replay: &WReplayRef,
-        strategy: &RefCell<impl MergeStrategy>,
-        token: u64,
-    ) {
+    pub async fn track(&self, replay: &WReplayRef, strategy: &RefCell<impl MergeStrategy>, token: u64) {
         let mut pos_queue = PositionHistory::new(self.delay_s, self.sleep_s);
         let mut prev_current = 0;
         let mut prev_delayed = 0;
@@ -79,12 +74,7 @@ impl StreamDelay {
         }
     }
 
-    pub fn set_to_end(
-        &self,
-        replay: &WReplayRef,
-        strategy: &RefCell<impl MergeStrategy>,
-        token: u64,
-    ) {
+    pub fn set_to_end(&self, replay: &WReplayRef, strategy: &RefCell<impl MergeStrategy>, token: u64) {
         let final_len = replay.borrow_mut().get_data().len();
         let last_delayed_len = replay.borrow_mut().get_delayed_data_len();
         if final_len > last_delayed_len {

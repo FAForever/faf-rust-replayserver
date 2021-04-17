@@ -4,8 +4,7 @@ use crate::database::database::Database;
 use crate::util::timeout::cancellable;
 use crate::worker_threads::WorkerThreadPool;
 use crate::{
-    accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver,
-    worker_threads::WorkerThreadWork,
+    accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver, worker_threads::WorkerThreadWork,
 };
 use crate::{metrics, replay::save::SavedReplayDirectory};
 use futures::{stream::StreamExt, Stream};
@@ -39,8 +38,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
 
     async fn run(self) {
         let saver = InnerReplaySaver::new(self.db, self.dir);
-        let replay_work =
-            WorkerThreadWork::new(self.config.clone(), self.shutdown_token.clone(), saver);
+        let replay_work = WorkerThreadWork::new(self.config.clone(), self.shutdown_token.clone(), saver);
         let thread_pool = WorkerThreadPool::new(replay_work, self.config.server.worker_threads);
 
         let initial_timeout = self.config.server.connection_accept_timeout_s;
@@ -74,10 +72,7 @@ async fn server_with_real_deps(
 }
 
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
-    server_with_real_deps(config, shutdown_token)
-        .await
-        .run()
-        .await;
+    server_with_real_deps(config, shutdown_token).await.run().await;
 }
 
 #[cfg(test)]
@@ -129,14 +124,7 @@ mod test {
 
         conf.server.connection_accept_timeout_s = Duration::from_secs(20);
 
-        let server = Server::new(
-            Arc::new(conf),
-            token.clone(),
-            stream! { yield c; },
-            db,
-            replay_dir,
-        )
-        .run();
+        let server = Server::new(Arc::new(conf), token.clone(), stream! { yield c; }, db, replay_dir).run();
         let mut ended_too_early = true;
 
         let wait = async {
@@ -340,20 +328,19 @@ mod test {
             }
             drop(w);
         };
-        let replay_reading =
-            |mut r: tokio::io::DuplexStream, mut w: tokio::io::DuplexStream, i: usize| async move {
-                let mut buf: Box<[u8]> = Box::new([0; 256]);
-                w.write_all(format!("G/{}/foo\0", i).into_bytes().as_ref())
-                    .await
-                    .unwrap();
-                tokio::time::sleep(Duration::from_millis(30)).await;
-                loop {
-                    let res = r.read(&mut *buf).await.unwrap();
-                    if res == 0 {
-                        break;
-                    }
+        let replay_reading = |mut r: tokio::io::DuplexStream, mut w: tokio::io::DuplexStream, i: usize| async move {
+            let mut buf: Box<[u8]> = Box::new([0; 256]);
+            w.write_all(format!("G/{}/foo\0", i).into_bytes().as_ref())
+                .await
+                .unwrap();
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            loop {
+                let res = r.read(&mut *buf).await.unwrap();
+                if res == 0 {
+                    break;
                 }
-            };
+            }
+        };
 
         let write_functions = w_writers.into_iter().enumerate().map(|e| {
             let (i, w) = e;

@@ -23,16 +23,10 @@ impl std::fmt::Debug for ReplayHeader {
 impl ReplayHeader {
     pub async fn from_connection<T: AsyncBufRead + Unpin>(c: &mut T) -> ConnResult<Self> {
         let limited = c.take(MAX_SIZE);
-        Self::do_from_connection(limited)
-            .await
-            .map_err(|x| x.into())
+        Self::do_from_connection(limited).await.map_err(|x| x.into())
     }
 
-    async fn skip<T: AsyncBufRead + Unpin>(
-        r: &mut T,
-        count: u64,
-        buf: &mut Vec<u8>,
-    ) -> std::io::Result<()> {
+    async fn skip<T: AsyncBufRead + Unpin>(r: &mut T, count: u64, buf: &mut Vec<u8>) -> std::io::Result<()> {
         let read = r.take(count).read_to_end(buf).await?;
         if read < count as usize {
             Err(std::io::Error::new(

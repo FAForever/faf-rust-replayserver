@@ -29,17 +29,11 @@ pub struct Replay {
 }
 
 impl Replay {
-    pub fn new(
-        id: u64,
-        shutdown_token: CancellationToken,
-        config: Settings,
-        saver: ReplaySaver,
-    ) -> Self {
+    pub fn new(id: u64, shutdown_token: CancellationToken, config: Settings, saver: ReplaySaver) -> Self {
         let writer_connection_count = EmptyCounter::new();
         let reader_connection_count = EmptyCounter::new();
         let should_stop_accepting_connections = Cell::new(false);
-        let time_with_zero_writers_to_end_replay =
-            config.replay.time_with_zero_writers_to_end_replay_s;
+        let time_with_zero_writers_to_end_replay = config.replay.time_with_zero_writers_to_end_replay_s;
         let forced_timeout = config.replay.forced_timeout_s;
         let replay_timeout_token = shutdown_token.child_token();
 
@@ -89,9 +83,7 @@ impl Replay {
         self.writer_connection_count.wait_until_empty().await;
         self.merger.finalize();
         log::debug!("Replay {} finished merging data", self.id);
-        self.saver
-            .save_replay(self.merger.get_merged_replay(), self.id)
-            .await;
+        self.saver.save_replay(self.merger.get_merged_replay(), self.id).await;
         self.reader_connection_count.wait_until_empty().await;
         log::info!("Replay {} ended", self.id);
         // Cancel to return from timeout
@@ -110,11 +102,7 @@ impl Replay {
     pub async fn handle_connection(&self, mut c: Connection) -> ConnResult<()> {
         log::debug!("Replay {} started handling {}", self.id, c);
         if self.should_stop_accepting_connections.get() {
-            log::info!(
-                "Replay {} dropped {} because its write phase is over",
-                self.id,
-                c
-            );
+            log::info!("Replay {} dropped {} because its write phase is over", self.id, c);
             return Err(ConnectionError::CannotAssignToReplay);
         }
         match c.get_header().type_ {

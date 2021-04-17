@@ -8,8 +8,7 @@ pub async fn write_replay(
     json_header: impl serde::Serialize,
     replay: MReplayRef,
 ) -> std::io::Result<()> {
-    to.write_all(serde_json::to_string(&json_header)?.as_bytes())
-        .await?;
+    to.write_all(serde_json::to_string(&json_header)?.as_bytes()).await?;
     to.write_all("\n".as_bytes()).await?;
     let mut encoder = ZstdEncoder::with_quality(to, async_compression::Level::Precise(10));
     let mut replay_writer = MergedReplayReader::new(replay);
@@ -23,9 +22,7 @@ pub mod test {
     use async_compression::tokio::bufread::ZstdDecoder;
     use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 
-    pub async fn unpack_replay(
-        from: impl AsyncRead + Unpin,
-    ) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
+    pub async fn unpack_replay(from: impl AsyncRead + Unpin) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
         let mut read = BufReader::new(from);
         let mut json = Vec::new();
         let mut unc_replay = Vec::new();

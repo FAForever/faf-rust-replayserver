@@ -5,10 +5,7 @@ use crate::{
     accept::header::{ConnectionHeader, ConnectionType},
     metrics,
 };
-use tokio::{
-    io::AsyncBufRead, io::AsyncBufReadExt, io::AsyncRead, io::AsyncWrite, io::BufReader,
-    net::TcpStream,
-};
+use tokio::{io::AsyncBufRead, io::AsyncBufReadExt, io::AsyncRead, io::AsyncWrite, io::BufReader, net::TcpStream};
 
 pub type ReaderType = Box<dyn AsyncBufRead + Send>;
 pub type WriterType = Box<dyn AsyncWrite + Send>;
@@ -62,14 +59,10 @@ impl Connection {
     }
 
     fn set_metric(&self) {
-        metrics::ACTIVE_CONNS
-            .with_label_values(&[self.header2label()])
-            .inc();
+        metrics::ACTIVE_CONNS.with_label_values(&[self.header2label()]).inc();
     }
     fn reset_metric(&self) {
-        metrics::ACTIVE_CONNS
-            .with_label_values(&[self.header2label()])
-            .dec();
+        metrics::ACTIVE_CONNS.with_label_values(&[self.header2label()]).dec();
     }
 
     pub fn set_header(&mut self, header: ConnectionHeader) {

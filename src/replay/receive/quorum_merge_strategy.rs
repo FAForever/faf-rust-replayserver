@@ -41,8 +41,8 @@ use super::merge_strategy::MergeStrategy;
 // We keep the state of a replay r in R in the struct below:
 
 struct ReplayState {
-    replay: WReplayRef, // Writer replay, updated from connection in another task.
-    canon_replay: MReplayRef, // Canonical replay C.
+    replay: WReplayRef,         // Writer replay, updated from connection in another task.
+    canon_replay: MReplayRef,   // Canonical replay C.
     stream_cmp_distance: usize, // As defined above.
 
     // Fields used to lazily check relation of r towards C.
@@ -222,9 +222,7 @@ impl SharedState {
         if hint <= self.merged_delayed_data_len() {
             return;
         }
-        self.canonical_stream
-            .borrow_mut()
-            .advance_delayed_data(hint);
+        self.canonical_stream.borrow_mut().advance_delayed_data(hint);
     }
 }
 
@@ -421,11 +419,7 @@ pub struct MergeQuorumState {
 //   * Replays from Q are added to Res.
 //   * Stalemate is constructed with Res.
 impl MergeQuorumState {
-    fn from_stalemate(
-        shared: SharedState,
-        mut good_replays: Vec<u64>,
-        mut reserve: HashSet<u64>,
-    ) -> Self {
+    fn from_stalemate(shared: SharedState, mut good_replays: Vec<u64>, mut reserve: HashSet<u64>) -> Self {
         debug_assert!(!good_replays.is_empty());
 
         // Take longest replays
@@ -524,8 +518,7 @@ impl MergeQuorumState {
     }
 
     fn update_delayed_position(&mut self) {
-        self.s
-            .update_merged_delayed_data_len(self.quorum_delayed_position());
+        self.s.update_merged_delayed_data_len(self.quorum_delayed_position());
     }
 }
 
@@ -549,10 +542,7 @@ macro_rules! both {
 
 impl QuorumMergeStrategy {
     pub fn new(target_quorum_size: usize, stream_cmp_distance: usize) -> Self {
-        Self::Stalemate(MergeStalemateState::new(
-            target_quorum_size,
-            stream_cmp_distance,
-        ))
+        Self::Stalemate(MergeStalemateState::new(target_quorum_size, stream_cmp_distance))
     }
 
     fn should_change_state(&self) -> bool {
@@ -712,8 +702,8 @@ mod tests {
     use super::QuorumMergeStrategy;
     use crate::util::buf_traits::ReadAtExt;
     use crate::{
-        replay::receive::merge_strategy::MergeStrategy, replay::streams::ReplayHeader,
-        replay::streams::WriterReplay, util::buf_traits::DiscontiguousBuf,
+        replay::receive::merge_strategy::MergeStrategy, replay::streams::ReplayHeader, replay::streams::WriterReplay,
+        util::buf_traits::DiscontiguousBuf,
     };
     use std::{cell::RefCell, io::Read, rc::Rc};
 
@@ -741,9 +731,7 @@ mod tests {
         let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
-        stream2.borrow_mut().add_header(ReplayHeader {
-            data: vec![1, 3, 3, 7],
-        });
+        stream2.borrow_mut().add_header(ReplayHeader { data: vec![1, 3, 3, 7] });
 
         let token1 = strat.replay_added(stream1.clone());
         let token2 = strat.replay_added(stream2.clone());
@@ -764,9 +752,7 @@ mod tests {
     fn test_strategy_gets_all_data_of_one() {
         let mut strat = strat();
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
-        stream1.borrow_mut().add_header(ReplayHeader {
-            data: vec![1, 3, 3, 7],
-        });
+        stream1.borrow_mut().add_header(ReplayHeader { data: vec![1, 3, 3, 7] });
 
         let token1 = strat.replay_added(stream1.clone());
         strat.replay_header_added(token1);
@@ -802,12 +788,8 @@ mod tests {
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
 
-        stream1.borrow_mut().add_header(ReplayHeader {
-            data: vec![1, 3, 3, 7],
-        });
-        stream2.borrow_mut().add_header(ReplayHeader {
-            data: vec![1, 3, 3, 7],
-        });
+        stream1.borrow_mut().add_header(ReplayHeader { data: vec![1, 3, 3, 7] });
+        stream2.borrow_mut().add_header(ReplayHeader { data: vec![1, 3, 3, 7] });
         let token1 = strat.replay_added(stream1.clone());
         let token2 = strat.replay_added(stream2.clone());
         strat.replay_header_added(token1);
@@ -860,12 +842,8 @@ mod tests {
         let stream1 = Rc::new(RefCell::new(WriterReplay::new()));
         let stream2 = Rc::new(RefCell::new(WriterReplay::new()));
 
-        stream1.borrow_mut().add_header(ReplayHeader {
-            data: vec![1, 3, 3, 7],
-        });
-        stream2.borrow_mut().add_header(ReplayHeader {
-            data: vec![1, 3, 3, 7],
-        });
+        stream1.borrow_mut().add_header(ReplayHeader { data: vec![1, 3, 3, 7] });
+        stream2.borrow_mut().add_header(ReplayHeader { data: vec![1, 3, 3, 7] });
         let token1 = strat.replay_added(stream1.clone());
         let token2 = strat.replay_added(stream2.clone());
         strat.replay_header_added(token1);

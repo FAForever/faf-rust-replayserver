@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use prometheus_exporter::prometheus::{
-    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
-    IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec, IntCounter,
+    IntCounterVec, IntGauge, IntGaugeVec,
 };
 
 use crate::error::{ConnResult, ConnectionError};
