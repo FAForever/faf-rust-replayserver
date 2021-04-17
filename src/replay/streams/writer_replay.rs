@@ -1,14 +1,12 @@
 use std::{cell::RefCell, io::Write, rc::Rc};
 
-use futures::Future;
-use tokio::{io::AsyncReadExt, sync::Notify};
-use tokio_util::sync::CancellationToken;
+use tokio::io::AsyncReadExt;
 
 use crate::{
     error::ConnResult,
     server::connection::Connection,
     util::buf_deque::BufDeque,
-    util::{buf_traits::DiscontiguousBuf, timeout::cancellable},
+    util::buf_traits::DiscontiguousBuf,
 };
 
 use super::ReplayHeader;
@@ -23,8 +21,6 @@ pub struct WriterReplay {
     header: MaybeHeader,
     data: BufDeque,
     delayed_data_len: usize,
-    header_notification: Rc<Notify>,
-    finished_notification: Rc<Notify>,
     finished: bool,
 }
 
@@ -34,15 +30,12 @@ impl WriterReplay {
             header: MaybeHeader::None,
             data: BufDeque::new(),
             delayed_data_len: 0,
-            header_notification: Rc::new(Notify::new()),
-            finished_notification: Rc::new(Notify::new()),
             finished: false,
         }
     }
     // First, functions for connection data writing.
     pub fn add_header(&mut self, h: ReplayHeader) {
         self.header = MaybeHeader::Some(h);
-        self.header_notification.notify_waiters();
     }
 
     pub fn add_data(&mut self, buf: &[u8]) {
@@ -51,7 +44,6 @@ impl WriterReplay {
 
     pub fn finish(&mut self) {
         self.finished = true;
-        self.finished_notification.notify_waiters();
     }
 
     // Second, functions for delayed data updating.
@@ -81,30 +73,6 @@ impl WriterReplay {
         self.delayed_data_len
     }
 
-    pub fn wait_for_header(&self) -> impl Future<Output = ()> {
-        debug_assert!(!matches!(self.header, MaybeHeader::Discarded));
-
-        let has_header = matches!(self.header, MaybeHeader::Some(..));
-        let wait = self.header_notification.clone();
-        async move {
-            if has_header {
-                return;
-            }
-            wait.notified().await
-        }
-    }
-
-    pub fn wait_until_finished(&self) -> impl Future<Output = ()> {
-        let finished = self.finished;
-        let wait = self.finished_notification.clone();
-        async move {
-            if finished {
-                return;
-            }
-            wait.notified().await
-        }
-    }
-
     pub fn discard(&mut self, until: usize) {
         self.data.discard(until);
     }
@@ -114,21 +82,17 @@ impl WriterReplay {
     }
 }
 
-pub async fn read_from_connection(
-    me: Rc<RefCell<WriterReplay>>,
-    c: &mut Connection,
-    shutdown_token: CancellationToken,
-) {
-    cancellable(do_read_from_connection(&me, c), &shutdown_token).await;
-    me.borrow_mut().finish();
+pub type WReplayRef = Rc<RefCell<WriterReplay>>;
+
+pub async fn read_header(me: WReplayRef, c: &mut Connection) -> ConnResult<()>
+{
+    let header = ReplayHeader::from_connection(c).await?;
+    me.borrow_mut().add_header(header);
+    Ok(())
 }
 
-async fn do_read_from_connection(
-    me: &Rc<RefCell<WriterReplay>>,
-    mut c: &mut Connection,
-) -> ConnResult<()> {
-    let header = ReplayHeader::from_connection(&mut c).await?;
-    me.borrow_mut().add_header(header);
+pub async fn read_data(me: WReplayRef, c: &mut Connection) -> ConnResult<()>
+{
     let mut buf: Box<[u8]> = Box::new([0; 4096]);
     loop {
         let read = c.read(&mut *buf).await?;
@@ -139,5 +103,3 @@ async fn do_read_from_connection(
     }
     Ok(())
 }
-
-pub type WReplayRef = Rc<RefCell<WriterReplay>>;
