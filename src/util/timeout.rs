@@ -25,8 +25,8 @@ pub async fn cancellable<T, F: Future<Output = T>>(f: F, token: &CancellationTok
 #[cfg(test)]
 mod test {
     use super::*;
-    use tokio::join;
     use crate::util::test::sleep_s;
+    use tokio::join;
 
     #[tokio::test]
     async fn timeout_normal() {
