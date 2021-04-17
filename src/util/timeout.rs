@@ -24,15 +24,15 @@ pub async fn cancellable<T, F: Future<Output = T>>(f: F, token: &CancellationTok
 
 #[cfg(test)]
 mod test {
-    use tokio::join;
-
     use super::*;
+    use tokio::join;
+    use crate::util::test::sleep_s;
 
     #[tokio::test]
     async fn timeout_normal() {
         tokio::time::pause();
         let work = async {
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            sleep_s(5).await;
             1
         };
         let res = timeout(work, Duration::from_secs(10)).await;
@@ -43,7 +43,7 @@ mod test {
     async fn timeout_timeout() {
         tokio::time::pause();
         let work = async {
-            tokio::time::sleep(Duration::from_secs(20)).await;
+            sleep_s(20).await;
             1
         };
         let res = timeout(work, Duration::from_secs(10)).await;
@@ -56,10 +56,10 @@ mod test {
         let token = CancellationToken::new();
 
         let work = async {
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            sleep_s(5).await;
         };
         let cancel = async {
-            tokio::time::sleep(Duration::from_secs(10)).await;
+            sleep_s(10).await;
             token.cancel();
         };
         let cancellable = cancellable(work, &token);
@@ -73,10 +73,10 @@ mod test {
         let token = CancellationToken::new();
 
         let work = async {
-            tokio::time::sleep(Duration::from_secs(20)).await;
+            sleep_s(20).await;
         };
         let cancel = async {
-            tokio::time::sleep(Duration::from_secs(10)).await;
+            sleep_s(10).await;
             token.cancel();
         };
         let cancellable = cancellable(work, &token);
