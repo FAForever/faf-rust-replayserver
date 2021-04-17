@@ -1,7 +1,6 @@
 // This file has some stuff we do with Rust runtime and the process that's impractical to test with
 // cargo test. We build and test separate executables for this and ignore this file for coverage.
 
-// TODO prometheus server setup.
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
 use std::os::unix::net::UnixStream;
 use tokio::io::AsyncReadExt;
