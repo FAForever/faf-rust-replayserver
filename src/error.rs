@@ -5,10 +5,7 @@ pub enum ConnectionError {
     #[error("Bad data: {0}")]
     BadData(String),
     #[error("IO error: {context}, {source}")]
-    IO {
-        source: std::io::Error,
-        context: String,
-    },
+    IO { source: std::io::Error, context: String },
     #[error("Could not assign connection to replay")]
     CannotAssignToReplay,
 }

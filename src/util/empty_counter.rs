@@ -83,9 +83,7 @@ mod test {
             let awakened = Cell::new(false);
             let wait_empty = async {
                 let before = Instant::now();
-                counter
-                    .wait_until_empty_for(Duration::from_millis(100))
-                    .await;
+                counter.wait_until_empty_for(Duration::from_millis(100)).await;
                 awakened.set(true);
                 let after = Instant::now();
                 assert!(after - before > Duration::from_millis(120));
@@ -110,9 +108,7 @@ mod test {
             let awakened = Rc::new(RefCell::new(false));
             let wait_empty = async {
                 let before = Instant::now();
-                counter
-                    .wait_until_empty_for(Duration::from_millis(100))
-                    .await;
+                counter.wait_until_empty_for(Duration::from_millis(100)).await;
                 *awakened.borrow_mut() = true;
                 let after = Instant::now();
                 assert!(after - before > Duration::from_millis(90));
@@ -134,9 +130,7 @@ mod test {
             let awakened = Cell::new(false);
             let wait_empty = async {
                 let before = Instant::now();
-                counter
-                    .wait_until_empty_for(Duration::from_millis(100))
-                    .await;
+                counter.wait_until_empty_for(Duration::from_millis(100)).await;
                 awakened.set(true);
                 let after = Instant::now();
                 assert!(after - before > Duration::from_millis(420));
@@ -178,9 +172,7 @@ mod test {
             let awakened = Cell::new(false);
             let wait_empty = async {
                 let before = Instant::now();
-                counter
-                    .wait_until_empty_for(Duration::from_millis(100))
-                    .await;
+                counter.wait_until_empty_for(Duration::from_millis(100)).await;
                 awakened.set(true);
                 let after = Instant::now();
                 assert!(after - before > Duration::from_millis(300));
@@ -219,9 +211,7 @@ mod test {
             let counter = EmptyCounter::new();
             let wait_empty = async {
                 let before = Instant::now();
-                counter
-                    .wait_until_empty_for(Duration::from_millis(100))
-                    .await;
+                counter.wait_until_empty_for(Duration::from_millis(100)).await;
                 counter.wait_until_empty().await;
                 let after = Instant::now();
                 assert!(after - before > Duration::from_millis(150));

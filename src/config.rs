@@ -87,12 +87,10 @@ impl InnerSettings {
         db_pass_var: Result<String, VarError>,
     ) -> Result<Self, ConfigError> {
         let config_file = conf_var.map_err(|_| {
-            ConfigError::Message(
-                "RS_CONFIG_FILE env var not set, place the path to the config file there.".into(),
-            )
+            ConfigError::Message("RS_CONFIG_FILE env var not set, place the path to the config file there.".into())
         })?;
-        let db_password = db_pass_var
-            .map_err(|_| ConfigError::NotFound("Database password was not provided".into()))?;
+        let db_password =
+            db_pass_var.map_err(|_| ConfigError::NotFound("Database password was not provided".into()))?;
         let mut c = Config::new();
         c.set("database.password", db_password)?;
         c.merge(File::with_name(&config_file[..]))?;
@@ -147,14 +145,12 @@ pub mod test {
     #[test]
     fn test_config_needs_password() {
         let conf_file = get_file_path("example_config.yml");
-        InnerSettings::do_from_env(Ok(conf_file), Err(VarError::NotPresent))
-            .expect_err("Config init should've failed");
+        InnerSettings::do_from_env(Ok(conf_file), Err(VarError::NotPresent)).expect_err("Config init should've failed");
     }
 
     #[test]
     fn test_config_needs_file() {
         let password = String::from("banana"); // File does not have a password entry
-        InnerSettings::do_from_env(Err(VarError::NotPresent), Ok(password))
-            .expect_err("Config init should've failed");
+        InnerSettings::do_from_env(Err(VarError::NotPresent), Ok(password)).expect_err("Config init should've failed");
     }
 }

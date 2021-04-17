@@ -22,8 +22,7 @@ pub struct Replays {
 
 impl Replays {
     pub fn new(shutdown_token: CancellationToken, config: Settings, saver: ReplaySaver) -> Self {
-        let replay_builder =
-            move |rid| Replay::new(rid, shutdown_token.clone(), config.clone(), saver.clone());
+        let replay_builder = move |rid| Replay::new(rid, shutdown_token.clone(), config.clone(), saver.clone());
         Self {
             replays: WeakValueHashMap::new(),
             new_replay: Box::new(replay_builder),

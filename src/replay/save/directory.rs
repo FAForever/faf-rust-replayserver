@@ -34,10 +34,7 @@ impl SavedReplayDirectory {
         })
     }
 
-    pub async fn touch_and_return_file(
-        &self,
-        replay_id: u64,
-    ) -> std::io::Result<Box<dyn AsyncWrite + Unpin>> {
+    pub async fn touch_and_return_file(&self, replay_id: u64) -> std::io::Result<Box<dyn AsyncWrite + Unpin>> {
         let mut target = self.replay_path(replay_id);
         tokio::fs::create_dir_all(&target).await?;
 

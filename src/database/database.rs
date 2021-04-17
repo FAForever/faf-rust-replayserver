@@ -117,18 +117,11 @@ impl Database {
             .count)
     }
 
-    pub async fn get_mod_version_list(
-        &self,
-        game_mod: &str,
-    ) -> Result<Vec<ModVersions>, SaveError> {
+    pub async fn get_mod_version_list(&self, game_mod: &str) -> Result<Vec<ModVersions>, SaveError> {
         // We have to build table name dynamically, that's just how the DB is.
         // Since we know what existing tables look like, we do very restrictive validation.
         for c in game_mod.chars() {
-            if !(('a'..='z').contains(&c)
-                || ('A'..='Z').contains(&c)
-                || ('0'..='9').contains(&c)
-                || "_-".contains(c))
-            {
+            if !(('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || ('0'..='9').contains(&c) || "_-".contains(c)) {
                 log::info!(
                     "Game mod '{}' has unexpected characters (outside 'a-zA-Z0-9_-'",
                     game_mod
@@ -307,10 +300,7 @@ pub mod test {
     async fn test_db_game_on_new_map_version() {
         let db = get_db();
         let stats = db.get_game_stat_row(1040).await.unwrap();
-        assert_eq!(
-            stats.file_name.unwrap(),
-            "maps/scmp_003.v0003.zip".to_string()
-        );
+        assert_eq!(stats.file_name.unwrap(), "maps/scmp_003.v0003.zip".to_string());
     }
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
@@ -358,9 +348,7 @@ pub mod test {
     #[tokio::test]
     async fn test_db_nonexistent_game() {
         let db = get_db();
-        db.get_game_stat_row(10000)
-            .await
-            .expect_err("Game should not exist");
+        db.get_game_stat_row(10000).await.expect_err("Game should not exist");
     }
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]

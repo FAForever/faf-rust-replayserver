@@ -6,9 +6,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    config::Settings, replay::save::ReplaySaver, replay::Replays, server::connection::Connection,
-};
+use crate::{config::Settings, replay::save::ReplaySaver, replay::Replays, server::connection::Connection};
 
 #[derive(Clone)]
 pub struct WorkerThreadWork {

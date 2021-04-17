@@ -27,11 +27,7 @@ impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
         while at < max_cmp {
             let my_chunk = self.get_chunk(at);
             let other_chunk = other.get_chunk(at);
-            let eq_len = my_chunk
-                .iter()
-                .zip(other_chunk)
-                .take_while(|(a, b)| a == b)
-                .count();
+            let eq_len = my_chunk.iter().zip(other_chunk).take_while(|(a, b)| a == b).count();
             at += eq_len;
             if eq_len < std::cmp::min(my_chunk.len(), other_chunk.len()) {
                 return at;

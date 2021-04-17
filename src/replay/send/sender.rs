@@ -2,8 +2,8 @@ use tokio::io::AsyncWriteExt;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    replay::streams::MReplayRef, replay::streams::MergedReplayReader,
-    server::connection::Connection, util::timeout::cancellable,
+    replay::streams::MReplayRef, replay::streams::MergedReplayReader, server::connection::Connection,
+    util::timeout::cancellable,
 };
 
 pub struct ReplaySender {
