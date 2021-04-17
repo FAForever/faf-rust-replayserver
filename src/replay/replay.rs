@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::{cell::Cell, fmt::Display};
 
 use tokio::join;
 use tokio::time::Duration;
@@ -26,6 +26,12 @@ pub struct Replay {
     time_with_zero_writers_to_end_replay: Duration,
     forced_timeout: Duration,
     should_stop_accepting_connections: Cell<bool>,
+}
+
+impl Display for Replay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Replay {}", self.id)
+    }
 }
 
 impl Replay {
@@ -59,7 +65,7 @@ impl Replay {
         let cancellation = async {
             tokio::time::sleep(self.forced_timeout).await;
             self.replay_timeout_token.cancel();
-            log::info!("Replay {} timed out", self.id);
+            log::info!("{} timed out", self);
         };
 
         // Return early if we got cancelled normally
@@ -75,17 +81,17 @@ impl Replay {
     }
 
     async fn regular_lifetime(&self) {
-        log::info!("Replay {} started", self.id);
+        log::info!("{} started", self);
         metrics::RUNNING_REPLAYS.inc();
         self.wait_until_there_were_no_writers_for_a_while().await;
         self.should_stop_accepting_connections.set(true);
-        log::debug!("Replay {} stopped accepting connections", self.id);
+        log::debug!("{} stopped accepting connections", self);
         self.writer_connection_count.wait_until_empty().await;
         self.merger.finalize();
-        log::debug!("Replay {} finished merging data", self.id);
+        log::debug!("{} finished merging data", self);
         self.saver.save_replay(self.merger.get_merged_replay(), self.id).await;
         self.reader_connection_count.wait_until_empty().await;
-        log::info!("Replay {} ended", self.id);
+        log::info!("{} ended", self);
         // Cancel to return from timeout
         self.replay_timeout_token.cancel();
         metrics::RUNNING_REPLAYS.dec();
@@ -100,9 +106,9 @@ impl Replay {
     }
 
     pub async fn handle_connection(&self, mut c: Connection) -> ConnResult<()> {
-        log::debug!("Replay {} started handling {}", self.id, c);
+        log::debug!("{} started handling {}", self, c);
         if self.should_stop_accepting_connections.get() {
-            log::info!("Replay {} dropped {} because its write phase is over", self.id, c);
+            log::info!("{} dropped {} because its write phase is over", self, c);
             return Err(ConnectionError::CannotAssignToReplay);
         }
         match c.get_header().type_ {
@@ -117,7 +123,7 @@ impl Replay {
                 self.reader_connection_count.dec();
             }
         }
-        log::debug!("Replay {} finished handling {}", self.id, c);
+        log::debug!("{} finished handling {}", self, c);
         Ok(())
     }
 }
