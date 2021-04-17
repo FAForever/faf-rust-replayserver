@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::VecDeque};
 
 use crate::util::buf_traits::DiscontiguousBuf;
-use crate::{replay::streams::WReplayRef, util::timeout::until};
+use crate::replay::streams::WReplayRef;
 
 use tokio::time::Duration;
 
@@ -52,63 +52,26 @@ pub struct StreamDelay {
     sleep_s: Duration,
 }
 
-// This does two things:
-// * Sets writer stream's delayed data position. The position is updated roughly each sleep_s
-//   seconds and is set to data position delay_s seconds ago. Once the replay ends, the delayed
-//   position is set to real data position (since we don't need to anti-spoiler a replay that
-//   already ended).
-// * Calls merge strategy functions at the right times.
 impl StreamDelay {
     pub fn new(delay_s: Duration, sleep_s: Duration) -> Self {
         Self { delay_s, sleep_s }
     }
 
-    pub async fn update_delayed_data_and_drive_merge_strategy(
+    pub async fn track(
         &self,
         replay: &WReplayRef,
         strategy: &RefCell<impl MergeStrategy>,
+        token: u64
     ) {
-        let driver = StreamDelayContext::new(self, replay, strategy);
-        driver.update_delayed_data_and_drive_merge_strategy().await;
-    }
-}
-
-struct StreamDelayContext<'a, T: MergeStrategy> {
-    delay_s: Duration,
-    sleep_s: Duration,
-    replay: &'a WReplayRef,
-    strategy: &'a RefCell<T>,
-    token: u64,
-}
-
-impl<'a, T: MergeStrategy> StreamDelayContext<'a, T> {
-    pub fn new(delay: &StreamDelay, replay: &'a WReplayRef, strategy: &'a RefCell<T>) -> Self {
-        let token = strategy.borrow_mut().replay_added(replay.clone());
-        Self {
-            delay_s: delay.delay_s,
-            sleep_s: delay.sleep_s,
-            replay,
-            strategy,
-            token,
-        }
-    }
-
-    async fn notify_on_header(&self) {
-        let f = self.replay.borrow().wait_for_header();
-        f.await;
-        self.strategy.borrow_mut().replay_header_added(self.token);
-    }
-
-    async fn update_delayed_data(&self) -> ! {
         let mut pos_queue = PositionHistory::new(self.delay_s, self.sleep_s);
         let mut prev_current = 0;
         let mut prev_delayed = 0;
         loop {
-            let current = self.replay.borrow().get_data().len();
+            let current = replay.borrow().get_data().len();
             let delayed = pos_queue.push_and_get_delayed(current);
-            self.replay.borrow_mut().set_delayed_data_len(delayed);
+            replay.borrow_mut().set_delayed_data_len(delayed);
             if (current, delayed) != (prev_current, prev_delayed) {
-                self.strategy.borrow_mut().replay_data_updated(self.token);
+                strategy.borrow_mut().replay_data_updated(token);
             }
             prev_current = current;
             prev_delayed = delayed;
@@ -116,24 +79,17 @@ impl<'a, T: MergeStrategy> StreamDelayContext<'a, T> {
         }
     }
 
-    async fn after_finished(&self) {
-        let final_len = self.replay.borrow_mut().get_data().len();
-        self.replay.borrow_mut().set_delayed_data_len(final_len);
-        let mut s = self.strategy.borrow_mut();
-        s.replay_data_updated(self.token);
-        s.replay_removed(self.token);
-    }
-
-    async fn update_delayed_data_and_drive_merge_strategy(&self) {
-        let replay_end = self.replay.borrow().wait_until_finished();
-        until(
-            async {
-                self.notify_on_header().await;
-                self.update_delayed_data().await;
-            },
-            replay_end,
-        )
-        .await;
-        self.after_finished().await;
+    pub fn set_to_end(
+        &self,
+        replay: &WReplayRef,
+        strategy: &RefCell<impl MergeStrategy>,
+        token: u64
+    ) {
+        let final_len = replay.borrow_mut().get_data().len();
+        let last_delayed_len = replay.borrow_mut().get_delayed_data_len();
+        if final_len > last_delayed_len {
+            replay.borrow_mut().set_delayed_data_len(final_len);
+            strategy.borrow_mut().replay_data_updated(token);
+        }
     }
 }
