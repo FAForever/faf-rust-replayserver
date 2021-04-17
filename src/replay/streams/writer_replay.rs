@@ -11,14 +11,8 @@ use crate::{
 
 use super::ReplayHeader;
 
-enum MaybeHeader {
-    None,
-    Some(ReplayHeader),
-    Discarded,
-}
-
 pub struct WriterReplay {
-    header: MaybeHeader,
+    header: Option<ReplayHeader>,
     data: BufDeque,
     delayed_data_len: usize,
     finished: bool,
@@ -27,7 +21,7 @@ pub struct WriterReplay {
 impl WriterReplay {
     pub fn new() -> Self {
         Self {
-            header: MaybeHeader::None,
+            header: None,
             data: BufDeque::new(),
             delayed_data_len: 0,
             finished: false,
@@ -35,7 +29,7 @@ impl WriterReplay {
     }
     // First, functions for connection data writing.
     pub fn add_header(&mut self, h: ReplayHeader) {
-        self.header = MaybeHeader::Some(h);
+        self.header = Some(h);
     }
 
     pub fn add_data(&mut self, buf: &[u8]) {
@@ -62,11 +56,7 @@ impl WriterReplay {
 
     // Third, stuff used by the merge strategy.
     pub fn take_header(&mut self) -> ReplayHeader {
-        if let MaybeHeader::Some(h) = std::mem::replace(&mut self.header, MaybeHeader::Discarded) {
-            h
-        } else {
-            panic!("Cannot take header");
-        }
+        std::mem::replace(&mut self.header, None).expect("Cannot take header")
     }
 
     pub fn get_delayed_data_len(&self) -> usize {
