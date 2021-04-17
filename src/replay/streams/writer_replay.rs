@@ -27,36 +27,26 @@ impl WriterReplay {
             finished: false,
         }
     }
-    // First, functions for connection data writing.
+
     pub fn add_header(&mut self, h: ReplayHeader) {
         self.header = Some(h);
+    }
+
+    pub fn take_header(&mut self) -> ReplayHeader {
+        std::mem::replace(&mut self.header, None).expect("Cannot take header")
     }
 
     pub fn add_data(&mut self, buf: &[u8]) {
         self.data.write_all(buf).unwrap();
     }
 
-    pub fn finish(&mut self) {
-        self.finished = true;
-    }
-
-    // Second, functions for delayed data updating.
-    pub fn set_delayed_data_len(&mut self, new: usize) {
-        debug_assert!(self.delayed_data_len <= new);
-        self.delayed_data_len = new;
-    }
-
     pub fn get_data(&self) -> &impl DiscontiguousBuf {
         &self.data
     }
 
-    pub fn is_finished(&self) -> bool {
-        self.finished
-    }
-
-    // Third, stuff used by the merge strategy.
-    pub fn take_header(&mut self) -> ReplayHeader {
-        std::mem::replace(&mut self.header, None).expect("Cannot take header")
+    pub fn set_delayed_data_len(&mut self, new: usize) {
+        debug_assert!(self.delayed_data_len <= new);
+        self.delayed_data_len = new;
     }
 
     pub fn get_delayed_data_len(&self) -> usize {
@@ -69,6 +59,14 @@ impl WriterReplay {
 
     pub fn discard_all(&mut self) {
         self.data.discard(usize::MAX);
+    }
+
+    pub fn finish(&mut self) {
+        self.finished = true;
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.finished
     }
 }
 
