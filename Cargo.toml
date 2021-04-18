@@ -8,6 +8,7 @@ edition = "2018"
 local_db_tests = []
 process_tests = []
 bench = []
+fuzzing_tests = []
 
 [[bin]]
 name = "faf_rust_replayserver"
