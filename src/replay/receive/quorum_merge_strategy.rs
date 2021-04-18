@@ -694,8 +694,10 @@ impl MergeStrategy for QuorumMergeStrategy {
 // TODO - parametrize with stream cutoff and quorum once we make them configurable.
 #[cfg(test)]
 mod tests {
+    use rand::Rng;
+
     use super::QuorumMergeStrategy;
-    use crate::util::buf_traits::ReadAtExt;
+    use crate::util::{buf_traits::ReadAtExt, test::setup_logging};
     use crate::{
         replay::receive::merge_strategy::MergeStrategy, replay::streams::ReplayHeader, replay::streams::WriterReplay,
         util::buf_traits::DiscontiguousBuf,
@@ -866,6 +868,133 @@ mod tests {
         let out_buf: &mut [u8] = &mut [0; 6];
         out_data.reader().read(out_buf).unwrap();
         assert_eq!(out_buf, &[1, 2, 3, 4, 5, 6]);
+    }
+
+    // FIXME tweak so we can test small comparison cutoffs.
+    fn simple_fuzzing_round() {
+        let mut rng = rand::thread_rng();
+        let mut strat = QuorumMergeStrategy::new(2, 512);
+        let count = 8;
+        let chunk = 4;
+        let replay_len = 400;
+        let data_error_chance = 200;
+        let early_exit_chance = 200;
+
+        let mut streams = Vec::new();
+        let mut final_datas = Vec::new();
+
+        // Add all streams.
+        for _ in 0..count {
+            let stream = Rc::new(RefCell::new(WriterReplay::new()));
+            stream.borrow_mut().add_header(ReplayHeader { data: vec![1, 3, 3, 7] });
+            let token = strat.replay_added(stream.clone());
+            strat.replay_header_added(token);
+            let data: Vec<u8> = Vec::new();
+            streams.push((stream, token, data));
+        }
+
+        loop {
+            // Pick a non-finished stream to randomly advance.
+            if final_datas.len() == count {
+                break;
+            }
+            let idx = rng.gen_range(0..count);
+            let (s, token, data) = streams.get_mut(idx).unwrap();
+            if s.borrow().is_finished() {
+                continue;
+            }
+
+            let mut modified = false;
+            if rand::random() {
+                // Randomly advance data.
+                let mut amount = rng.gen_range(1..chunk + 1);
+                let data_len = s.borrow().get_data().len();
+                amount = std::cmp::min(amount, replay_len - data_len);
+
+                let mut new_data = vec![0; amount];
+                if rng.gen_range(0..data_error_chance) == 0 {
+                    // Small chance to introduce a deviation.
+                    let err_at = rng.gen_range(0..amount);
+                    new_data[err_at] = 1;
+                    log::debug!("Stream {} added an error at {}", idx, data_len + err_at);
+                }
+                data.extend(new_data.clone());
+                s.borrow_mut().add_data(&new_data);
+                modified = true;
+            }
+            if rand::random() {
+                // Randomly advance delayed data.
+                let amount = rng.gen_range(1..chunk + 1);
+                let mut delayed = s.borrow().get_delayed_data_len();
+                delayed += amount;
+                if delayed <= s.borrow().get_data().len() {
+                    s.borrow_mut().set_delayed_data_len(delayed);
+                    modified = true;
+                }
+            }
+
+            if modified {
+                strat.replay_data_updated(*token);
+            }
+
+            // Small chance to end early.
+            if s.borrow().get_data().len() == replay_len || rng.gen_range(0..early_exit_chance) == 0 {
+                let data_len = s.borrow().get_data().len();
+                log::debug!("Stream {} ended at {}", idx, data_len);
+                let delayed_data_len = s.borrow().get_delayed_data_len();
+                if delayed_data_len < data_len {
+                    s.borrow_mut().set_delayed_data_len(data_len);
+                    strat.replay_data_updated(*token);
+                }
+                final_datas.push((data.clone(), idx));
+                s.borrow_mut().finish();
+                strat.replay_removed(*token);
+            }
+        }
+
+        strat.finish();
+
+        let mut merged_data = Vec::new();
+        strat.get_merged_replay().borrow_mut().get_data().reader().read_to_end(&mut merged_data).unwrap();
+
+        // Now, filter out streams that split off alone.
+        let mut common_pfx_bundles = vec![final_datas];
+        for i in 0..replay_len {
+            // For each bundle
+            common_pfx_bundles = common_pfx_bundles.into_iter().flat_map(|mut s| {
+                //If all replays ended here, then merging could've ended here.
+                if s.iter().all(|d| d.0.len() <= i) {
+                    return vec![s];
+                }
+                // Otherwise merging continued.
+                s = s.into_iter().filter(|d| d.0.len() > i).collect();
+
+                // Split bundle based on whether the byte was changed.
+                let (a, b) = s.into_iter().partition(|d| d.0[i] == 0);
+                let mut ret = vec![a, b];
+                ret.sort_by_key(|b: &Vec<_>| -(b.len() as isize));
+                // Remove single offshoot if the other bundle has at least 2 streams.
+                if ret[1].len() <= 1 && ret[0].len() >= 2 {
+                    ret.pop();
+                }
+                ret
+            }).collect();
+        }
+        let remaining_datas: Vec<_> = common_pfx_bundles.into_iter().flatten().collect();
+        let indices: Vec<_> = remaining_datas.iter().map(|t| t.1).collect();
+        log::debug!("Remaining streams: {:?}", indices);
+        let datas: Vec<_> = remaining_datas.into_iter().map(|t| t.0).collect();
+        assert!(datas.contains(&merged_data));
+    }
+
+    #[cfg_attr(not(feature = "fuzzing_tests"), ignore)]
+    #[test]
+    fn test_strategy_simple_fuzzing() {
+        setup_logging();
+        for i in 0..100 {
+            log::debug!("Run {}", i);
+            simple_fuzzing_round();
+        }
     }
 }
 
