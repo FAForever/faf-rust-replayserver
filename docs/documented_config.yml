@@ -44,7 +44,7 @@ replay:
         # readers.
         # 1 second should be good, setting this too low will probably degrade
         # performance.
-        update_interval_s: 1000
+        update_interval_s: 1
         # The number of replays that need to agree on the data before the
         # merging algorithm adds it to the "canonical" replay.
         # 2 works well in practice. See the Architecture section for details.
