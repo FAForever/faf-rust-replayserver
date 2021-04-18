@@ -35,7 +35,7 @@ use super::merge_strategy::MergeStrategy;
 // In order to avoid matching a lot of data, we make a following "shortcut" assumption:
 // * As long as, every time we check, r and C's data is equal at a suffix of stream_cmp_distance
 //   bytes of C, r does not diverge from C.
-// In other words, whenever we lazily check if r diverges from C, we can check just the last
+// In other words, whenever we check if r diverges from C, we can check just the last
 // stream_cmp_distance bytes.
 //
 // We keep the state of a replay r in R in the struct below:
@@ -133,7 +133,7 @@ impl ReplayState {
         self.discard_unneeded_data();
     }
 
-    // To save memory, we discard data beyond canon_match_start(), or all data if we diverged.
+    // To save memory, we discard data before canon_match_start(), or all data if we diverged.
     // It is an error to access replay data from before canonical replay's length, and it's an
     // error to access any data of a diverged replay.
     fn discard_unneeded_data(&mut self) {
@@ -227,8 +227,8 @@ impl SharedState {
 }
 
 // The strategy switches between two states - a quorum and a stalemate.
-// During a quorum, it chooses a subset of replays and merges data from them into C every once in a
-// while. Once no more data can be merged, it transitions to a stalemate.
+// During a quorum, it chooses a subset of replays and merges data from them into C as far as it
+// can. Once merge point is reached, it transitions to a stalemate.
 // During a stalemate, it tries to collect a subset of replays that agree with C and agree on C's next
 // byte. Once it does, it transitions to quorum with that subset.
 //
@@ -252,19 +252,20 @@ pub struct MergeStalemateState {
 //   * Notice that every replay satisfies at least one of the above.
 // * A stalemate state is constructed with a set of replays I, which is a subset of R.
 //   * Every replay outside I diverges from C.
-//   * Replays from s I are discarded / distributed between Cand and Res according to above rules.
+//   * Replays from I are distributed between Cand and Res according to above rules.
 // * Whether a stalemate can be resolved is decided as follows:
-//   * If no delayed positions have ever been set, it cannot. (This is a hack to prevent too eager
-//     stalemate resolution at the start, when replays are still being added.)
-//   * Otherwise, if there are no replays in Cand, it cannot.
-//   * Otherwise, if there are no replays in Res, it can.
-//   * Otherwise it can be resolved iif one of entries in Cand has at least target_quorum_size
-//     replays.
+//   * Stalemate stays unresolved as long as no delayed positions have ever been set. (This is a
+//     hack to prevent too eager stalemate resolution at the start, when replays are still being
+//     added.)
+//   * If one of entries in Cand has at least target_quorum_size entries, the stalemate can be
+//     resolved.
+//   * Otherwise stalemate can resolved if set Res is empty and map Cand is not empty.
 // * Once a stalemate is resolved, it is turned into a quorum.
 //   * Replays from the most numerous entry in Cand become a "good replay" set G.
 //   * C is advanced by one byte that equals the extra byte replays in G agree on.
 //   * All other entries in Cand are discarded.
 //   * G and Res are given to quorum constructor.
+//   * Notice that all replays in G agree with C and all replays outside G and Res diverge from C.
 
 impl MergeStalemateState {
     fn new(target_quorum_size: usize, stream_cmp_distance: usize) -> Self {
@@ -393,7 +394,7 @@ impl MergeStalemateState {
 // QUORUM:
 // Have a set of replays Q that matches C. When constructed, merge replays in quorum and add the
 // common prefix to C. Update C's delayed position as a minimum of Q's replays' delayed positions.
-// Once C's delayed position reaches end of its data, enter a stalemate.
+// Once C's delayed position reaches end of merged data, enter a stalemate.
 
 pub struct MergeQuorumState {
     s: SharedState,
@@ -418,6 +419,8 @@ pub struct MergeQuorumState {
 // * Transitioning to a stalemate happens as follows:
 //   * Replays from Q are added to Res.
 //   * Stalemate is constructed with Res.
+//   * Notice that all replays outside Res are diverged.
+
 impl MergeQuorumState {
     fn from_stalemate(shared: SharedState, mut good_replays: Vec<u64>, mut reserve: HashSet<u64>) -> Self {
         debug_assert!(!good_replays.is_empty());
@@ -460,7 +463,7 @@ impl MergeQuorumState {
             .iter()
             .map(|id| self.s.get_replay(*id).delayed_data_len())
             .min()
-            .unwrap_or(0)
+            .unwrap()
     }
 
     fn replay_data_updated(&mut self, id: u64) {
@@ -667,8 +670,8 @@ impl MergeStrategy for QuorumMergeStrategy {
 //   amortized.
 //
 // Fifth claim is memory usage. We always discard any data that's stream_cmp_distance behind canon.
-// In a quorum, we wait with merging until delayed data catches up, so we keep at most last N
-// minutes of data in each replay. It's fine, potentially could be improved if we merge more
+// Once in a quorum, we won't merge more data until delayed data catches up, so we keep at most
+// last N minutes of data in each replay. It's fine, potentially could be improved if we merge more
 // eagerly?
 // In a stalemate, there could be pathological conditions where a replay stalls data (see below),
 // stopping stalemate resolution for the rest of the replay IF there is otherwise no quorum. That
@@ -684,16 +687,8 @@ impl MergeStrategy for QuorumMergeStrategy {
 // and entering stalemate. In a stalemate, things are fine as long as we find a quorum without
 // misbehaving replays, which is not the case in 1v1 and when almost all players left.
 //
-// In other words, we may have to find ways to detect misbehaving replays. At the same time, we
-// have to consider that long stalemates can happen (e.g. connection problems). Here's one possible
-// solution:
-// * When in a stalemate, run a check every second. If any replays had new data in K out of N seconds,
-//   consider the game "unblocked" and force-select a quorum. Possibly mark replays that didn't
-//   change in these N seconds as "misbehaving" and ignore them for further stalemates unless they
-//   change.
-//
-// This should still create consistent replays at a cost of rarely or never producing worse
-// quorums. Don't implement this unless we verify that the issue exists and that this fixes it.
+// Note that it doesn't seem to be a problem in the current python server which uses the same merge
+// strategy, so this might not be a problem in practice.
 //
 
 // TODO - parametrize with stream cutoff and quorum once we make them configurable.
