@@ -45,7 +45,6 @@ async fn do_run_server() {
         shutdown_token.cancel();
     };
     join!(f1, f2);
-    /* Worker threads are joined once we drop the server. */
 }
 
 fn start_prometheus_server(config: &config::Settings) -> bool {
