@@ -68,7 +68,7 @@ impl InnerReplaySaver {
         metrics::SAVED_REPLAYS.inc();
         return true;
     }
-    // TODO count and store ticks
+
     pub async fn save_replay(&self, replay: MReplayRef, id: u64) {
         let replay_saved = self.save_replay_to_disk(replay.clone(), id).await;
         let ticks = self.count_ticks(replay, id).await;

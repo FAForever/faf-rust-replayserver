@@ -4,8 +4,6 @@ Usage
 Deployment
 ----------
 
-TODO: integrate into faf-stack.
-
 The server is built with ``cargo build``, its executable is
 ``faf_rust_replayserver``. For deployment, you'll want to use the provided
 Dockerfile, or better yet, a github release. The server is integrated into
