@@ -38,9 +38,5 @@ Generated coverage is available under ./coverage.
 TODOs
 -----
 
-* Finish up tests
-  * Fix holes in coverage where it makes sense
-  * More exhausive merge strategy tests
-  * Some tests of server as a whole, maybe? I don't know
-  * Any other stuff I can think of
-* Testing on the test server
+* More tests in src/replay.
+* Add process tests to CI, maybe.
