@@ -26,6 +26,8 @@ database:
 storage:
         # Base path under which replays are stored.
         vault_path: /tmp/foo
+        # Zstd compression level.
+        compression_level: 10
 replay:
         # Time, in seconds, after a game is timed out and forcefully ended. Set
         # it to longer than you expect the longest game to last, e.g. 6 hours.

@@ -11,6 +11,7 @@ database:
         name: faf
 storage:
         vault_path: /tmp/foo
+        compression_level: 10
 replay:
         forced_timeout_s: 21600
         time_with_zero_writers_to_end_replay_s: 10

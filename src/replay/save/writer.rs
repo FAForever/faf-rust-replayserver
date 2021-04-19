@@ -7,10 +7,12 @@ pub async fn write_replay(
     mut to: impl AsyncWrite + Unpin,
     json_header: impl serde::Serialize,
     replay: MReplayRef,
+    compression_level: u32,
 ) -> std::io::Result<()> {
     to.write_all(serde_json::to_string(&json_header)?.as_bytes()).await?;
     to.write_all("\n".as_bytes()).await?;
-    let mut encoder = ZstdEncoder::with_quality(to, async_compression::Level::Precise(10));
+    let clevel = async_compression::Level::Precise(compression_level);
+    let mut encoder = ZstdEncoder::with_quality(to, clevel);
     let mut replay_writer = MergedReplayReader::new(replay);
     replay_writer.write_to(&mut encoder).await?;
     encoder.shutdown().await?;
