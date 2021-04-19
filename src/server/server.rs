@@ -37,7 +37,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
     }
 
     async fn run(self) {
-        let saver = InnerReplaySaver::new(self.db, self.dir);
+        let saver = InnerReplaySaver::new(self.db, self.dir, &self.config);
         let replay_work = WorkerThreadWork::new(self.config.clone(), self.shutdown_token.clone(), saver);
         let thread_pool = WorkerThreadPool::new(replay_work, self.config.server.worker_threads);
 

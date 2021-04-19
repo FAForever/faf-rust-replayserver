@@ -50,6 +50,7 @@ pub struct DatabaseSettings {
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct StorageSettings {
     pub vault_path: String,
+    pub compression_level: u32
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
@@ -122,6 +123,7 @@ pub mod test {
             },
             storage: StorageSettings {
                 vault_path: "/tmp/foo".into(),
+                compression_level: 10,
             },
             replay: ReplaySettings {
                 forced_timeout_s: Duration::from_secs(3600 * 6),
