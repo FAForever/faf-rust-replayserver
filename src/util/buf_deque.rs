@@ -115,7 +115,7 @@ impl Write for BufDeque {
 #[cfg(test)]
 mod test {
     use super::{BufDeque, CHUNK_SIZE};
-    use crate::util::buf_traits::{DiscontiguousBuf, ReadAtExt};
+    use crate::util::buf_traits::{DiscontiguousBuf, DiscontiguousBufExt, ReadAtExt};
     use std::io::{Read, Write};
 
     fn compare_eq(deque: &BufDeque, data: &Vec<u8>) {
@@ -200,5 +200,27 @@ mod test {
         let mut read = Vec::new();
         bl.reader_from(CHUNK_SIZE).read_to_end(&mut read).unwrap();
         assert_eq!(read, vec![2; 4]);
+    }
+
+    #[test]
+    fn test_iter_chunks() {
+        let mut bl = BufDeque::new();
+        let data1 = [1; CHUNK_SIZE - 4];
+        let data2 = [2; 8];
+        bl.write_all(&data1).unwrap();
+        bl.write_all(&data2).unwrap();
+
+        assert_eq!(bl.iter_chunks(30, 30).count(), 0);
+
+        let mut total = 0;
+        for (i, buf) in bl.iter_chunks(CHUNK_SIZE - 5, CHUNK_SIZE + 2).enumerate() {
+            total = i + 1;
+            match i {
+                0 => assert_eq!(buf, &[1, 2, 2, 2, 2]),
+                1 => assert_eq!(buf, &[2, 2]),
+                _ => panic!("Expected 2 chunks"),
+            }
+        }
+        assert_eq!(total, 2);
     }
 }
