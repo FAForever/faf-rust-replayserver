@@ -10,9 +10,10 @@ pub trait DiscontiguousBuf {
     fn len(&self) -> usize;
 }
 
-pub trait DiscontiguousBufExt {
+pub trait DiscontiguousBufExt: DiscontiguousBuf {
     fn common_prefix_from(&self, other: &impl DiscontiguousBuf, start: usize) -> usize;
     fn at(&self, pos: usize) -> u8;
+    fn iter_chunks(&self, start: usize, end: usize) -> IterChunks<'_, Self>;
 }
 
 impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
@@ -39,6 +40,34 @@ impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
     /* Can't implement Index for generic trait :( */
     fn at(&self, pos: usize) -> u8 {
         self.get_chunk(pos)[0]
+    }
+
+    fn iter_chunks(&self, start: usize, end: usize) -> IterChunks<'_, Self> {
+        assert!(start <= end);
+        assert!(start <= self.len());
+        IterChunks { b: self, start, end }
+    }
+}
+
+pub struct IterChunks<'a, T: DiscontiguousBuf + ?Sized> {
+    b: &'a T,
+    start: usize,
+    end: usize,
+}
+
+impl<'a, T: DiscontiguousBuf> Iterator for IterChunks<'a, T> {
+    type Item = &'a [u8];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start == self.end {
+            return None;
+        }
+        let mut chunk = self.b.get_chunk(self.start);
+        if self.start + chunk.len() > self.end {
+            chunk = &chunk[..self.end - self.start];
+        }
+        self.start += chunk.len();
+        Some(chunk)
     }
 }
 

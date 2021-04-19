@@ -5,7 +5,7 @@ use tokio::sync::Notify;
 
 use crate::{
     util::buf_traits::DiscontiguousBuf,
-    util::{buf_deque::BufDeque, buf_traits::ReadAt},
+    util::{buf_deque::BufDeque, buf_traits::{ReadAt, DiscontiguousBufExt}},
 };
 
 use super::{writer_replay::WriterReplay, ReplayHeader};
@@ -72,14 +72,9 @@ impl MergedReplay {
         debug_assert!(until <= writer.get_data().len());
 
         let writer_data = writer.get_data();
-        let mut cursor = self.data.len();
-        while cursor < until {
-            let mut chunk = writer_data.get_chunk(cursor);
-            if chunk.len() > until - cursor {
-                chunk = &chunk[..until - cursor];
-            }
+        let from = self.data.len();
+        for chunk in writer_data.iter_chunks(from, until) {
             self.data.write_all(chunk).unwrap();
-            cursor += chunk.len();
         }
     }
 
