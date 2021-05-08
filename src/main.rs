@@ -1,20 +1,8 @@
-use server::server::run_server;
+use faf_rust_replayserver::server::server::run_server;
 use tokio::join;
-use util::process::{setup_process_exit_on_panic, wait_for_signals};
+use faf_rust_replayserver::util::process::{setup_process_exit_on_panic, wait_for_signals};
 
-pub mod accept;
-pub mod config;
-pub mod database;
-pub mod metrics;
-pub mod replay;
-pub mod server;
-pub mod util;
-pub mod worker_threads;
-
-#[macro_use]
-pub mod error;
-
-use crate::config::InnerSettings;
+use faf_rust_replayserver::config::{Settings, InnerSettings};
 use tokio_util::sync::CancellationToken;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -47,7 +35,7 @@ async fn do_run_server() {
     join!(f1, f2);
 }
 
-fn start_prometheus_server(config: &config::Settings) -> bool {
+fn start_prometheus_server(config: &Settings) -> bool {
     let addr = format!("0.0.0.0:{}", config.server.prometheus_port);
     let parsed_addr = match addr.parse() {
         Err(e) => {
