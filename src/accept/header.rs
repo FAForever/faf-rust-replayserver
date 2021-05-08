@@ -63,7 +63,7 @@ pub mod header_reader {
 
     async fn read_connection_header(conn: &mut Connection) -> ConnResult<ConnectionHeader> {
         let type_ = read_type(conn).await.map_err(|e| match e {
-            ConnectionError::IO { source: e, .. } if e.kind() == ErrorKind::UnexpectedEof => ConnectionError::NoData,
+            ConnectionError::IO(e) if e.kind() == ErrorKind::UnexpectedEof => ConnectionError::NoData,
             e => e,
         })?;
         let (id, name) = read_game_data(conn).await?;
