@@ -4,8 +4,8 @@ pub enum ConnectionError {
     NoData,
     #[error("Bad data: {0}")]
     BadData(String),
-    #[error("IO error: {context}, {source}")]
-    IO { source: std::io::Error, context: String },
+    #[error("IO error: {0}")]
+    IO(#[from] std::io::Error),
     #[error("Could not assign connection to replay")]
     CannotAssignToReplay,
 }
@@ -13,15 +13,6 @@ pub enum ConnectionError {
 // Little shortcut for less typing,
 pub fn bad_data(what: impl Into<String>) -> ConnectionError {
     ConnectionError::BadData(what.into())
-}
-
-impl From<std::io::Error> for ConnectionError {
-    fn from(source: std::io::Error) -> ConnectionError {
-        ConnectionError::IO {
-            source,
-            context: String::new(),
-        }
-    }
 }
 
 pub type ConnResult<T> = Result<T, ConnectionError>;
