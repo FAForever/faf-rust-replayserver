@@ -37,3 +37,6 @@ jobs:
               with:
                   command: test
                   args: --features local_db_tests
+
+            - name: "Run tests that need separate processes"
+              run: timeout 30 ./test/run_process_tests.sh
