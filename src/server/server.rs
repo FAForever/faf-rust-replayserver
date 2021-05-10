@@ -8,7 +8,6 @@ use crate::{
 };
 use crate::{metrics, replay::save::SavedReplayDirectory};
 use futures::{stream::StreamExt, Stream};
-use log::{debug, info};
 use tokio_util::sync::CancellationToken;
 
 struct Server<C: Stream<Item = Connection>> {
@@ -44,7 +43,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
         let accept_connections = self.connections.for_each_concurrent(None, |mut c| async {
             match read_initial_header(&mut c, initial_timeout).await {
                 Err(e) => {
-                    info!("Could not accept connection: {}", e);
+                    log::info!("Could not accept connection: {}", e);
                     metrics::inc_served_conns::<()>(&Err(e));
                 }
                 Ok(_) => runner.dispatch_connection(c).await,
@@ -52,8 +51,8 @@ impl<C: Stream<Item = Connection>> Server<C> {
         });
 
         match cancellable(accept_connections, &self.shutdown_token).await {
-            Some(_) => debug!("Server stopped accepting connections for some reason!"),
-            None => debug!("Server shutting down"),
+            Some(_) => log::warn!("Server stopped accepting connections for some reason!"),
+            None => log::info!("Server shutting down"),
         }
 
         runner.shutdown();

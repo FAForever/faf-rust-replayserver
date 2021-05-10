@@ -37,7 +37,7 @@ impl Replays {
             Some(r) => Ok(r),
             None => {
                 if conn_header.type_ == ConnectionType::Reader {
-                    log::debug!("Replay id {} not found for {}", conn_header.id, c);
+                    log::info!("{} asked for replay {}, which is not running", c, conn_header.id);
                     Err(ConnectionError::CannotAssignToReplay)
                 } else {
                     let r = Rc::new((self.new_replay)(conn_header.id));
