@@ -1,8 +1,8 @@
 use faf_rust_replayserver::server::server::run_server;
-use tokio::join;
 use faf_rust_replayserver::util::process::{setup_process_exit_on_panic, wait_for_signals};
+use tokio::join;
 
-use faf_rust_replayserver::config::{Settings, InnerSettings};
+use faf_rust_replayserver::config::{InnerSettings, Settings};
 use tokio_util::sync::CancellationToken;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -955,30 +955,39 @@ mod tests {
         strat.finish();
 
         let mut merged_data = Vec::new();
-        strat.get_merged_replay().borrow_mut().get_data().reader().read_to_end(&mut merged_data).unwrap();
+        strat
+            .get_merged_replay()
+            .borrow_mut()
+            .get_data()
+            .reader()
+            .read_to_end(&mut merged_data)
+            .unwrap();
 
         // Now, filter out streams that split off alone.
         let mut common_pfx_bundles = vec![final_datas];
         for i in 0..replay_len {
             // For each bundle
-            common_pfx_bundles = common_pfx_bundles.into_iter().flat_map(|mut s| {
-                //If all replays ended here, then merging could've ended here.
-                if s.iter().all(|d| d.0.len() <= i) {
-                    return vec![s];
-                }
-                // Otherwise merging continued.
-                s = s.into_iter().filter(|d| d.0.len() > i).collect();
+            common_pfx_bundles = common_pfx_bundles
+                .into_iter()
+                .flat_map(|mut s| {
+                    //If all replays ended here, then merging could've ended here.
+                    if s.iter().all(|d| d.0.len() <= i) {
+                        return vec![s];
+                    }
+                    // Otherwise merging continued.
+                    s = s.into_iter().filter(|d| d.0.len() > i).collect();
 
-                // Split bundle based on whether the byte was changed.
-                let (a, b) = s.into_iter().partition(|d| d.0[i] == 0);
-                let mut ret = vec![a, b];
-                ret.sort_by_key(|b: &Vec<_>| -(b.len() as isize));
-                // Remove single offshoot if the other bundle has at least 2 streams.
-                if ret[1].len() <= 1 && ret[0].len() >= 2 {
-                    ret.pop();
-                }
-                ret
-            }).collect();
+                    // Split bundle based on whether the byte was changed.
+                    let (a, b) = s.into_iter().partition(|d| d.0[i] == 0);
+                    let mut ret = vec![a, b];
+                    ret.sort_by_key(|b: &Vec<_>| -(b.len() as isize));
+                    // Remove single offshoot if the other bundle has at least 2 streams.
+                    if ret[1].len() <= 1 && ret[0].len() >= 2 {
+                        ret.pop();
+                    }
+                    ret
+                })
+                .collect();
         }
         let remaining_datas: Vec<_> = common_pfx_bundles.into_iter().flatten().collect();
         let indices: Vec<_> = remaining_datas.iter().map(|t| t.1).collect();

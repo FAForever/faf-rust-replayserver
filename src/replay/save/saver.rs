@@ -1,6 +1,9 @@
 use std::{io::Read, sync::Arc};
 
-use crate::{config::Settings, database::database::Database, database::queries::Queries, metrics, replay::streams::MReplayRef, util::buf_traits::ReadAtExt};
+use crate::{
+    config::Settings, database::database::Database, database::queries::Queries, metrics, replay::streams::MReplayRef,
+    util::buf_traits::ReadAtExt,
+};
 
 use super::{writer::write_replay, ReplayJsonHeader, SavedReplayDirectory};
 use faf_replay_parser::scfa;
@@ -27,7 +30,7 @@ impl InnerReplaySaver {
         Self {
             db: Queries::new(db),
             save_dir,
-            compression_level
+            compression_level,
         }
     }
 
@@ -84,8 +87,8 @@ impl InnerReplaySaver {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::util::test::get_file;
     use crate::config::test::default_config;
+    use crate::util::test::get_file;
 
     #[test]
     fn saver_can_read_example_replay_ticks() {
