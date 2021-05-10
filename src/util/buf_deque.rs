@@ -5,13 +5,15 @@ use super::buf_traits::DiscontiguousBuf;
 
 const CHUNK_SIZE: usize = 4096;
 
-/* Buffer deque with discarding.
+/* A deque of buffers that acts as a "sliding window" of replay data. We can append data to the
+ * front and discard it from the back. We don't use a vector to avoid reallocating and moving
+ * memory all the time.
  * TODO think about a way to do zero-copy stuff.
  */
 pub struct BufDeque {
     chunks: VecDeque<Box<[u8; CHUNK_SIZE]>>,
     discarded_chunks: usize,
-    end: usize,
+    window_end: usize,
 }
 
 impl BufDeque {
@@ -19,17 +21,17 @@ impl BufDeque {
         Self {
             chunks: VecDeque::new(),
             discarded_chunks: 0,
-            end: 0,
+            window_end: 0,
         }
     }
 
-    fn discard_start(&self) -> usize {
+    fn window_start(&self) -> usize {
         self.discarded_chunks * CHUNK_SIZE
     }
 
-    fn relative_end(&self) -> usize {
-        assert!(self.discard_start() <= self.end);
-        self.end - self.discard_start()
+    fn window_size(&self) -> usize {
+        assert!(self.window_start() <= self.window_end);
+        self.window_end - self.window_start()
     }
 
     fn get_last_chunk(&mut self) -> &mut [u8; CHUNK_SIZE] {
@@ -41,8 +43,8 @@ impl BufDeque {
     }
 
     fn no_space_in_last_chunk(&self) -> bool {
-        assert!(self.discard_start() <= self.end);
-        self.relative_end() == self.chunks.len() * CHUNK_SIZE
+        assert!(self.window_start() <= self.window_end);
+        self.window_size() == self.chunks.len() * CHUNK_SIZE
     }
 
     /* Discard data at most up to 'until'.
@@ -63,21 +65,21 @@ impl BufDeque {
         let mut skipped = 0;
 
         // If we discarded beyond end, cut off the start
-        if self.end < self.discard_start() {
-            let data_discarded_beyond_end = self.discard_start() - self.end;
+        if self.window_end < self.window_start() {
+            let data_discarded_beyond_end = self.window_start() - self.window_end;
             let bytes_to_skip = std::cmp::min(data_discarded_beyond_end, buf.len());
             skipped = bytes_to_skip;
-            self.end += skipped;
+            self.window_end += skipped;
             buf = &buf[bytes_to_skip..];
         }
 
         // If we still have bytes to write, write them
         if !buf.is_empty() {
-            let offset = self.end % CHUNK_SIZE;
+            let offset = self.window_end % CHUNK_SIZE;
             let mut chunk: &mut [u8] = self.get_last_chunk();
             chunk = &mut chunk[offset..];
             written = chunk.write(buf).unwrap();
-            self.end += written;
+            self.window_end += written;
         }
         skipped + written
     }
@@ -85,17 +87,17 @@ impl BufDeque {
 
 impl DiscontiguousBuf for BufDeque {
     fn len(&self) -> usize {
-        self.end
+        self.window_end
     }
 
     /* We break contract here and potentially panic if discarded data is accessed. */
     fn get_chunk(&self, mut start: usize) -> &[u8] {
-        assert!(self.discard_start() <= start && start < self.end);
-        start -= self.discard_start();
+        assert!(self.window_start() <= start && start < self.window_end);
+        start -= self.window_start();
 
         let chunk_idx = start / CHUNK_SIZE;
         let chunk_start = start % CHUNK_SIZE;
-        let chunk_end = min(CHUNK_SIZE, self.relative_end() - (chunk_idx * CHUNK_SIZE));
+        let chunk_end = min(CHUNK_SIZE, self.window_size() - (chunk_idx * CHUNK_SIZE));
 
         let chunk = &**self.chunks.get(chunk_idx).unwrap();
         &chunk[chunk_start..chunk_end]
