@@ -46,6 +46,7 @@ Code improvement checklist
 
 Code that needs no real improvement is marked with ✓.
 
+```
 ├── accept ✓
 ├── config.rs ✓ (could add validation)
 ├── database ✓
@@ -73,5 +74,6 @@ Code that needs no real improvement is marked with ✓.
 │   ├── connection.rs ✓
 │   └── server.rs ✓ (maybe more tests)
 ├── util ✓
+```
 
 TL; DR the only thing that still feels bad is the whole state machine of replays.
