@@ -2,9 +2,9 @@ use super::connection::Connection;
 use crate::accept::header::read_initial_header;
 use crate::database::database::Database;
 use crate::util::timeout::cancellable;
-use crate::worker_threads::WorkerThreadPool;
+use crate::replay::runner::ReplayRunner;
 use crate::{
-    accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver, worker_threads::WorkerThreadWork,
+    accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver,
 };
 use crate::{metrics, replay::save::SavedReplayDirectory};
 use futures::{stream::StreamExt, Stream};
@@ -38,8 +38,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
 
     async fn run(self) {
         let saver = InnerReplaySaver::new(self.db, self.dir, &self.config);
-        let replay_work = WorkerThreadWork::new(self.config.clone(), self.shutdown_token.clone(), saver);
-        let thread_pool = WorkerThreadPool::new(replay_work, self.config.server.worker_threads);
+        let runner = ReplayRunner::new(self.config.clone(), self.shutdown_token.clone(), saver);
 
         let initial_timeout = self.config.server.connection_accept_timeout_s;
         let accept_connections = self.connections.for_each_concurrent(None, |mut c| async {
@@ -48,7 +47,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
                     info!("Could not accept connection: {}", e);
                     metrics::inc_served_conns::<()>(&Err(e));
                 }
-                Ok(_) => thread_pool.assign_connection(c).await,
+                Ok(_) => runner.dispatch_connection(c).await,
             }
         });
 
@@ -57,7 +56,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
             None => debug!("Server shutting down"),
         }
 
-        thread_pool.join();
+        runner.shutdown();
     }
 }
 
