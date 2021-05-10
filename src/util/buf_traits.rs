@@ -1,9 +1,8 @@
 use std::{cell::RefCell, io::Read, rc::Rc};
 
-// Buffer made up of smaller contiguous chunks. We use those to discard data more easily.
+// Convenience traits for working with non-contiguous buffers and reading from things behind a
+// RefCell.
 
-// We slighly break rules for buffers we can discard from. Trying to access data that was already
-// discarded causes a panic.
 pub trait DiscontiguousBuf {
     // Get a contiguous chunk starting from start. Panics if start >= len.
     fn get_chunk(&self, start: usize) -> &[u8];
@@ -37,11 +36,12 @@ impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
         at
     }
 
-    /* Can't implement Index for generic trait :( */
+    // Can't implement Index for generic trait :(
     fn at(&self, pos: usize) -> u8 {
         self.get_chunk(pos)[0]
     }
 
+    // Iterate over chunks from start to end.
     fn iter_chunks(&self, start: usize, end: usize) -> IterChunks<'_, Self> {
         assert!(start <= end);
         assert!(start <= self.len());

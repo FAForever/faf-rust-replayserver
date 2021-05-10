@@ -5,7 +5,10 @@ use tokio::sync::Notify;
 
 use crate::{
     util::buf_traits::DiscontiguousBuf,
-    util::{buf_deque::BufDeque, buf_traits::{ReadAt, DiscontiguousBufExt}},
+    util::{
+        buf_deque::BufDeque,
+        buf_traits::{DiscontiguousBufExt, ReadAt},
+    },
 };
 
 use super::{writer_replay::WriterReplay, ReplayHeader};

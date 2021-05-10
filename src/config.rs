@@ -50,7 +50,7 @@ pub struct DatabaseSettings {
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct StorageSettings {
     pub vault_path: String,
-    pub compression_level: u32
+    pub compression_level: u32,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]

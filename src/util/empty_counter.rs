@@ -1,6 +1,8 @@
 use futures::Future;
 use tokio::{select, sync::watch, time::Duration};
 
+// A counter that can be incremented & decremented, and that you can wait on until it has been
+// empty for a specified amount of time.
 pub struct EmptyCounter {
     counter: watch::Sender<usize>,
     watcher: watch::Receiver<usize>,
