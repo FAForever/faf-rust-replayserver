@@ -40,3 +40,38 @@ TODOs
 
 * More tests in src/replay.
 * Add process tests to CI, maybe.
+
+Code improvement checklist
+--------------------------
+
+Code that needs no real improvement is marked with ✓.
+
+├── accept ✓
+├── config.rs ✓ (could add validation)
+├── database ✓
+├── error.rs ✓
+├── main.rs ✓
+├── metrics.rs ✓
+├── process_test ✓
+├── replay
+│   ├── receive
+│   │   ├── merger.rs
+│   │   ├── merge_strategy.rs
+│   │   ├── quorum_merge_strategy.rs
+│   │   └── replay_delay.rs
+│   ├── replay.rs ✓ (maybe more tests)
+│   ├── replays.rs ✓
+│   ├── save ✓
+│   ├── send ✓
+│   ├── streams
+│   │   ├── header.rs ✓
+│   │   ├── merged_replay_reader.rs
+│   │   ├── merged_replay.rs
+│   │   └── writer_replay.rs
+│   └── runner.rs ✓
+├── server
+│   ├── connection.rs ✓
+│   └── server.rs ✓ (maybe more tests)
+├── util ✓
+
+TL; DR the only thing that still feels bad is the whole state machine of replays.
