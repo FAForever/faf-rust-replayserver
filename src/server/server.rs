@@ -1,11 +1,9 @@
 use super::connection::Connection;
 use crate::accept::header::read_initial_header;
 use crate::database::database::Database;
-use crate::util::timeout::cancellable;
 use crate::replay::runner::ReplayRunner;
-use crate::{
-    accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver,
-};
+use crate::util::timeout::cancellable;
+use crate::{accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver};
 use crate::{metrics, replay::save::SavedReplayDirectory};
 use futures::{stream::StreamExt, Stream};
 use tokio_util::sync::CancellationToken;
