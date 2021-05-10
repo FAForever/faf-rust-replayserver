@@ -39,7 +39,6 @@ TODOs
 -----
 
 * More tests in src/replay.
-* Add process tests to CI, maybe.
 
 Code improvement checklist
 --------------------------
