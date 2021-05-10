@@ -8,8 +8,12 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{config::Settings, replay::save::ReplaySaver, replay::Replays, server::connection::Connection};
 
-fn handle_replays(config: Settings, shutdown_token: CancellationToken, saver: ReplaySaver) -> impl FnOnce(Receiver<Connection>) + Clone + Send {
-   move |s| {
+fn handle_replays(
+    config: Settings,
+    shutdown_token: CancellationToken,
+    saver: ReplaySaver,
+) -> impl FnOnce(Receiver<Connection>) + Clone + Send {
+    move |s| {
         let mut replays = Replays::new(shutdown_token, config, saver);
         let wrapper = ReceiverStream::new(s);
 
@@ -20,7 +24,7 @@ fn handle_replays(config: Settings, shutdown_token: CancellationToken, saver: Re
         local_loop.block_on(async {
             replays.handle_connections_and_replays(wrapper).await;
         });
-   }
+    }
 }
 
 struct WorkerThread {
@@ -67,7 +71,7 @@ impl ReplayRunner {
         }
         Self { replay_workers }
     }
-    
+
     pub async fn dispatch_connection(&self, conn: Connection) {
         let conn_info = conn.get_header();
         let worker_to_pick = (conn_info.id % self.replay_workers.len() as u64) as usize;
