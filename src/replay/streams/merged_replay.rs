@@ -1,13 +1,13 @@
 use std::{cell::RefCell, io::Read, io::Write, rc::Rc};
 
 use futures::Future;
-use tokio::sync::Notify;
 
 use crate::{
     util::buf_traits::DiscontiguousBuf,
     util::{
         buf_deque::BufDeque,
         buf_traits::{DiscontiguousBufExt, ReadAt},
+        event::Event,
     },
 };
 
@@ -18,7 +18,7 @@ pub struct MergedReplay {
     header: Option<ReplayHeader>,
     delayed_data_len: usize,
     finished: bool,
-    delayed_data_notification: Rc<Notify>,
+    delayed_data_notification: Event,
 }
 
 impl MergedReplay {
@@ -28,7 +28,7 @@ impl MergedReplay {
             header: None,
             delayed_data_len: 0,
             finished: false,
-            delayed_data_notification: Rc::new(Notify::new()),
+            delayed_data_notification: Event::new(),
         }
     }
 
@@ -49,13 +49,13 @@ impl MergedReplay {
     }
 
     pub fn wait_for_more_data(&self) -> impl Future<Output = ()> {
-        let wait = self.delayed_data_notification.clone();
+        let wait = self.delayed_data_notification.wait();
         let finished = self.finished;
         async move {
             if finished {
                 return;
             }
-            wait.notified().await;
+            wait.await;
         }
     }
 
@@ -63,7 +63,7 @@ impl MergedReplay {
         debug_assert!(!self.finished);
         debug_assert!(self.get_data().len() == 0);
         self.header = Some(header);
-        self.delayed_data_notification.notify_waiters();
+        self.delayed_data_notification.notify();
     }
 
     pub fn get_header(&self) -> Option<&ReplayHeader> {
@@ -89,12 +89,12 @@ impl MergedReplay {
         debug_assert!(len <= self.data.len());
         debug_assert!(!self.finished);
         self.delayed_data_len = len;
-        self.delayed_data_notification.notify_waiters();
+        self.delayed_data_notification.notify();
     }
 
     pub fn finish(&mut self) {
         self.finished = true;
-        self.delayed_data_notification.notify_waiters();
+        self.delayed_data_notification.notify();
     }
 }
 
