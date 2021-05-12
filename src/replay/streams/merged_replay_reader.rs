@@ -1,6 +1,5 @@
 use std::io::Read;
 
-use futures::Future;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use crate::{replay::streams::MReplayRef, util::buf_traits::ReadAtExt};
