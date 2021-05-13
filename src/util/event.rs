@@ -33,20 +33,19 @@ impl Waiter {
             // We're in a single thread and not reentrant, it's fine
             let version = self.version.get();
             if self.last < version {
-                return
+                return;
             } else {
                 notify.await
             }
         }
     }
-
 }
 
 impl Event {
     pub fn new() -> Self {
         Self {
             notify: Rc::new(Notify::new()),
-            version: Rc::new(Cell::new(0))
+            version: Rc::new(Cell::new(0)),
         }
     }
 
@@ -73,8 +72,8 @@ impl Drop for Event {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{Arc, Mutex};
     use futures::FutureExt;
+    use std::sync::{Arc, Mutex};
     use tokio::sync::Barrier;
 
     use super::*;
