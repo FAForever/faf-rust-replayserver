@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, rc::Rc};
+use std::{cell::Cell, rc::Rc};
 
 use futures::Future;
 use tokio::sync::Notify;
@@ -17,12 +17,12 @@ use tokio::sync::Notify;
 // * Task one is waken up.
 pub struct Event {
     notify: Rc<Notify>,
-    version: Rc<UnsafeCell<usize>>,
+    version: Rc<Cell<usize>>,
 }
 
 pub struct Waiter {
     notify: Rc<Notify>,
-    version: Rc<UnsafeCell<usize>>,
+    version: Rc<Cell<usize>>,
     last: usize,
 }
 
@@ -31,7 +31,7 @@ impl Waiter {
         loop {
             let notify = self.notify.notified();
             // We're in a single thread and not reentrant, it's fine
-            let version = unsafe { *self.version.get() };
+            let version = self.version.get();
             if self.last < version {
                 return
             } else {
@@ -46,7 +46,7 @@ impl Event {
     pub fn new() -> Self {
         Self {
             notify: Rc::new(Notify::new()),
-            version: Rc::new(UnsafeCell::new(0))
+            version: Rc::new(Cell::new(0))
         }
     }
 
@@ -54,13 +54,13 @@ impl Event {
         let w = Waiter {
             notify: self.notify.clone(),
             version: self.version.clone(),
-            last: unsafe { *self.version.get() }
+            last: self.version.get(),
         };
         w.wait()
     }
 
     pub fn notify(&mut self) {
-        unsafe { *self.version.get() += 1 };
+        self.version.set(self.version.get() + 1);
         self.notify.notify_waiters();
     }
 }
