@@ -28,13 +28,15 @@ pub struct Waiter {
 
 impl Waiter {
     pub async fn wait(self) {
-        let notify = self.notify.notified();
-        // We're in a single thread and not reentrant, it's fine
-        let version = unsafe { *self.version.get() };
-        if self.last < version {
-            return
-        } else {
-            notify.await
+        loop {
+            let notify = self.notify.notified();
+            // We're in a single thread and not reentrant, it's fine
+            let version = unsafe { *self.version.get() };
+            if self.last < version {
+                return
+            } else {
+                notify.await
+            }
         }
     }
 
@@ -65,8 +67,7 @@ impl Event {
 
 impl Drop for Event {
     fn drop(&mut self) {
-        // Release any waiters that are still waiting.
-        unsafe { *self.version.get() += 1 };
+        self.notify()
     }
 }
 
