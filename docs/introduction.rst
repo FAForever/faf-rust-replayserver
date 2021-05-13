@@ -4,8 +4,8 @@ Introduction
 SCFA has a replay watching feature. When a game starts, the FA process can
 connect to a replay server. As the game progresses, it sends the game's replay
 to that server. Another player using FAF can then watch the game by connecting
-to the same server. Additionally, the server saves replays server-side, so anyone can
-watch them later.
+to the same server. Additionally, the server saves replays server-side, so
+anyone can watch them later.
 
 Back in GPG times, things were simple - you picked a game, you picked a player,
 you received his replay data. The server just forwarded data streams between

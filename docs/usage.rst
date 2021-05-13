@@ -10,7 +10,8 @@ Dockerfile, or better yet, a github release. The server is integrated into
 `faf-stack <https://github.com/FAForever/faf-stack>`_.
 
 To release a new version, just tag the commit and prepare a release on Github.
-A release Github action should do the rest.
+A release Github action should do the rest, AKA build and push an image to
+Dockerhub.
 
 Configuration
 -------------
