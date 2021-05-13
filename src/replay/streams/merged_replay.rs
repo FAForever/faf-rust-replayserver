@@ -49,13 +49,15 @@ impl MergedReplay {
     }
 
     pub fn wait_for_more_data(&self) -> impl Future<Output = ()> {
-        let wait = self.delayed_data_notification.wait();
-        let finished = self.finished;
+        let wait = if self.finished {
+            None
+        } else {
+            Some(self.delayed_data_notification.wait())
+        };
         async move {
-            if finished {
-                return;
+            if let Some(w) = wait {
+                w.await;
             }
-            wait.await;
         }
     }
 
