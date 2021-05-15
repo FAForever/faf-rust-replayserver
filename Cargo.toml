@@ -38,7 +38,7 @@ rand = "0.8.3"
 serde = { version = "1.0.125", features = ["derive"] }
 serde_json = "1.0.64"
 signal-hook = "0.3.7"
-sqlx = { version = "0.5.1", features = ["runtime-tokio-rustls", "mysql", "time"] }
+sqlx = { version = "0.5.1", features = ["runtime-tokio-native-tls", "mysql", "time", "offline"] }
 thiserror = "1.0.24"
 time = { version = "0.2.26", features = ["std"] }
 tokio-stream = { version = "0.1.5", features = ["net"] }

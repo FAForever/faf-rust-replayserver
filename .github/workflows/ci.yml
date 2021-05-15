@@ -11,6 +11,7 @@ jobs:
         env:
             DB_HOST: localhost
             DB_PORT: 3306
+            DATABASE_URL: "mysql://root:banana@127.0.0.1:3306/faf"
         steps:
             - uses: actions/checkout@v2
             - uses: actions-rs/toolchain@v1

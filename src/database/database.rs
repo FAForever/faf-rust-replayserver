@@ -62,7 +62,7 @@ impl Database {
     // I wonder if they interact badly with the language server.
 
     pub async fn get_team_players(&self, id: u64) -> Result<Vec<TeamPlayerRow>, SaveError> {
-        let query = "
+        Ok(sqlx::query_as!(TeamPlayerRow, "
             SELECT
                 `login`.`login` AS login,
                 `game_player_stats`.`team` AS team
@@ -72,16 +72,14 @@ impl Database {
             INNER JOIN `login`
               ON `login`.id = `game_player_stats`.`playerId`
             WHERE `game_stats`.`id` = ? AND `game_player_stats`.`AI` = 0
-        ";
-        Ok(sqlx::query_as::<_, TeamPlayerRow>(query)
-            .bind(id)
+            ", id)
             .fetch_all(&self.pool)
             .await?)
     }
 
     pub async fn get_game_stat_row(&self, id: u64) -> Result<GameStatRow, SaveError> {
         // TODO is table_map obsolete? Gotta ask.
-        let query = "
+        Ok(sqlx::query_as!(GameStatRow, "
             SELECT
                 `game_stats`.`startTime` AS start_time,
                 `game_stats`.`endTime` AS end_time,
@@ -98,20 +96,16 @@ impl Database {
             LEFT JOIN `table_map`
               ON `game_stats`.`mapId` = `table_map`.`id`
             WHERE `game_stats`.`id` = ?
-        ";
-        Ok(sqlx::query_as::<_, GameStatRow>(query)
-            .bind(id)
+            ", id)
             .fetch_one(&self.pool)
             .await?)
     }
 
     pub async fn get_player_count(&self, id: u64) -> Result<i64, SaveError> {
-        let query = "
+        Ok(sqlx::query_as!(PlayerCount,"
            SELECT COUNT(*) AS count FROM `game_player_stats`
            WHERE `game_player_stats`.`gameId` = ?
-        ";
-        Ok(sqlx::query_as::<_, PlayerCount>(query)
-            .bind(id)
+           ", id)
             .fetch_one(&self.pool)
             .await?
             .count)
@@ -144,6 +138,7 @@ impl Database {
         ",
             game_mod = game_mod
         );
+        // This can't be a macro
         match sqlx::query_as::<_, ModVersions>(query.as_str())
             .fetch_all(&self.pool)
             .await

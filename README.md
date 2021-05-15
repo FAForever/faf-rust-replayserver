@@ -28,6 +28,22 @@ cargo build --features process_tests
 ./test/run_process_tests.sh
 ```
 
+Sqlx compile-time checks
+------------------------
+
+Database queries are checked for correctness at compile time. You'll need to
+run FAF database from faf-stack and set DATABASE_URL env var to
+"mysql://root:banana@127.0.0.1:3306/faf" for compilation to work.
+
+Results of compile-time checking are saved to sqlx-data.json, which lets us
+compile on CI without setting up faf-stack. If you're changing DB queries, run the following command:
+
+```
+env DATABASE_URL="mysql://root:banana@127.0.0.1:3306/faf" cargo sqlx prepare -- --lib
+```
+
+In order to regenerate the file.
+
 Coverage
 --------
 
