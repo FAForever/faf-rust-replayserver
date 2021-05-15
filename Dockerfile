@@ -2,7 +2,7 @@ FROM rust:1.50.0 AS builder
 
 WORKDIR /server
 ADD . /server
-RUN cargo build --release
+RUN env SQLX_OFFLINE=true cargo build --release
 
 FROM gcr.io/distroless/cc
 LABEL maintainer="ikotrasinsk@gmail.com"
