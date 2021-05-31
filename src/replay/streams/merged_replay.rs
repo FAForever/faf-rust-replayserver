@@ -1,12 +1,13 @@
 use std::{cell::RefCell, io::Read, io::Write, rc::Rc};
 
 use futures::Future;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use crate::{
     util::buf_traits::DiscontiguousBuf,
     util::{
         buf_deque::BufDeque,
-        buf_traits::{DiscontiguousBufExt, ReadAt},
+        buf_traits::{DiscontiguousBufExt, ReadAt, ReadAtExt},
         event::Event,
     },
 };
@@ -118,5 +119,24 @@ impl ReadAt for MergedReplay {
 }
 
 pub type MReplayRef = Rc<RefCell<MergedReplay>>;
+
+pub async fn write_replay_stream(replay: &MReplayRef, c: &mut (impl AsyncWrite + Unpin)) -> std::io::Result<()> {
+    let mut buf: Box<[u8]> = Box::new([0; 4096]);
+    let mut reader = replay.reader();
+    loop {
+        let r = replay.borrow();
+        if r.delayed_len() <= reader.position() && r.is_finished() {
+            return Ok(());
+        }
+        drop(r);
+
+        let data_read = reader.read(&mut *buf).unwrap();
+        c.write_all(&buf[..data_read]).await?;
+        if data_read == 0 {
+            let f = replay.borrow().wait_for_more_data();
+            f.await;
+        }
+    }
+}
 
 // TODO tests

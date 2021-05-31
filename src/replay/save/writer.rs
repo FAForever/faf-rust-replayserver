@@ -1,9 +1,9 @@
+use crate::replay::streams::write_replay_stream;
 use crate::replay::streams::MReplayRef;
-use crate::replay::streams::MergedReplayReader;
 use async_compression::tokio::write::ZstdEncoder;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
-pub async fn write_replay(
+pub async fn write_replay_file(
     mut to: impl AsyncWrite + Unpin,
     json_header: impl serde::Serialize,
     replay: MReplayRef,
@@ -13,8 +13,7 @@ pub async fn write_replay(
     to.write_all("\n".as_bytes()).await?;
     let clevel = async_compression::Level::Precise(compression_level);
     let mut encoder = ZstdEncoder::with_quality(to, clevel);
-    let mut replay_writer = MergedReplayReader::new(replay);
-    replay_writer.write_to(&mut encoder).await?;
+    write_replay_stream(&replay, &mut encoder).await?;
     encoder.shutdown().await?;
     Ok(())
 }

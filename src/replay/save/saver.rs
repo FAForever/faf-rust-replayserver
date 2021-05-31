@@ -5,7 +5,7 @@ use crate::{
     util::buf_traits::ReadAtExt,
 };
 
-use super::{writer::write_replay, ReplayJsonHeader, SavedReplayDirectory};
+use super::{writer::write_replay_file, ReplayJsonHeader, SavedReplayDirectory};
 use faf_replay_parser::scfa;
 
 pub type ReplaySaver = Arc<InnerReplaySaver>;
@@ -67,7 +67,7 @@ impl InnerReplaySaver {
             }
             Ok(f) => f,
         };
-        if let Err(e) = write_replay(target_file, json_header, replay, self.compression_level).await {
+        if let Err(e) = write_replay_file(target_file, json_header, replay, self.compression_level).await {
             log::warn!("Failed to write out replay {}: {}", id, e);
             return false;
         }

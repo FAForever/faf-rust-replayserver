@@ -62,7 +62,9 @@ impl Database {
     // I wonder if they interact badly with the language server.
 
     pub async fn get_team_players(&self, id: u64) -> Result<Vec<TeamPlayerRow>, SaveError> {
-        Ok(sqlx::query_as!(TeamPlayerRow, "
+        Ok(sqlx::query_as!(
+            TeamPlayerRow,
+            "
             SELECT
                 `login`.`login` AS login,
                 `game_player_stats`.`team` AS team
@@ -72,14 +74,18 @@ impl Database {
             INNER JOIN `login`
               ON `login`.id = `game_player_stats`.`playerId`
             WHERE `game_stats`.`id` = ? AND `game_player_stats`.`AI` = 0
-            ", id)
-            .fetch_all(&self.pool)
-            .await?)
+            ",
+            id
+        )
+        .fetch_all(&self.pool)
+        .await?)
     }
 
     pub async fn get_game_stat_row(&self, id: u64) -> Result<GameStatRow, SaveError> {
         // TODO is table_map obsolete? Gotta ask.
-        Ok(sqlx::query_as!(GameStatRow, "
+        Ok(sqlx::query_as!(
+            GameStatRow,
+            "
             SELECT
                 `game_stats`.`startTime` AS start_time,
                 `game_stats`.`endTime` AS end_time,
@@ -96,19 +102,25 @@ impl Database {
             LEFT JOIN `table_map`
               ON `game_stats`.`mapId` = `table_map`.`id`
             WHERE `game_stats`.`id` = ?
-            ", id)
-            .fetch_one(&self.pool)
-            .await?)
+            ",
+            id
+        )
+        .fetch_one(&self.pool)
+        .await?)
     }
 
     pub async fn get_player_count(&self, id: u64) -> Result<i64, SaveError> {
-        Ok(sqlx::query_as!(PlayerCount,"
+        Ok(sqlx::query_as!(
+            PlayerCount,
+            "
            SELECT COUNT(*) AS count FROM `game_player_stats`
            WHERE `game_player_stats`.`gameId` = ?
-           ", id)
-            .fetch_one(&self.pool)
-            .await?
-            .count)
+           ",
+            id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .count)
     }
 
     pub async fn get_mod_version_list(&self, game_mod: &str) -> Result<Vec<ModVersions>, SaveError> {
