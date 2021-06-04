@@ -150,7 +150,7 @@ mod test {
         tokio::time::pause();
 
         let mut mock_saver = InnerReplaySaver::faux();
-        faux::when!(mock_saver.save_replay).then_do(|| ());
+        faux::when!(mock_saver.save_replay).then(|_| ());
 
         let token = CancellationToken::new();
         let mut config = default_config();
@@ -192,7 +192,7 @@ mod test {
         tokio::time::pause();
 
         let mut mock_saver = InnerReplaySaver::faux();
-        faux::when!(mock_saver.save_replay).then_do(|| ());
+        faux::when!(mock_saver.save_replay).then(|_| ());
         let token = CancellationToken::new();
         let config = default_config();
 
@@ -246,7 +246,7 @@ mod test {
         tokio::time::pause();
 
         let mut mock_saver = InnerReplaySaver::faux();
-        faux::when!(mock_saver.save_replay).then_do(|| ());
+        faux::when!(mock_saver.save_replay).then(|_| ());
         let token = CancellationToken::new();
         let mut config = default_config();
         config.replay.time_with_zero_writers_to_end_replay_s = Duration::from_secs(2);
