@@ -25,30 +25,30 @@ path = "src/process_test/process_panic.rs"
 required-features = ["process_tests"]
 
 [dependencies]
-async-compression = { version = "0.3.7", features = ["tokio", "zstd"] }
-async-stream = "0.3.0"
+async-compression = { version = "0.3.8", features = ["tokio", "zstd"] }
+async-stream = "0.3.2"
 config = { version = "0.11.0", features = ["yaml"] }
 env_logger = "0.8.3"
 faf-replay-parser = "0.5.1"
-futures = "0.3.13"
+futures = "0.3.15"
 lazy_static = "1.4.0"
-log = "0.4.11"
-prometheus_exporter = "0.8.0"
+log = "0.4.14"
+prometheus_exporter = "0.8.2"
 rand = "0.8.3"
-serde = { version = "1.0.125", features = ["derive"] }
+serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
-signal-hook = "0.3.7"
-sqlx = { version = "0.5.1", features = ["runtime-tokio-native-tls", "mysql", "time", "offline"] }
-thiserror = "1.0.24"
+signal-hook = "0.3.9"
+sqlx = { version = "0.5.5", features = ["runtime-tokio-native-tls", "mysql", "time", "offline"] }
+thiserror = "1.0.25"
 time = { version = "0.2.26", features = ["std"] }
-tokio-stream = { version = "0.1.5", features = ["net"] }
-tokio-util = "0.6.5"
+tokio-stream = { version = "0.1.6", features = ["net"] }
+tokio-util = "0.6.7"
 weak-table = "0.3.0"
 
 [dependencies.tokio]
-version = "1.4.0"
+version = "1.6.1"
 features = ["sync", "net", "io-util", "rt", "macros", "test-util", "time"]
 
 [dev-dependencies]
-faux = "0.0.7"
+faux = "0.1.2"
 tempfile = "3.2.0"
