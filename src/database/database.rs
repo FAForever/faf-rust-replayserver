@@ -446,8 +446,8 @@ pub mod test {
 
     pub fn mock_database() -> Database {
         let mut mock_db = Database::faux();
-        faux::when!(mock_db.get_game_stat_row).safe_then(|_id| Ok(default_game_stats()));
-        faux::when!(mock_db.get_team_players).safe_then(|_id| {
+        faux::when!(mock_db.get_game_stat_row).then(|_id| Ok(default_game_stats()));
+        faux::when!(mock_db.get_team_players).then(|_id| {
             Ok(vec![
                 TeamPlayerRow {
                     login: "user1".into(),
@@ -467,8 +467,8 @@ pub mod test {
                 },
             ])
         });
-        faux::when!(mock_db.get_player_count).safe_then(|_id| Ok(4));
-        faux::when!(mock_db.get_mod_version_list).then_do(|| {
+        faux::when!(mock_db.get_player_count).then(|_id| Ok(4));
+        faux::when!(mock_db.get_mod_version_list).then(|_| {
             Ok(vec![
                 ModVersions {
                     file_id: 50,
@@ -484,7 +484,7 @@ pub mod test {
                 },
             ])
         });
-        faux::when!(mock_db.update_game_stats).safe_then(|(_id, _ticks, _saved)| Ok(()));
+        faux::when!(mock_db.update_game_stats).then(|(_id, _ticks, _saved)| Ok(()));
         mock_db
     }
 }

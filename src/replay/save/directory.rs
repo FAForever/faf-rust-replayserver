@@ -78,7 +78,7 @@ pub mod test {
 
     pub fn test_directory() -> SavedReplayDirectory {
         let mut f = SavedReplayDirectory::faux();
-        faux::when!(f.touch_and_return_file).then_do(|| Ok(Box::new(sink())));
+        faux::when!(f.touch_and_return_file).then(|_| Ok(Box::new(sink())));
         f
     }
 }

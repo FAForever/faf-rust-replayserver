@@ -136,8 +136,8 @@ mod test {
             game_mod: Some("faf".into()),
             file_name: None,
         };
-        faux::when!(mdb.get_game_stat_row).safe_then(move |_| Ok(null_stats()));
-        faux::when!(mdb.get_player_count).safe_then(|_| Ok(4));
+        faux::when!(mdb.get_game_stat_row).then(move |_| Ok(null_stats()));
+        faux::when!(mdb.get_player_count).then(|_| Ok(4));
 
         let q = Queries::new(mdb);
         let stats = q.get_game_stats(1).await.unwrap();

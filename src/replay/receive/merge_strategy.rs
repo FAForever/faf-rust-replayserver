@@ -13,13 +13,13 @@ use crate::replay::{streams::MReplayRef, streams::WReplayRef};
 //   * A replay has a header, data and a delayed position in the data. A header can be added, data
 //     can be appended, delayed position can increase.
 //   * The strategy is called when a replay is added, finished, a replay's header is added, a
-//     replay's data or delayed data changes. Callbacks are called quickly but not immediately, a
-//     replay could've received more data or finished before its data updated/finished callback was
-//     called.
-//   * A replay is added, then (optionally) its header is added and its data changes, then it is
-//     finished.
-//   * Before calling replay_removed(), replay_data_update() will be called one last time with all
+//     replay's data or delayed data changes. Callbacks are called immediately after a replay
+//     changes, but there's no guarantee other replays didn't change as well in the meantime.
+//   * A replay is added, then (optionally) its header is added, then its data and delayed data
+//     changes, then it is finished.
+//   * Before calling replay_removed(), replay_data_updated() will be called one last time with all
 //     replay data present.
+//
 // * We define a canonical replay C.
 //   * The strategy sets C's header, writes data to C, sets C's delayed position and finishes C
 //     based on R.
@@ -29,7 +29,7 @@ use crate::replay::{streams::MReplayRef, streams::WReplayRef};
 //  * After all replays are added, processed and removed, finish() is called. At finish(),
 //    strategy should merge all outstanding data.
 pub trait MergeStrategy {
-    /* We use IDs to identify replays for simplicity, */
+    /* We use IDs to identify replays. */
     fn replay_added(&mut self, w: WReplayRef) -> u64;
     fn replay_removed(&mut self, id: u64);
     fn replay_header_added(&mut self, id: u64);
