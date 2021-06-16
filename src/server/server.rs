@@ -41,7 +41,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
         let accept_connections = self.connections.for_each_concurrent(None, |mut c| async {
             match read_initial_header(&mut c, initial_timeout).await {
                 Err(e) => {
-                    log::info!("Could not accept connection: {}", e);
+                    log::info!("Could not accept {}: {}", c, e);
                     metrics::inc_served_conns::<()>(&Err(e));
                 }
                 Ok(_) => runner.dispatch_connection(c).await,

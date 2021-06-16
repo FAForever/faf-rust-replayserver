@@ -30,7 +30,10 @@ impl ReplaySender {
     }
 
     async fn do_send_replay_to_connection(&self, c: &mut Connection) -> std::io::Result<()> {
-        write_replay_stream(&self.merged_replay, c).await?;
-        c.shutdown().await
+        let written = write_replay_stream(&self.merged_replay, c).await?;
+        c.flush().await?;
+        c.shutdown().await?;
+        log::debug!("{} ended, wrote {} bytes total", c, written);
+        Ok(())
     }
 }

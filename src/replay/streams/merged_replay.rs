@@ -37,6 +37,10 @@ impl MergedReplay {
         self.get_header().map_or(0, |h| h.data.len())
     }
 
+    pub fn len(&self) -> usize {
+        self.header_len() + self.data.len()
+    }
+
     pub fn delayed_data_len(&self) -> usize {
         self.delayed_data_len
     }
@@ -120,13 +124,13 @@ impl ReadAt for MergedReplay {
 
 pub type MReplayRef = Rc<RefCell<MergedReplay>>;
 
-pub async fn write_replay_stream(replay: &MReplayRef, c: &mut (impl AsyncWrite + Unpin)) -> std::io::Result<()> {
+pub async fn write_replay_stream(replay: &MReplayRef, c: &mut (impl AsyncWrite + Unpin)) -> std::io::Result<usize> {
     let mut buf: Box<[u8]> = Box::new([0; 4096]);
     let mut reader = replay.reader();
     loop {
         let r = replay.borrow();
         if r.delayed_len() <= reader.position() && r.is_finished() {
-            return Ok(());
+            return Ok(reader.position());
         }
         drop(r);
 

@@ -86,12 +86,16 @@ impl Replay {
         self.wait_until_there_were_no_writers_for_a_while().await;
         self.should_stop_accepting_connections.set(true);
         log::debug!("{} stopped accepting connections", self);
+
         self.writer_connection_count.wait_until_empty().await;
         self.merger.finalize();
-        log::debug!("{} finished merging data", self);
+        let rlen = self.merger.get_merged_replay().borrow().len();
+        log::debug!("{} finished merging data ({} bytes total)", self, rlen);
+
         self.saver.save_replay(self.merger.get_merged_replay(), self.id).await;
         self.reader_connection_count.wait_until_empty().await;
         log::info!("{} ended", self);
+
         // Cancel to return from timeout
         self.replay_timeout_token.cancel();
         metrics::RUNNING_REPLAYS.dec();
