@@ -58,9 +58,6 @@ impl Database {
         Self { pool }
     }
 
-    // TODO: use compile-time query checks once some integration with faf-stack is added.
-    // I wonder if they interact badly with the language server.
-
     pub async fn get_team_players(&self, id: u64) -> Result<Vec<TeamPlayerRow>, SaveError> {
         Ok(sqlx::query_as!(
             TeamPlayerRow,
