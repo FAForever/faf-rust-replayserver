@@ -11,12 +11,6 @@ pub type ReaderType = Box<dyn AsyncBufRead + Send>;
 pub type WriterType = Box<dyn AsyncWrite + Send>;
 
 pub struct Connection {
-    // FIXME. I *hate* to use boxed traits here, but with async traits below there really isn't a
-    // better way to mock this. If it ends up hurting performance, we can conditionally replace it
-    // with a non-box.
-    //
-    // reader: BufReader<OwnedReadHalf>,
-    // writer: OwnedWriteHalf,
     reader: ReaderType,
     writer: WriterType,
     header: Option<ConnectionHeader>,
@@ -31,7 +25,6 @@ impl Connection {
         Self::new_from(reader, writer)
     }
 
-    // Used for tests. Connection is just a wrapper for a few things, so I think it's justified.
     pub fn new_from(reader: ReaderType, writer: WriterType) -> Self {
         let mut id = String::new();
         for _ in 0..12 {
