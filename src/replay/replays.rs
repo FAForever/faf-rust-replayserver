@@ -1,7 +1,6 @@
 use std::rc::{Rc, Weak};
 
-use async_stream::stream;
-use futures::{Stream, StreamExt};
+use futures::{Stream, StreamExt, stream};
 use tokio_util::sync::CancellationToken;
 use weak_table::WeakValueHashMap;
 
@@ -29,37 +28,26 @@ impl Replays {
         }
     }
 
-    fn assign_connection_to_replay(&mut self, c: Connection) -> impl Stream<Item = Assignment> {
+    fn assign_connection_to_replay(&mut self, c: Connection) -> Vec<Assignment> {
         let conn_header = c.get_header();
-        let mut replay_is_newly_created = false;
+        let mut assignments = vec![];
 
-        let maybe_replay = match self.replays.get(&conn_header.id) {
-            Some(r) => Ok(r),
+        let replay = match self.replays.get(&conn_header.id) {
+            Some(r) => r,
             None => {
                 if conn_header.type_ == ConnectionType::Reader {
                     log::info!("{} asked for replay {}, which is not running", c, conn_header.id);
-                    Err(ConnectionError::CannotAssignToReplay)
-                } else {
-                    let r = Rc::new((self.new_replay)(conn_header.id));
-                    self.replays.insert(conn_header.id, r.clone());
-                    replay_is_newly_created = true;
-                    Ok(r)
+                    metrics::inc_served_conns(Some(ConnectionError::CannotAssignToReplay));
+                    return vec![];
                 }
-            }
+                let r = Rc::new((self.new_replay)(conn_header.id));
+                self.replays.insert(conn_header.id, r.clone());
+                assignments.push(Assignment::NewReplay(r.clone()));
+                r
+            },
         };
-        stream! {
-            let replay = match maybe_replay {
-                Err(e) => {
-                    metrics::inc_served_conns::<()>(&Err(e));
-                    return;
-                },
-                Ok(r) => r,
-            };
-            if replay_is_newly_created {
-                yield Assignment::NewReplay(replay.clone());
-            }
-            yield Assignment::Connection(c, replay);
-        }
+        assignments.push(Assignment::Connection(c, replay));
+        assignments
     }
 
     async fn handle_connection_or_replay_lifetime(a: Assignment) {
@@ -67,13 +55,13 @@ impl Replays {
             Assignment::NewReplay(r) => r.lifetime().await,
             Assignment::Connection(c, r) => {
                 let res = r.handle_connection(c).await;
-                metrics::inc_served_conns(&res);
+                metrics::inc_served_conns(res.err());
             }
         }
     }
 
     pub async fn handle_connections_and_replays(&mut self, cs: impl Stream<Item = Connection>) {
-        cs.flat_map(|c| self.assign_connection_to_replay(c))
+        cs.flat_map(|c| stream::iter(self.assign_connection_to_replay(c)))
             .for_each_concurrent(None, Self::handle_connection_or_replay_lifetime)
             .await
     }

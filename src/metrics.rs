@@ -4,7 +4,7 @@ use prometheus_exporter::prometheus::{
     IntCounterVec, IntGauge, IntGaugeVec,
 };
 
-use crate::error::{ConnResult, ConnectionError};
+use crate::error::ConnectionError;
 
 lazy_static! {
     pub static ref ACTIVE_CONNS: IntGaugeVec = register_int_gauge_vec!(
@@ -36,10 +36,10 @@ lazy_static! {
     .unwrap();
 }
 
-pub fn inc_served_conns<T>(res: &ConnResult<T>) {
+pub fn inc_served_conns(res: Option<ConnectionError>) {
     let label = match res {
-        Ok(..) => "Success",
-        Err(e) => match e {
+        None => "Success",
+        Some(e) => match e {
             ConnectionError::NoData => "Empty connection",
             ConnectionError::BadData(..) => "Bad data",
             ConnectionError::IO { .. } => "I/O error",

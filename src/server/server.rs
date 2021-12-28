@@ -42,7 +42,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
             match read_initial_header(&mut c, initial_timeout).await {
                 Err(e) => {
                     log::info!("Could not accept connection: {}", e);
-                    metrics::inc_served_conns::<()>(&Err(e));
+                    metrics::inc_served_conns(Some(e));
                 }
                 Ok(_) => runner.dispatch_connection(c).await,
             }

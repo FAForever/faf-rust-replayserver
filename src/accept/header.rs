@@ -12,7 +12,7 @@ use crate::server::connection::Connection;
 use crate::util::timeout::timeout;
 use crate::{server::connection::read_until_exact, some_error};
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ConnectionType {
     Reader = 1,
     Writer = 2,
