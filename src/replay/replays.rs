@@ -1,6 +1,6 @@
 use std::rc::{Rc, Weak};
 
-use futures::{Stream, StreamExt, stream};
+use futures::{stream, Stream, StreamExt};
 use tokio_util::sync::CancellationToken;
 use weak_table::WeakValueHashMap;
 
@@ -44,7 +44,7 @@ impl Replays {
                 self.replays.insert(conn_header.id, r.clone());
                 assignments.push(Assignment::NewReplay(r.clone()));
                 r
-            },
+            }
         };
         assignments.push(Assignment::Connection(c, replay));
         assignments

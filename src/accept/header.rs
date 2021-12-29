@@ -48,9 +48,7 @@ pub mod header_reader {
 
         let pieces: Vec<&[u8]> = line[..].splitn(2, |c| c == &b'/').collect();
         if pieces.len() < 2 {
-            return Err(bad_data(format!(
-                "No slash between game ID and name",
-            )));
+            return Err(bad_data(format!("No slash between game ID and name",)));
         }
         let (id_bytes, name_bytes) = (pieces[0], pieces[1]);
         let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1]; // remove trailing '\0'
