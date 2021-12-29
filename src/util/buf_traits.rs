@@ -44,7 +44,7 @@ impl<T: ChunkedBuf> ChunkedBufExt for T {
     // Iterate over chunks from start to end.
     fn iter_chunks(&self, start: usize, end: usize) -> IterChunks<'_, Self> {
         assert!(start <= end);
-        assert!(start <= self.len());
+        assert!(end <= self.len());
         IterChunks { b: self, start, end }
     }
 }
