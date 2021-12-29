@@ -1,4 +1,4 @@
-use crate::replay::streams::write_replay_stream;
+use crate::replay::streams::MReplayReader;
 use crate::replay::streams::MReplayRef;
 use async_compression::tokio::write::ZstdEncoder;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
@@ -13,7 +13,7 @@ pub async fn write_replay_file(
     to.write_all("\n".as_bytes()).await?;
     let clevel = async_compression::Level::Precise(compression_level);
     let mut encoder = ZstdEncoder::with_quality(to, clevel);
-    write_replay_stream(&replay, &mut encoder).await?;
+    tokio::io::copy(&mut MReplayReader::new(replay), &mut encoder).await?;
     encoder.shutdown().await?;
     Ok(())
 }

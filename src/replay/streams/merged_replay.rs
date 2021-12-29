@@ -1,15 +1,13 @@
-use std::{cell::RefCell, io::Read, io::Write, rc::Rc};
+use std::task::Context;
+use std::task::Poll;
+use std::{cell::RefCell, io::Write, rc::Rc};
 
-use futures::Future;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::io::AsyncRead;
 
+use crate::util::event::Event;
 use crate::{
     util::buf_traits::ChunkedBuf,
-    util::{
-        buf_deque::BufDeque,
-        buf_traits::{ChunkedBufExt, ReadAt, ReadAtExt},
-        event::Event,
-    },
+    util::{buf_deque::BufDeque, buf_traits::ChunkedBufExt},
 };
 
 use super::{writer_replay::WriterReplay, ReplayHeader};
@@ -19,7 +17,7 @@ pub struct MergedReplay {
     header: Option<ReplayHeader>,
     delayed_data_len: usize,
     finished: bool,
-    delayed_data_notification: Event,
+    read_event: Event,
 }
 
 impl MergedReplay {
@@ -29,7 +27,7 @@ impl MergedReplay {
             header: None,
             delayed_data_len: 0,
             finished: false,
-            delayed_data_notification: Event::new(),
+            read_event: Event::new(),
         }
     }
 
@@ -49,24 +47,19 @@ impl MergedReplay {
         self.finished
     }
 
-    pub fn wait_for_more_data(&self) -> impl Future<Output = ()> {
-        let wait = if self.finished {
-            None
-        } else {
-            Some(self.delayed_data_notification.wait())
-        };
-        async move {
-            if let Some(w) = wait {
-                w.await;
-            }
-        }
+    pub fn wait_for_read_event(&mut self, cx: &Context) {
+        self.read_event.wait(cx);
+    }
+
+    fn notify_read_event(&mut self) {
+        self.read_event.notify();
     }
 
     pub fn add_header(&mut self, header: ReplayHeader) {
         debug_assert!(!self.finished);
         debug_assert!(self.get_data().len() == 0);
         self.header = Some(header);
-        self.delayed_data_notification.notify();
+        self.notify_read_event();
     }
 
     pub fn get_header(&self) -> Option<&ReplayHeader> {
@@ -92,51 +85,80 @@ impl MergedReplay {
         debug_assert!(len <= self.data.len());
         debug_assert!(!self.finished);
         self.delayed_data_len = len;
-        self.delayed_data_notification.notify();
+        self.notify_read_event();
     }
 
     pub fn finish(&mut self) {
         self.finished = true;
-        self.delayed_data_notification.notify();
+        self.notify_read_event();
     }
 }
 
-impl ReadAt for MergedReplay {
-    fn read_at(&self, mut start: usize, buf: &mut [u8]) -> std::io::Result<usize> {
-        if start >= self.delayed_len() {
-            return Ok(0);
-        }
-        debug_assert!(self.header.is_some());
+impl ChunkedBuf for MergedReplay {
+    fn len(&self) -> usize {
+        self.delayed_len()
+    }
+
+    fn get_chunk(&self, mut start: usize) -> &[u8] {
         if start < self.header_len() {
-            let mut data = &self.get_header().unwrap().data[start..];
-            data.read(buf)
+            &self.get_header().unwrap().data[start..]
         } else {
             start -= self.header_len();
-            let read_max = std::cmp::min(buf.len(), self.delayed_data_len - start);
-            self.data.read_at(start, &mut buf[..read_max])
+            let delay_limit = self.delayed_data_len - start;
+
+            let chunk = self.data.get_chunk(start);
+            let read_max = std::cmp::min(chunk.len(), delay_limit);
+            &chunk[..read_max]
         }
     }
 }
 
 pub type MReplayRef = Rc<RefCell<MergedReplay>>;
 
-pub async fn write_replay_stream(replay: &MReplayRef, c: &mut (impl AsyncWrite + Unpin)) -> std::io::Result<()> {
-    let mut buf: Box<[u8]> = Box::new([0; 4096]);
-    let mut reader = replay.reader();
-    loop {
-        let r = replay.borrow();
-        if r.delayed_len() <= reader.position() && r.is_finished() {
-            return Ok(());
-        }
-        drop(r);
+// AsyncRead for merged replay.
+//
+// Having all position/delayed/is_finished logic in poll_read guarantees that we won't cause some
+// stupid race condition by awaiting while holding some replay state.
+pub struct MReplayReader {
+    replay: MReplayRef,
+    position: usize,
+}
 
-        let data_read = reader.read(&mut *buf).unwrap();
-        c.write_all(&buf[..data_read]).await?;
-        if data_read == 0 {
-            let f = replay.borrow().wait_for_more_data();
-            f.await;
+impl MReplayReader {
+    pub fn new(replay: MReplayRef) -> Self {
+        Self { replay, position: 0 }
+    }
+}
+
+impl AsyncRead for MReplayReader {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let mut r = self.replay.borrow_mut();
+
+        if r.delayed_len() <= self.position {
+            if r.is_finished() {
+                Poll::Ready(Ok(()))
+            } else {
+                r.wait_for_read_event(cx);
+                Poll::Pending
+            }
+        } else {
+            // TODO maybe we could do a loop here
+            let chunk = r.get_chunk(self.position);
+            let copyable = std::cmp::min(chunk.len(), buf.remaining());
+            buf.put_slice(&chunk[..copyable]);
+            drop(r);
+            self.position += copyable;
+            Poll::Ready(Ok(()))
         }
     }
 }
+
+// NOTE: If we could implement AsyncBufReader, we could write replay data without extra copies. We
+// can't though since we don't *own* the buffer, we have to borrow through a RefCell and can't
+// return a bare &[u8]. I don't think there's a way around this.
 
 // TODO tests
