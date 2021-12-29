@@ -3,25 +3,25 @@ use std::{cell::RefCell, io::Read, rc::Rc};
 // Convenience traits for working with non-contiguous buffers and reading from things behind a
 // RefCell.
 
-pub trait DiscontiguousBuf {
+pub trait ChunkedBuf {
     // Get a contiguous chunk starting from start. Panics if start >= len.
     fn get_chunk(&self, start: usize) -> &[u8];
     fn len(&self) -> usize;
 }
 
-pub trait DiscontiguousBufExt: DiscontiguousBuf {
-    fn common_prefix_from(&self, other: &impl DiscontiguousBuf, start: usize) -> usize;
+pub trait ChunkedBufExt: ChunkedBuf {
+    fn common_prefix_from(&self, other: &impl ChunkedBuf, start: usize) -> usize;
     fn at(&self, pos: usize) -> u8;
     fn iter_chunks(&self, start: usize, end: usize) -> IterChunks<'_, Self>;
 }
 
-impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
+impl<T: ChunkedBuf> ChunkedBufExt for T {
     // Compare with another buf from position start. Position end is the first position at which
     // the two streams differ (or end of one of the streams).
     //
     // TODO: this compiles to byte-by-byte comparison loop. Pretty good, but maybe we can do better
     // by comparing words or even SIMD. Profile.
-    fn common_prefix_from(&self, other: &impl DiscontiguousBuf, start: usize) -> usize {
+    fn common_prefix_from(&self, other: &impl ChunkedBuf, start: usize) -> usize {
         let mut at = start;
         let max_cmp = std::cmp::min(self.len(), other.len());
         while at < max_cmp {
@@ -49,13 +49,13 @@ impl<T: DiscontiguousBuf> DiscontiguousBufExt for T {
     }
 }
 
-pub struct IterChunks<'a, T: DiscontiguousBuf + ?Sized> {
+pub struct IterChunks<'a, T: ChunkedBuf + ?Sized> {
     b: &'a T,
     start: usize,
     end: usize,
 }
 
-impl<'a, T: DiscontiguousBuf> Iterator for IterChunks<'a, T> {
+impl<'a, T: ChunkedBuf> Iterator for IterChunks<'a, T> {
     type Item = &'a [u8];
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -78,7 +78,7 @@ pub trait ReadAt {
     fn read_at(&self, start: usize, buf: &mut [u8]) -> std::io::Result<usize>;
 }
 
-impl<T: DiscontiguousBuf> ReadAt for T {
+impl<T: ChunkedBuf> ReadAt for T {
     fn read_at(&self, start: usize, buf: &mut [u8]) -> std::io::Result<usize> {
         if start >= self.len() {
             return Ok(0);

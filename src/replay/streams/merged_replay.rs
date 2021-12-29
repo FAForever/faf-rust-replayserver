@@ -4,10 +4,10 @@ use futures::Future;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use crate::{
-    util::buf_traits::DiscontiguousBuf,
+    util::buf_traits::ChunkedBuf,
     util::{
         buf_deque::BufDeque,
-        buf_traits::{DiscontiguousBufExt, ReadAt, ReadAtExt},
+        buf_traits::{ChunkedBufExt, ReadAt, ReadAtExt},
         event::Event,
     },
 };
@@ -84,7 +84,7 @@ impl MergedReplay {
         }
     }
 
-    pub fn get_data(&self) -> &impl DiscontiguousBuf {
+    pub fn get_data(&self) -> &impl ChunkedBuf {
         &self.data
     }
 

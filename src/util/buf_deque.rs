@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::{cmp::min, collections::VecDeque};
 
-use super::buf_traits::DiscontiguousBuf;
+use super::buf_traits::ChunkedBuf;
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -43,7 +43,6 @@ impl BufDeque {
     }
 
     fn no_space_in_last_chunk(&self) -> bool {
-        assert!(self.window_start() <= self.window_end);
         self.window_size() == self.chunks.len() * CHUNK_SIZE
     }
 
@@ -67,10 +66,9 @@ impl BufDeque {
         // If we discarded beyond end, cut off the start
         if self.window_end < self.window_start() {
             let data_discarded_beyond_end = self.window_start() - self.window_end;
-            let bytes_to_skip = std::cmp::min(data_discarded_beyond_end, buf.len());
-            skipped = bytes_to_skip;
+            skipped = std::cmp::min(data_discarded_beyond_end, buf.len());
             self.window_end += skipped;
-            buf = &buf[bytes_to_skip..];
+            buf = &buf[skipped..];
         }
 
         // If we still have bytes to write, write them
@@ -85,7 +83,7 @@ impl BufDeque {
     }
 }
 
-impl DiscontiguousBuf for BufDeque {
+impl ChunkedBuf for BufDeque {
     fn len(&self) -> usize {
         self.window_end
     }
@@ -117,7 +115,7 @@ impl Write for BufDeque {
 #[cfg(test)]
 mod test {
     use super::{BufDeque, CHUNK_SIZE};
-    use crate::util::buf_traits::{DiscontiguousBuf, DiscontiguousBufExt, ReadAtExt};
+    use crate::util::buf_traits::{ChunkedBuf, ChunkedBufExt, ReadAtExt};
     use std::io::{Read, Write};
 
     fn compare_eq(deque: &BufDeque, data: &Vec<u8>) {

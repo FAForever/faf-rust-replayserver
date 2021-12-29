@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
 use crate::{
     replay::streams::MReplayRef, replay::streams::MergedReplay, replay::streams::WReplayRef,
-    util::buf_traits::DiscontiguousBuf, util::buf_traits::DiscontiguousBufExt,
+    util::buf_traits::ChunkedBuf, util::buf_traits::ChunkedBufExt,
 };
 
 use super::merge_strategy::MergeStrategy;
@@ -700,7 +700,7 @@ mod tests {
     use crate::util::{buf_traits::ReadAtExt, test::setup_logging};
     use crate::{
         replay::receive::merge_strategy::MergeStrategy, replay::streams::ReplayHeader, replay::streams::WriterReplay,
-        util::buf_traits::DiscontiguousBuf,
+        util::buf_traits::ChunkedBuf,
     };
     use std::{cell::RefCell, io::Read, rc::Rc};
 

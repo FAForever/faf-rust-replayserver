@@ -3,7 +3,7 @@ use std::{cell::RefCell, io::Write, rc::Rc};
 use tokio::io::AsyncReadExt;
 
 use crate::{
-    error::ConnResult, server::connection::Connection, util::buf_deque::BufDeque, util::buf_traits::DiscontiguousBuf,
+    error::ConnResult, server::connection::Connection, util::buf_deque::BufDeque, util::buf_traits::ChunkedBuf,
 };
 
 use super::ReplayHeader;
@@ -37,7 +37,7 @@ impl WriterReplay {
         self.data.write_all(buf).unwrap();
     }
 
-    pub fn get_data(&self) -> &impl DiscontiguousBuf {
+    pub fn get_data(&self) -> &impl ChunkedBuf {
         &self.data
     }
 

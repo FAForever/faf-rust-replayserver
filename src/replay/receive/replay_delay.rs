@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::VecDeque};
 
 use crate::replay::streams::WReplayRef;
-use crate::util::buf_traits::DiscontiguousBuf;
+use crate::util::buf_traits::ChunkedBuf;
 
 use tokio::time::Duration;
 
