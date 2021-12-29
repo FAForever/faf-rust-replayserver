@@ -26,6 +26,8 @@ pub struct ConnectionHeader {
 }
 
 pub mod header_reader {
+    use crate::util::pretty_bytes;
+
     use super::*;
 
     async fn read_type(conn: &mut Connection) -> ConnResult<ConnectionType> {
@@ -34,7 +36,7 @@ pub mod header_reader {
         match &buf {
             b"P/" => Ok(ConnectionType::Writer),
             b"G/" => Ok(ConnectionType::Reader),
-            _ => Err(bad_data(format!("Invalid connection type: {:x?}", buf))),
+            _ => Err(bad_data(format!("Invalid connection type: '{}'", pretty_bytes(&buf)))),
         }
     }
 
@@ -47,8 +49,7 @@ pub mod header_reader {
         let pieces: Vec<&[u8]> = line[..].splitn(2, |c| c == &b'/').collect();
         if pieces.len() < 2 {
             return Err(bad_data(format!(
-                "Connection header has too few slashes: {}",
-                pieces.len()
+                "No slash between game ID and name",
             )));
         }
         let (id_bytes, name_bytes) = (pieces[0], pieces[1]);
@@ -62,6 +63,7 @@ pub mod header_reader {
     }
 
     async fn read_connection_header(conn: &mut Connection) -> ConnResult<ConnectionHeader> {
+        // early EOF is most likely a connection with no data
         let type_ = read_type(conn).await.map_err(|e| match e {
             ConnectionError::IO(e) if e.kind() == ErrorKind::UnexpectedEof => ConnectionError::NoData,
             e => e,
@@ -116,6 +118,7 @@ mod test {
         setup_logging();
         let mut c = conn_from_read_data(b"U/1/foo\0");
         let err = read_and_set_connection_header(&mut c).await.err().unwrap();
+        log::debug!("{}", err);
         assert!(matches!(err, ConnectionError::BadData(..)));
     }
 
