@@ -31,12 +31,11 @@ Replay lifetime
 ---------------
 
 A Replay is created when we accept the first writer connection with its ID. The
-Replay reads data from writer connections and uses a merging algorithms to
-merge it into a "canonical" replay. At the same time it sends already merged
-data to reader connections.
+Replay reads data from writer connections and merges it into a "canonical"
+replay. At the same time it sends already merged data to reader connections.
 
 At some point all writer connections end and no more writer connections will
-arrive. Once there have been no writer connection for a while (e.g. 30
+arrive. Once there have been no writer connections for a while (e.g. 30
 seconds), the Replay stops merging data, stops accepting new connections and
 saves the replay on disk. After that, once there are no more connections
 remaining, the replay is over.
@@ -71,8 +70,8 @@ It works more-or-less as follows:
 * For every writer connection, a writer replay is created which holds replay
   data and information on its progress and delayed position. A task reads data
   from the connection and appends it to the writer replay. At the same time, the
-  same task periodically calculates writer replay's delayed position and calls
-  the merge strategy to react to replay's new data.
+  same task periodically calculates writer replay's data position from some
+  time ago and calls the merge strategy to react to replay's new data.
 * The merge strategy holds references to writer replays, which it shares with
   the above tasks. It's periodically woken up to react to changes to writer
   replays, merging them into a canonical merged replay.
