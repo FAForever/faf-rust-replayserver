@@ -48,9 +48,9 @@ impl ReplayHeader {
             }};
         }
 
-        let _version = read_until_exact(&mut r, 0, &mut data).await?;
+        let _version = read_until_exact(&mut r, b'\0', &mut data).await?;
         Self::skip(&mut r, 3, &mut data).await?;
-        let _replay_version_and_map = read_until_exact(&mut r, 0, &mut data).await?;
+        let _replay_version_and_map = read_until_exact(&mut r, b'\0', &mut data).await?;
         Self::skip(&mut r, 4, &mut data).await?;
 
         let mod_data_size = read_value!(read_u32_le);
@@ -62,7 +62,7 @@ impl ReplayHeader {
         let player_count = r.read_u8().await?;
         data.push(player_count);
         for _ in 0..player_count {
-            let _name = read_until_exact(&mut r, 0, &mut data).await?;
+            let _name = read_until_exact(&mut r, b'\0', &mut data).await?;
             let _timeout_count = read_value!(read_u32_le);
         }
 

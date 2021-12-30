@@ -41,7 +41,7 @@ impl ReplayStream for MergedReplay {
     }
 }
 
-// Access to replay header + data.
+// Access to replay header + data, for AsyncRead implementation.
 impl ChunkedBuf for MergedReplay {
     fn len(&self) -> usize {
         self.delayed_data_len() + self.header_len()
