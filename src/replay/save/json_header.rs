@@ -29,6 +29,7 @@ pub struct ReplayJsonHeader {
 
 impl ReplayJsonHeader {
     fn fixup_team_dict(mut d: GameTeams) -> HashMap<String, Vec<String>> {
+        // Json headers stores team number as string. Some legacy reason.
         let mut out = HashMap::new();
         for (k, v) in d.drain() {
             out.insert(k.to_string(), v);
