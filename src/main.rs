@@ -8,8 +8,7 @@ use tokio_util::sync::CancellationToken;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 async fn do_run_server() {
-    let maybe_config = InnerSettings::from_env();
-    let config = match maybe_config {
+    let config = match InnerSettings::from_env() {
         Err(e) => {
             log::info!("Failed to load config: {}", e);
             return;

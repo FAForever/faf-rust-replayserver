@@ -1,4 +1,3 @@
-use std::io::ErrorKind;
 use std::str::from_utf8;
 
 use tokio::io::AsyncReadExt;
@@ -45,13 +44,13 @@ pub mod header_reader {
         read_until_exact(&mut conn.take(1024), b'\0', &mut line)
             .await
             .map_err(|_| bad_data("Connection header is incomplete"))?;
+        line.pop(); // remove trailing '\0'
 
         let pieces: Vec<&[u8]> = line[..].splitn(2, |c| c == &b'/').collect();
         if pieces.len() < 2 {
             return Err(bad_data(format!("No slash between game ID and name",)));
         }
         let (id_bytes, name_bytes) = (pieces[0], pieces[1]);
-        let name_bytes: &[u8] = &name_bytes[0..name_bytes.len() - 1]; // remove trailing '\0'
 
         let id =
             some_error!(from_utf8(id_bytes)?.parse::<u64>()?).map_err(|_| bad_data("Failed to parse replay ID"))?;
@@ -62,10 +61,9 @@ pub mod header_reader {
 
     async fn read_connection_header(conn: &mut Connection) -> ConnResult<ConnectionHeader> {
         // early EOF is most likely a connection with no data
-        let type_ = read_type(conn).await.map_err(|e| match e {
-            ConnectionError::IO(e) if e.kind() == ErrorKind::UnexpectedEof => ConnectionError::NoData,
-            e => e,
-        })?;
+        let type_ = read_type(conn)
+            .await
+            .map_err(|e| if e.is_eof() { ConnectionError::NoData } else { e })?;
         let (id, name) = read_game_data(conn).await?;
         Ok(ConnectionHeader { type_, id, name })
     }

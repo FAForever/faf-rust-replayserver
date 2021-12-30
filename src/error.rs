@@ -1,3 +1,5 @@
+use std::io::ErrorKind;
+
 #[derive(thiserror::Error, Debug)]
 pub enum ConnectionError {
     #[error("Empty connection")]
@@ -8,6 +10,16 @@ pub enum ConnectionError {
     IO(#[from] std::io::Error),
     #[error("Could not assign connection to replay")]
     CannotAssignToReplay,
+}
+
+// Some helpers.
+impl ConnectionError {
+    pub fn is_eof(&self) -> bool {
+        if let Self::IO(e) = self {
+            return e.kind() == ErrorKind::UnexpectedEof;
+        }
+        return false;
+    }
 }
 
 // Little shortcut for less typing,
