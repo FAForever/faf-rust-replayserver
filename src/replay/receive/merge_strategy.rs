@@ -19,6 +19,7 @@ use crate::replay::{streams::MReplayRef, streams::WReplayRef};
 //     changes, then it is finished.
 //   * Before calling replay_removed(), replay_data_updated() will be called one last time with all
 //     replay data present.
+//   * Function replay_data_updated() may be called without the data actually changing.
 //
 // * We define a canonical replay C.
 //   * The strategy sets C's header, writes data to C, sets C's delayed position and finishes C

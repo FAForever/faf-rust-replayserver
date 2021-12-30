@@ -1,5 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
+use tokio::select;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
     replay::streams::MReplayRef,
     replay::streams::{read_data, read_header, WriterReplay},
     server::connection::Connection,
-    util::timeout::{cancellable, until},
+    util::timeout::cancellable,
 };
 
 use super::{merge_strategy::MergeStrategy, quorum_merge_strategy::QuorumMergeStrategy, replay_delay::StreamDelay};
@@ -38,19 +39,21 @@ impl ReplayMerger {
         let replay = Rc::new(RefCell::new(WriterReplay::new()));
         let token = self.merge_strategy.borrow_mut().replay_added(replay.clone());
 
+        let merge_strategy_update_data = || self.merge_strategy.borrow_mut().replay_data_updated(token);
+
         let read_from_connection = async {
             read_header(replay.clone(), c).await?;
             self.merge_strategy.borrow_mut().replay_header_added(token);
-            until(
-                self.stream_delay.track(&replay, &self.merge_strategy, token),
-                read_data(replay.clone(), c),
-            )
-            .await;
+            select! {
+                _ = read_data(replay.clone(), c) => (),
+                _ = self.stream_delay.update_replay_timestamp(&replay, &merge_strategy_update_data) => (),
+            };
             ConnResult::Ok(())
         };
         cancellable(read_from_connection, &self.shutdown_token).await;
 
-        self.stream_delay.set_to_end(&replay, &self.merge_strategy, token);
+        self.stream_delay.set_final_replay_timestamp(&replay);
+        merge_strategy_update_data();
         replay.borrow_mut().finish();
         self.merge_strategy.borrow_mut().replay_removed(token);
     }

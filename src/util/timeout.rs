@@ -3,7 +3,7 @@ use tokio::select;
 use tokio::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-pub async fn until<T1, F1, T2, F2>(f1: F1, f2: F2) -> Option<T1>
+async fn until<T1, F1, T2, F2>(f1: F1, f2: F2) -> Option<T1>
 where
     F1: Future<Output = T1>,
     F2: Future<Output = T2>,

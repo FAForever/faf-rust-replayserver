@@ -1,11 +1,9 @@
-use std::{cell::RefCell, collections::VecDeque};
+use std::collections::VecDeque;
 
 use crate::replay::streams::WReplayRef;
 use crate::util::buf_traits::ChunkedBuf;
 
 use tokio::time::Duration;
-
-use super::merge_strategy::MergeStrategy;
 
 pub struct PositionHistory {
     sleep_s: Duration,
@@ -57,7 +55,7 @@ impl StreamDelay {
         Self { delay_s, sleep_s }
     }
 
-    pub async fn track(&self, replay: &WReplayRef, strategy: &RefCell<impl MergeStrategy>, token: u64) {
+    pub async fn update_replay_timestamp(&self, replay: &WReplayRef, on_update: &dyn Fn()) -> ! {
         let mut pos_queue = PositionHistory::new(self.delay_s, self.sleep_s);
         let mut prev_current = 0;
         let mut prev_delayed = 0;
@@ -66,7 +64,7 @@ impl StreamDelay {
             let delayed = pos_queue.push_and_get_delayed(current);
             replay.borrow_mut().set_delayed_data_len(delayed);
             if (current, delayed) != (prev_current, prev_delayed) {
-                strategy.borrow_mut().replay_data_updated(token);
+                on_update();
             }
             prev_current = current;
             prev_delayed = delayed;
@@ -74,12 +72,8 @@ impl StreamDelay {
         }
     }
 
-    pub fn set_to_end(&self, replay: &WReplayRef, strategy: &RefCell<impl MergeStrategy>, token: u64) {
+    pub fn set_final_replay_timestamp(&self, replay: &WReplayRef) {
         let final_len = replay.borrow_mut().get_data().len();
-        let last_delayed_len = replay.borrow_mut().get_delayed_data_len();
-        if final_len > last_delayed_len {
-            replay.borrow_mut().set_delayed_data_len(final_len);
-            strategy.borrow_mut().replay_data_updated(token);
-        }
+        replay.borrow_mut().set_delayed_data_len(final_len);
     }
 }
