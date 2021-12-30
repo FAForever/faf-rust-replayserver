@@ -43,9 +43,12 @@ impl InnerReplaySaver {
     }
 
     fn count_ticks(&self, replay: MReplayRef, id: u64) -> Option<u32> {
-        replay.borrow().get_header()?;
         let header_len = replay.borrow().header_len();
-        self.get_ticks(&mut replay.reader_from(header_len), id)
+        if header_len != 0 {
+            self.get_ticks(&mut replay.reader_from(header_len), id)
+        } else {
+            None
+        }
     }
 
     async fn save_replay_to_disk(&self, replay: MReplayRef, id: u64) -> bool {

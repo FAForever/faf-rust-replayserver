@@ -7,12 +7,33 @@ use crate::{
 };
 
 use super::ReplayHeader;
+use super::ReplayStream;
 
 pub struct WriterReplay {
     header: Option<ReplayHeader>,
     data: BufDeque,
     delayed_data_len: usize,
     finished: bool,
+}
+
+impl ReplayStream for WriterReplay {
+    type Buf = BufDeque;
+
+    fn data_len(&self) -> usize {
+        self.data.len()
+    }
+
+    fn delayed_data_len(&self) -> usize {
+        self.delayed_data_len
+    }
+
+    fn get_data(&self) -> &Self::Buf {
+        &self.data
+    }
+
+    fn is_finished(&self) -> bool {
+        self.finished
+    }
 }
 
 impl WriterReplay {
@@ -37,17 +58,9 @@ impl WriterReplay {
         self.data.write_all(buf).unwrap();
     }
 
-    pub fn get_data(&self) -> &impl ChunkedBuf {
-        &self.data
-    }
-
     pub fn set_delayed_data_len(&mut self, new: usize) {
         debug_assert!(self.delayed_data_len <= new);
         self.delayed_data_len = new;
-    }
-
-    pub fn get_delayed_data_len(&self) -> usize {
-        self.delayed_data_len
     }
 
     pub fn discard(&mut self, until: usize) {
@@ -60,10 +73,6 @@ impl WriterReplay {
 
     pub fn finish(&mut self) {
         self.finished = true;
-    }
-
-    pub fn is_finished(&self) -> bool {
-        self.finished
     }
 }
 

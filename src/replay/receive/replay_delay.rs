@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
+use crate::replay::streams::ReplayStreamRef;
 use crate::replay::streams::WReplayRef;
-use crate::util::buf_traits::ChunkedBuf;
 
 use tokio::time::Duration;
 
@@ -60,7 +60,7 @@ impl StreamDelay {
         let mut prev_current = 0;
         let mut prev_delayed = 0;
         loop {
-            let current = replay.borrow().get_data().len();
+            let current = replay.data_len();
             let delayed = pos_queue.push_and_get_delayed(current);
             replay.borrow_mut().set_delayed_data_len(delayed);
             if (current, delayed) != (prev_current, prev_delayed) {
@@ -73,7 +73,7 @@ impl StreamDelay {
     }
 
     pub fn set_final_replay_timestamp(&self, replay: &WReplayRef) {
-        let final_len = replay.borrow_mut().get_data().len();
+        let final_len = replay.data_len();
         replay.borrow_mut().set_delayed_data_len(final_len);
     }
 }

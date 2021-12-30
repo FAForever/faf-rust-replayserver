@@ -1,8 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, collections::HashSet, ops::Deref, rc::Rc};
 
+use crate::replay::streams::ReplayStream;
+use crate::replay::streams::ReplayStreamRef;
 use crate::{
     replay::streams::MReplayRef, replay::streams::MergedReplay, replay::streams::WReplayRef,
-    util::buf_traits::ChunkedBuf, util::buf_traits::ChunkedBufExt,
+    util::buf_traits::ChunkedBufExt,
 };
 
 use super::merge_strategy::MergeStrategy;
@@ -65,11 +67,11 @@ impl ReplayState {
         }
     }
     fn data_len(&self) -> usize {
-        self.replay.borrow().get_data().len()
+        self.replay.data_len()
     }
 
     fn canon_len(&self) -> usize {
-        self.canon_replay.borrow().get_data().len()
+        self.canon_replay.data_len()
     }
 
     fn common_len(&self) -> usize {
@@ -77,18 +79,17 @@ impl ReplayState {
     }
 
     fn delayed_data_len(&self) -> usize {
-        self.replay.borrow().get_delayed_data_len()
+        self.replay.delayed_data_len()
     }
 
     fn is_finished(&self) -> bool {
-        self.replay.borrow().is_finished()
+        self.replay.is_finished()
     }
 
     fn common_prefix_from(&self, other: &ReplayState, start: usize) -> usize {
         self.replay
-            .borrow()
             .get_data()
-            .common_prefix_from(other.replay.borrow().get_data(), start)
+            .common_prefix_from(other.replay.get_data().deref(), start)
     }
 
     fn diverges_from_canon(&mut self) -> bool {
@@ -97,7 +98,6 @@ impl ReplayState {
     }
 
     fn canon_match_start(&self) -> usize {
-        debug_assert!(self.data_matching_canon <= self.common_len());
         let optimized_match_start = self.common_len().saturating_sub(self.stream_cmp_distance);
         std::cmp::max(self.data_matching_canon, optimized_match_start)
     }
@@ -119,12 +119,11 @@ impl ReplayState {
             return;
         }
 
-        let match_start = self.canon_match_start(); // this borrows
+        let match_start = self.canon_match_start();
         self.data_matching_canon = self
             .replay
-            .borrow()
             .get_data()
-            .common_prefix_from(self.canon_replay.borrow().get_data(), match_start);
+            .common_prefix_from(self.canon_replay.get_data().deref(), match_start);
 
         if self.data_matching_canon != self.common_len() {
             self.set_diverged();
@@ -199,11 +198,11 @@ impl SharedState {
     }
 
     fn merged_data_len(&self) -> usize {
-        self.canonical_stream.borrow().get_data().len()
+        self.canonical_stream.data_len()
     }
 
     fn merged_delayed_data_len(&self) -> usize {
-        self.canonical_stream.borrow().delayed_data_len()
+        self.canonical_stream.delayed_data_len()
     }
 
     fn append_canon_data(&mut self, id: u64, to: usize) {
@@ -291,7 +290,7 @@ impl MergeStalemateState {
     fn try_move_replay_to_candidates(&mut self, id: u64) {
         {
             let replay = self.s.get_replay(id).replay.borrow();
-            if replay.get_data().len() <= self.s.merged_data_len() {
+            if replay.data_len() <= self.s.merged_data_len() {
                 if replay.is_finished() {
                     self.reserve.remove(&id); // Replay finished short.
                 }
@@ -697,7 +696,10 @@ mod tests {
     use rand::Rng;
 
     use super::QuorumMergeStrategy;
-    use crate::util::{buf_traits::ReadAtExt, test::setup_logging};
+    use crate::replay::streams::ReplayStream;
+    use crate::replay::streams::ReplayStreamRef;
+    use crate::util::buf_traits::ReadAtExt;
+    use crate::util::test::setup_logging;
     use crate::{
         replay::receive::merge_strategy::MergeStrategy, replay::streams::ReplayHeader, replay::streams::WriterReplay,
         util::buf_traits::ChunkedBuf,
@@ -900,7 +902,7 @@ mod tests {
             }
             let idx = rng.gen_range(0..count);
             let (s, token, data) = streams.get_mut(idx).unwrap();
-            if s.borrow().is_finished() {
+            if s.is_finished() {
                 continue;
             }
 
@@ -908,7 +910,7 @@ mod tests {
             if rand::random() {
                 // Randomly advance data.
                 let mut amount = rng.gen_range(1..chunk + 1);
-                let data_len = s.borrow().get_data().len();
+                let data_len = s.data_len();
                 amount = std::cmp::min(amount, replay_len - data_len);
 
                 let mut new_data = vec![0; amount];
@@ -925,9 +927,9 @@ mod tests {
             if rand::random() {
                 // Randomly advance delayed data.
                 let amount = rng.gen_range(1..chunk + 1);
-                let mut delayed = s.borrow().get_delayed_data_len();
+                let mut delayed = s.delayed_data_len();
                 delayed += amount;
-                if delayed <= s.borrow().get_data().len() {
+                if delayed <= s.data_len() {
                     s.borrow_mut().set_delayed_data_len(delayed);
                     modified = true;
                 }
@@ -938,10 +940,10 @@ mod tests {
             }
 
             // Small chance to end early.
-            if s.borrow().get_data().len() == replay_len || rng.gen_range(0..early_exit_chance) == 0 {
-                let data_len = s.borrow().get_data().len();
+            if s.data_len() == replay_len || rng.gen_range(0..early_exit_chance) == 0 {
+                let data_len = s.data_len();
                 log::debug!("Stream {} ended at {}", idx, data_len);
-                let delayed_data_len = s.borrow().get_delayed_data_len();
+                let delayed_data_len = s.delayed_data_len();
                 if delayed_data_len < data_len {
                     s.borrow_mut().set_delayed_data_len(data_len);
                     strat.replay_data_updated(*token);

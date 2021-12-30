@@ -10,6 +10,7 @@ use crate::{
     util::{buf_deque::BufDeque, buf_traits::ChunkedBufExt},
 };
 
+use super::ReplayStream;
 use super::{writer_replay::WriterReplay, ReplayHeader};
 
 pub struct MergedReplay {
@@ -20,83 +21,30 @@ pub struct MergedReplay {
     read_event: Event,
 }
 
-impl MergedReplay {
-    pub fn new() -> Self {
-        Self {
-            data: BufDeque::new(),
-            header: None,
-            delayed_data_len: 0,
-            finished: false,
-            read_event: Event::new(),
-        }
+impl ReplayStream for MergedReplay {
+    type Buf = BufDeque;
+
+    fn data_len(&self) -> usize {
+        self.data.len()
     }
 
-    pub fn header_len(&self) -> usize {
-        self.get_header().map_or(0, |h| h.data.len())
-    }
-
-    pub fn delayed_data_len(&self) -> usize {
+    fn delayed_data_len(&self) -> usize {
         self.delayed_data_len
     }
 
-    pub fn delayed_len(&self) -> usize {
-        self.delayed_data_len + self.header_len()
-    }
-
-    pub fn is_finished(&self) -> bool {
-        self.finished
-    }
-
-    pub fn wait_for_read_event(&mut self, cx: &Context) {
-        self.read_event.wait(cx);
-    }
-
-    fn notify_read_event(&mut self) {
-        self.read_event.notify();
-    }
-
-    pub fn add_header(&mut self, header: ReplayHeader) {
-        debug_assert!(!self.finished);
-        debug_assert!(self.get_data().len() == 0);
-        self.header = Some(header);
-        self.notify_read_event();
-    }
-
-    pub fn get_header(&self) -> Option<&ReplayHeader> {
-        self.header.as_ref()
-    }
-
-    pub fn add_data(&mut self, writer: &WriterReplay, until: usize) {
-        debug_assert!(!self.finished);
-        debug_assert!(until <= writer.get_data().len());
-
-        let writer_data = writer.get_data();
-        let from = self.data.len();
-        for chunk in writer_data.iter_chunks(from, until) {
-            self.data.write_all(chunk).unwrap();
-        }
-    }
-
-    pub fn get_data(&self) -> &impl ChunkedBuf {
+    fn get_data(&self) -> &Self::Buf {
         &self.data
     }
 
-    pub fn advance_delayed_data(&mut self, len: usize) {
-        debug_assert!(len <= self.data.len());
-        debug_assert!(!self.finished);
-        self.delayed_data_len = len;
-        self.notify_read_event();
-    }
-
-    pub fn finish(&mut self) {
-        self.finished = true;
-        self.notify_read_event();
+    fn is_finished(&self) -> bool {
+        self.finished
     }
 }
 
+// Access to replay header + data.
 impl ChunkedBuf for MergedReplay {
     fn len(&self) -> usize {
-        self.delayed_len()
+        self.delayed_data_len() + self.header_len()
     }
 
     fn get_chunk(&self, mut start: usize) -> &[u8] {
@@ -110,6 +58,64 @@ impl ChunkedBuf for MergedReplay {
             let read_max = std::cmp::min(chunk.len(), delay_limit);
             &chunk[..read_max]
         }
+    }
+}
+
+impl MergedReplay {
+    pub fn new() -> Self {
+        Self {
+            data: BufDeque::new(),
+            header: None,
+            delayed_data_len: 0,
+            finished: false,
+            read_event: Event::new(),
+        }
+    }
+
+    pub fn get_header(&self) -> Option<&ReplayHeader> {
+        self.header.as_ref()
+    }
+
+    pub fn add_header(&mut self, header: ReplayHeader) {
+        debug_assert!(!self.finished);
+        debug_assert!(self.data_len() == 0);
+        self.header = Some(header);
+        self.notify_read_event();
+    }
+
+    pub fn header_len(&self) -> usize {
+        self.get_header().map_or(0, |h| h.data.len())
+    }
+
+    pub fn wait_for_read_event(&mut self, cx: &Context) {
+        self.read_event.wait(cx);
+    }
+
+    fn notify_read_event(&mut self) {
+        self.read_event.notify();
+    }
+
+    pub fn add_data(&mut self, writer: &WriterReplay, until: usize) {
+        debug_assert!(!self.finished);
+        debug_assert!(until <= writer.get_data().len());
+
+        let writer_data = writer.get_data();
+        let from = self.data.len();
+        for chunk in writer_data.iter_chunks(from, until) {
+            self.data.write_all(chunk).unwrap();
+        }
+    }
+
+    pub fn advance_delayed_data(&mut self, len: usize) {
+        debug_assert!(len <= self.data.len());
+        debug_assert!(!self.finished);
+        self.delayed_data_len = len;
+        self.notify_read_event();
+    }
+
+    pub fn finish(&mut self) {
+        self.finished = true;
+        self.notify_read_event();
     }
 }
 
@@ -138,7 +144,7 @@ impl AsyncRead for MReplayReader {
     ) -> std::task::Poll<std::io::Result<()>> {
         let mut r = self.replay.borrow_mut();
 
-        if r.delayed_len() <= self.position {
+        if r.len() <= self.position {
             if r.is_finished() {
                 Poll::Ready(Ok(()))
             } else {
