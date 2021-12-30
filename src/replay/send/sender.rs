@@ -1,4 +1,3 @@
-use tokio::io::AsyncWriteExt;
 use tokio_util::sync::CancellationToken;
 
 use crate::replay::streams::MReplayReader;
@@ -22,13 +21,9 @@ impl ReplaySender {
     }
 
     async fn send_replay_to_connection(&self, c: &mut Connection) {
-        if let Err(e) = self.do_send_replay_to_connection(c).await {
+        let mut reader = MReplayReader::new(self.merged_replay.clone());
+        if let Err(e) = tokio::io::copy(&mut reader, c).await {
             log::info!("Replay send error: {}", e);
         };
-    }
-
-    async fn do_send_replay_to_connection(&self, c: &mut Connection) -> std::io::Result<()> {
-        tokio::io::copy(&mut MReplayReader::new(self.merged_replay.clone()), c).await?;
-        c.shutdown().await
     }
 }
