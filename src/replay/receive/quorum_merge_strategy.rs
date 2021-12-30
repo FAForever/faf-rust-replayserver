@@ -23,137 +23,74 @@ use super::merge_strategy::MergeStrategy;
 //   * target_quorum_size, in count.
 
 // For a replay r in R, we define:
-// * r matches C iff C's data is a (non-strict) prefix of r's data.
+// * r matches C iff C's data is a prefix of r's data.
 // * r in R diverges from C iff either:
-//   * Common prefix of r and C is not equal to either r or C,
-//   * r has less data than C and r is finished.
+//   * Common prefix of r and C does not equal either r or C,
+//   * C's data is longer than r's data and r is finished.
 //
 // Intuitively:
-//  * r matching C means that its data "agrees" with all canonical data.
-//  * r diverging from C means that either r's data doesn't match C's at some point or r ended
-//    early, so we can't use it for further merging.
-// * If neither is true, then r has the same data as C, but has less of it and is not finished.
-//
-// In order to avoid matching a lot of data, we make a following "shortcut" assumption:
-// * As long as, every time we check, r and C's data is equal at a suffix of stream_cmp_distance
-//   bytes of C, r does not diverge from C.
-// In other words, whenever we check if r diverges from C, we can check just the last
-// stream_cmp_distance bytes.
+//  * r matching C means that its data "agrees" with all data in C.
+//  * r diverging from C means that r's data does not match C's, either because some bytes don't
+//    match or because r ended prematurely.
+//  * If neither is true, then r has less data than C and is not finished.
 //
 // We keep the state of a replay r in R in the struct below:
-
 struct ReplayState {
-    replay: WReplayRef,         // Writer replay, updated from connection in another task.
-    canon_replay: MReplayRef,   // Canonical replay C.
+    r: WReplayRef,              // Writer replay, updated from connection in another task.
     stream_cmp_distance: usize, // As defined above.
-
-    // Fields used to lazily check relation of r towards C.
-    data_matching_canon: usize,
-    diverges: bool,
+    data_matching_canon: usize, // Length of data that we already checked that matches C.
 }
 
-// And we check its diverge status (along with a helper functions for comparing streams and other
-// stuff) here. Proving correctness is not hard and left to the reader.
-
-// TODO test this in isolation.
 impl ReplayState {
-    fn new(replay: WReplayRef, canon_replay: MReplayRef, stream_cmp_distance: usize) -> Self {
+    fn new(r: WReplayRef, stream_cmp_distance: usize) -> Self {
         Self {
-            replay,
-            canon_replay,
+            r,
             stream_cmp_distance,
             data_matching_canon: 0,
-            diverges: false,
         }
     }
-    fn data_len(&self) -> usize {
-        self.replay.data_len()
-    }
 
-    fn canon_len(&self) -> usize {
-        self.canon_replay.data_len()
-    }
-
-    fn common_len(&self) -> usize {
-        std::cmp::min(self.canon_len(), self.data_len())
-    }
-
-    fn delayed_data_len(&self) -> usize {
-        self.replay.delayed_data_len()
-    }
-
-    fn is_finished(&self) -> bool {
-        self.replay.is_finished()
-    }
-
-    fn common_prefix_from(&self, other: &ReplayState, start: usize) -> usize {
-        self.replay
+    fn common_prefix_from_to(&self, other: &ReplayState, start: usize, end: Option<usize>) -> usize {
+        self.r
             .get_data()
-            .common_prefix_from(other.replay.get_data().deref(), start)
+            .common_prefix_from_to(other.r.get_data().deref(), start, end)
     }
 
-    fn diverges_from_canon(&mut self) -> bool {
-        self.match_with_canon_stream();
-        self.diverges
+    fn match_start_optimization(&self, canon_length: usize) -> usize {
+        canon_length.saturating_sub(self.stream_cmp_distance)
     }
 
-    fn canon_match_start(&self) -> usize {
-        let optimized_match_start = self.common_len().saturating_sub(self.stream_cmp_distance);
-        std::cmp::max(self.data_matching_canon, optimized_match_start)
+    // We only check whether a replay diverges in a stalemate state, and only when r has at least
+    // as much data as C. We also make an optimization: we only compare a maximum of
+    // stream_cmp_distance bytes and if these match, we assume that r does not diverge.
+    fn diverges_at_stalemate(&self, c: &MergedReplay) -> bool {
+        assert!(self.r.data_len() >= c.data_len());
+        let optimized_match_start = self.match_start_optimization(c.data_len());
+        let match_start = std::cmp::max(self.data_matching_canon, optimized_match_start);
+        let match_len = self.r.get_data().common_prefix_from(c.get_data(), match_start);
+        match_len != c.data_len()
     }
 
+    // Mark replay as diverged. Discards all data. Strategy removes the replay from useful sets.
     fn set_diverged(&mut self) {
-        self.replay.borrow_mut().discard_all();
-        self.diverges = true;
+        self.r.borrow_mut().discard_all();
     }
 
-    fn match_with_canon_stream(&mut self) {
-        if self.diverges {
-            return;
-        }
-        if self.data_len() < self.canon_len() && self.is_finished() {
-            self.set_diverged();
-            return;
-        }
-        if self.data_matching_canon == self.common_len() {
-            return;
-        }
-
-        let match_start = self.canon_match_start();
-        self.data_matching_canon = self
-            .replay
-            .get_data()
-            .common_prefix_from(self.canon_replay.get_data().deref(), match_start);
-
-        if self.data_matching_canon != self.common_len() {
-            self.set_diverged();
-        }
-
-        self.discard_unneeded_data();
+    // Mark replay as matching. Called either when the stalemate upgrades a replay to a quorum
+    // candidate or after canonical stream was extended from quorum replays.
+    //
+    // Discards data up to canon length, as it's already in the canon replay and useless for
+    // checking divergence.
+    fn set_matching(&mut self, canon_length: usize) {
+        self.data_matching_canon = std::cmp::max(canon_length, self.data_matching_canon);
+        self.r.borrow_mut().discard(self.data_matching_canon);
     }
 
-    // To save memory, we discard data before canon_match_start(), or all data if we diverged.
-    // It is an error to access replay data from before canonical replay's length, and it's an
-    // error to access any data of a diverged replay.
-    fn discard_unneeded_data(&mut self) {
-        // If we diverged, we already discarded everything
-        if !self.diverges {
-            let match_start = self.canon_match_start(); // this borrows
-            self.replay.borrow_mut().discard(match_start);
-        }
-    }
-
-    // For when we *know* the replay matches.
-    fn explicitly_set_matching(&mut self) {
-        debug_assert!(!self.diverges);
-        debug_assert!(self.data_len() >= self.canon_len());
-        self.data_matching_canon = self.canon_len();
-        self.discard_unneeded_data();
-    }
-
-    // For when we *know* the replay does not match.
-    fn explicitly_set_diverged(&mut self) {
-        self.set_diverged();
+    // Discard data that's not used for checking divergence. Called by the quorum to remove data
+    // from streams in reserve that will never be merged into C, leaving only what we'll need to
+    // check for divergence with C in the future.
+    fn discard_if_not_needed_for_checking_divergence(&mut self, canon_length: usize) {
+        self.r.borrow_mut().discard(self.match_start_optimization(canon_length))
     }
 }
 
@@ -183,7 +120,7 @@ impl SharedState {
 
     fn add_replay(&mut self, r: WReplayRef) -> u64 {
         let token = self.token;
-        let replay = ReplayState::new(r, self.canonical_stream.clone(), self.stream_cmp_distance);
+        let replay = ReplayState::new(r, self.stream_cmp_distance);
         self.replays.insert(token, replay);
         self.token += 1;
         token
@@ -197,28 +134,25 @@ impl SharedState {
         self.replays.get_mut(&token).unwrap()
     }
 
-    fn merged_data_len(&self) -> usize {
+    fn canon_data_len(&self) -> usize {
         self.canonical_stream.data_len()
     }
 
-    fn merged_delayed_data_len(&self) -> usize {
+    fn canon_delayed_data_len(&self) -> usize {
         self.canonical_stream.delayed_data_len()
     }
 
-    fn append_canon_data(&mut self, id: u64, to: usize) {
+    fn append_canon_data(&mut self, id: u64, until: usize) {
         {
             let mut canon_replay = self.canonical_stream.borrow_mut();
-            let source_replay = self.get_replay(id).replay.borrow();
-            canon_replay.add_data(&*source_replay, to);
-        }
-        for r in self.replays.values_mut() {
-            r.discard_unneeded_data();
+            let source_replay = self.get_replay(id).r.borrow();
+            canon_replay.add_data(source_replay.deref(), until);
         }
     }
 
-    fn update_merged_delayed_data_len(&mut self, mut hint: usize) {
-        hint = std::cmp::min(hint, self.merged_data_len());
-        if hint <= self.merged_delayed_data_len() {
+    fn update_canon_delayed_data_len(&mut self, mut hint: usize) {
+        hint = std::cmp::min(hint, self.canon_data_len());
+        if hint <= self.canon_delayed_data_len() {
             return;
         }
         self.canonical_stream.borrow_mut().advance_delayed_data(hint);
@@ -228,14 +162,14 @@ impl SharedState {
 // The strategy switches between two states - a quorum and a stalemate.
 // During a quorum, it chooses a subset of replays and merges data from them into C as far as it
 // can. Once merge point is reached, it transitions to a stalemate.
-// During a stalemate, it tries to collect a subset of replays that agree with C and agree on C's next
+// During a stalemate, it tries to collect a subset of replays that match C and agree on C's next
 // byte. Once it does, it transitions to quorum with that subset.
 //
 // In detail:
 //
 // STALEMATE:
-// Find a subset of replays that matches C and agrees on the next byte. Once found, advance the
-// stream by that byte and transition to quorum.
+// Find a subset of replays that match C and agree on the next byte. Once found, advance the stream
+// by that byte and transition to quorum.
 
 pub struct MergeStalemateState {
     s: SharedState,
@@ -243,15 +177,19 @@ pub struct MergeStalemateState {
     reserve: HashSet<u64>,
 }
 
-// * Stalemate has a set Res and a map Cand.
+// * A stalemate has a set Res and a map Cand.
 // * At any time between callbacks (ignoring changes we weren't yet notified of):
-//   * Replays in Cand are exactly those that match C and are longer than C.
-//   * Replays in Res are no longer than C and are not finished.
+//   * Replays in Cand are exactly those that match C and are strictly longer than C.
+//   * Cand is a map from byte values to sets of replays. Each replay in cand under a key 'x' has a
+//     byte 'x' at a position right after all data from C.
+//   * Replays in Res are no longer than C and not finished.
 //   * All replays in neither either diverge from C, or are no longer than C and finished.
 //   * Notice that every replay satisfies at least one of the above.
+//
 // * A stalemate state is constructed with a set of replays I, which is a subset of R.
 //   * Every replay outside I diverges from C.
 //   * Replays from I are distributed between Cand and Res according to above rules.
+//
 // * Whether a stalemate can be resolved is decided as follows:
 //   * Stalemate stays unresolved as long as no delayed positions have ever been set. (This is a
 //     hack to prevent too eager stalemate resolution at the start, when replays are still being
@@ -259,12 +197,13 @@ pub struct MergeStalemateState {
 //   * If one of entries in Cand has at least target_quorum_size entries, the stalemate can be
 //     resolved.
 //   * Otherwise stalemate can resolved if set Res is empty and map Cand is not empty.
+//
 // * Once a stalemate is resolved, it is turned into a quorum.
 //   * Replays from the most numerous entry in Cand become a "good replay" set G.
 //   * C is advanced by one byte that equals the extra byte replays in G agree on.
-//   * All other entries in Cand are discarded.
+//   * All other entries in Cand are discarded as diverging from C.
 //   * G and Res are given to quorum constructor.
-//   * Notice that all replays in G agree with C and all replays outside G and Res diverge from C.
+//   * Notice that all replays in G match C and all replays outside G and Res diverge from C.
 
 impl MergeStalemateState {
     fn new(target_quorum_size: usize, stream_cmp_distance: usize) -> Self {
@@ -287,30 +226,40 @@ impl MergeStalemateState {
         me
     }
 
+    fn insert_candidate(&mut self, byte: u8, id: u64) {
+        if self.candidates.get(&byte).is_none() {
+            self.candidates.insert(byte, Vec::new());
+        }
+        let cands_for_byte = self.candidates.get_mut(&byte).unwrap();
+        cands_for_byte.push(id);
+    }
+
     fn try_move_replay_to_candidates(&mut self, id: u64) {
-        {
-            let replay = self.s.get_replay(id).replay.borrow();
-            if replay.data_len() <= self.s.merged_data_len() {
-                if replay.is_finished() {
-                    self.reserve.remove(&id); // Replay finished short.
-                }
-                return; // Replay is short, still in reserve.
+        let canon_data_len = self.s.canon_data_len();
+        let replay = self.s.get_replay(id);
+        let replay_len = replay.r.data_len();
+        let replay_is_finished = replay.r.is_finished();
+
+        if replay_len <= canon_data_len {
+            if replay_is_finished {
+                let replay = self.s.get_mut_replay(id);
+                replay.set_diverged();
+                self.reserve.remove(&id); // Replay finished short. Diverges.
             }
+            return; // Replay is short, still in reserve.
         }
-        {
-            self.reserve.remove(&id);
-            if self.s.get_mut_replay(id).diverges_from_canon() {
-                return; // Replay diverged in the meantime.
-            }
-        }
-        {
-            let replay = self.s.get_replay(id).replay.borrow(); // Replay matches and can become a candidate.
-            let next_byte = replay.get_data().at(self.s.merged_data_len());
-            if self.candidates.get(&next_byte).is_none() {
-                self.candidates.insert(next_byte, Vec::new());
-            }
-            let cands_for_byte = self.candidates.get_mut(&next_byte).unwrap();
-            cands_for_byte.push(id);
+
+        self.reserve.remove(&id);
+        let diverges = replay.diverges_at_stalemate(&self.s.canonical_stream.borrow());
+        let replay = self.s.get_mut_replay(id);
+
+        if diverges {
+            replay.set_diverged();
+        } else {
+            // Replay matches and can become a candidate.
+            replay.set_matching(canon_data_len);
+            let next_byte = replay.r.get_data().at(canon_data_len);
+            self.insert_candidate(next_byte, id);
         }
     }
 
@@ -327,10 +276,9 @@ impl MergeStalemateState {
         }
 
         // Delayed data check.
-        if self.s.delayed_data_started || self.s.get_replay(id).delayed_data_len() == 0 {
-            return;
+        if !self.s.delayed_data_started && self.s.get_replay(id).r.delayed_data_len() > 0 {
+            self.s.delayed_data_started = true;
         }
-        self.s.delayed_data_started = true;
     }
 
     fn replay_ended(&mut self, id: u64) {
@@ -361,7 +309,7 @@ impl MergeStalemateState {
         debug_assert!(!self.candidates.is_empty());
 
         // Sort by stream count, then by longest stream.
-        let replay_len = |&id| self.s.get_replay(id).data_len();
+        let replay_len = |&id| self.s.get_replay(id).r.data_len();
         let best_byte = *self
             .candidates
             .iter()
@@ -374,16 +322,13 @@ impl MergeStalemateState {
 
         // Advance replay by 1 byte
         let good_replay = *good_replays.get(0).unwrap();
-        let byte_pos = self.s.merged_data_len();
+        let byte_pos = self.s.canon_data_len();
         self.s.append_canon_data(good_replay, byte_pos + 1);
-        for id in good_replays.iter() {
-            self.s.get_mut_replay(*id).explicitly_set_matching();
-        }
 
-        // Discard all the rest, they diverge
+        // Discard all diverging replays
         for (_, v) in self.candidates.iter() {
             for id in v.iter() {
-                self.s.get_mut_replay(*id).explicitly_set_diverged();
+                self.s.get_mut_replay(*id).set_diverged();
             }
         }
         MergeQuorumState::from_stalemate(self.s, good_replays, self.reserve)
@@ -425,7 +370,7 @@ impl MergeQuorumState {
         debug_assert!(!good_replays.is_empty());
 
         // Take longest replays
-        good_replays.sort_unstable_by_key(|&id| shared.get_replay(id).data_len());
+        good_replays.sort_unstable_by_key(|&id| shared.get_replay(id).r.data_len());
         good_replays.reverse();
 
         // Collect enough replays for quorum, move rest to reserve
@@ -448,6 +393,20 @@ impl MergeQuorumState {
         token
     }
 
+    fn replay_data_updated(&mut self, id: u64) {
+        if self.quorum.contains(&id) {
+            self.update_delayed_position();
+        }
+    }
+
+    fn replay_ended(&mut self, _id: u64) {
+        // pass, we don't care
+    }
+
+    fn update_delayed_position(&mut self) {
+        self.s.update_canon_delayed_data_len(self.quorum_delayed_position());
+    }
+
     // We chose minimum rather than maximum due to delayed position behaviour. When a replay ends,
     // its delayed position immediately jumps to end of data, removing the 5 minute delay, so we
     // can deliver a finished replay immediately. If we used max, this could cause rapid switches
@@ -460,23 +419,13 @@ impl MergeQuorumState {
     fn quorum_delayed_position(&self) -> usize {
         self.quorum
             .iter()
-            .map(|id| self.s.get_replay(*id).delayed_data_len())
+            .map(|id| self.s.get_replay(*id).r.delayed_data_len())
             .min()
             .unwrap()
     }
 
-    fn replay_data_updated(&mut self, id: u64) {
-        if self.quorum.contains(&id) {
-            self.update_delayed_position();
-        }
-    }
-
-    fn replay_ended(&mut self, _id: u64) {
-        // pass, we don't care
-    }
-
     fn has_to_enter_stalemate(&self) -> bool {
-        self.s.merged_delayed_data_len() >= self.s.merged_data_len()
+        self.s.canon_delayed_data_len() >= self.s.canon_data_len()
     }
 
     fn enter_stalemate(self) -> MergeStalemateState {
@@ -486,41 +435,46 @@ impl MergeQuorumState {
         MergeStalemateState::from_quorum(s, reserve)
     }
 
+    fn merge_more_data(&mut self) {
+        let common_prefix = self.calculate_quorum_prefix();
+        let any_in_quorum = *self.quorum.iter().next().unwrap();
+        self.s.append_canon_data(any_in_quorum, common_prefix);
+        self.discard_data_after_merging();
+        self.update_delayed_position();
+    }
+
+    fn discard_data_after_merging(&mut self) {
+        let merged_len = self.s.canon_data_len();
+        for id in self.quorum.iter() {
+            self.s.get_mut_replay(*id).set_matching(merged_len);
+        }
+        for id in self.reserve.iter() {
+            self.s
+                .get_mut_replay(*id)
+                .discard_if_not_needed_for_checking_divergence(merged_len);
+        }
+    }
+
     fn calculate_quorum_prefix(&mut self) -> usize {
-        debug_assert!(!self.quorum.is_empty());
+        assert!(!self.quorum.is_empty());
 
         let shortest_id = *self
             .quorum
             .iter()
-            .min_by_key(|id| self.s.get_replay(**id).data_len())
+            .min_by_key(|id| self.s.get_replay(**id).r.data_len())
             .unwrap();
         let shortest = self.s.get_replay(shortest_id);
 
-        let cmp_start = self.s.merged_data_len();
-        let mut common_prefix = shortest.data_len();
+        let cmp_start = self.s.canon_data_len();
+        let mut common_prefix = shortest.r.data_len();
 
         for id in self.quorum.iter() {
             if *id == shortest_id {
                 continue;
             }
-            let pfx = shortest.common_prefix_from(self.s.get_replay(*id), cmp_start);
-            common_prefix = std::cmp::min(common_prefix, pfx);
+            common_prefix = shortest.common_prefix_from_to(self.s.get_replay(*id), cmp_start, Some(common_prefix));
         }
         common_prefix
-    }
-
-    fn merge_more_data(&mut self) {
-        let common_prefix = self.calculate_quorum_prefix();
-        let any_in_quorum = *self.quorum.iter().next().unwrap();
-        self.s.append_canon_data(any_in_quorum, common_prefix);
-        for id in self.quorum.iter() {
-            self.s.get_mut_replay(*id).explicitly_set_matching();
-        }
-        self.update_delayed_position();
-    }
-
-    fn update_delayed_position(&mut self) {
-        self.s.update_merged_delayed_data_len(self.quorum_delayed_position());
     }
 }
 
@@ -537,7 +491,7 @@ macro_rules! both {
         match $value {
             Self::Quorum($pattern) => $result,
             Self::Stalemate($pattern) => $result,
-            Self::Swapping => panic!("Programmer error - we're swapping state right now!"),
+            Self::Swapping => panic!(),
         }
     };
 }
@@ -551,7 +505,7 @@ impl QuorumMergeStrategy {
         match &self {
             Self::Quorum(s) => s.has_to_enter_stalemate(),
             Self::Stalemate(s) => s.can_exit_stalemate(),
-            Self::Swapping => panic!("Programmer error - we're swapping state right now!"),
+            Self::Swapping => panic!(),
         }
     }
 
@@ -562,7 +516,7 @@ impl QuorumMergeStrategy {
             *self = match tmp {
                 Self::Quorum(s) => Self::Stalemate(s.enter_stalemate()),
                 Self::Stalemate(s) => Self::Quorum(s.exit_stalemate()),
-                Self::Swapping => panic!("Programmer error - we're swapping state right now!"),
+                Self::Swapping => panic!(),
             }
         }
     }
@@ -585,7 +539,7 @@ impl MergeStrategy for QuorumMergeStrategy {
         // As a bonus, this guarantees that canonical stream will be in data stage once we start
         // merging data.
         let replay = both!(self, s => s.s.get_replay(id));
-        let header = replay.replay.borrow_mut().take_header();
+        let header = replay.r.borrow_mut().take_header();
         let mut canonical_stream = both!(self, s => s.s.canonical_stream.borrow_mut());
         if canonical_stream.get_header().is_none() {
             canonical_stream.add_header(header);
@@ -609,12 +563,12 @@ impl MergeStrategy for QuorumMergeStrategy {
         // Then, should_change_state() would return true, but we always end calls with it being
         // false. Therefore, we're in a stalemate.
         match self {
-            Self::Swapping => panic!("Programmer error - we're swapping state right now!"),
+            Self::Swapping => panic!(),
             Self::Quorum(..) => panic!("Expected to finish merge strategy in a stalemate"),
             Self::Stalemate(s) => {
                 // Not in a quorum. Delayed replay position must be equal to its data len.
-                let data_len = s.s.merged_data_len();
-                let position = s.s.merged_delayed_data_len();
+                let data_len = s.s.canon_data_len();
+                let position = s.s.canon_delayed_data_len();
                 debug_assert_eq!(data_len, position);
                 // All replays are finished, so Res is empty.
                 debug_assert!(s.reserve.is_empty());
@@ -663,7 +617,7 @@ impl MergeStrategy for QuorumMergeStrategy {
 // * We can assume quorum ends due to diverging data very few times, since every time it does, we
 //   discard at least one replay.
 // * Otherwise, the quorum ends because the delayed position caught up with the data we merged. If
-//   that happened after K < N minutes, then the shortest replay has been stalling for N - K
+//   that happened after K < N minutes, then one of the replays has been stalling for N - K
 //   minutes at that position. Total replay stalling time can't exceed (replay count) minutes per
 //   minute, so we won't enter stalemate more often than (replay count + 1) times per N minutes,
 //   amortized.
@@ -681,7 +635,7 @@ impl MergeStrategy for QuorumMergeStrategy {
 // connection is kept open. We can't time out replays quickly, because long pauses in the game
 // (e.g. connectivity issues) happen sometimes. Replays are timed out *eventually*, so everything
 // *eventually* works out, but if we wait for such a bad replay, a replay watcher could get
-// confused and say the server is broken. It kind of would be.
+// confused and say the server is broken.
 // In the quorum, a misbehaving replay will block merging, but won't block reaching the merge point
 // and entering stalemate. In a stalemate, things are fine as long as we find a quorum without
 // misbehaving replays, which is not the case in 1v1 and when almost all players left.

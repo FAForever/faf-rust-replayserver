@@ -10,6 +10,7 @@ pub trait ChunkedBuf {
 }
 
 pub trait ChunkedBufExt: ChunkedBuf {
+    fn common_prefix_from_to(&self, other: &impl ChunkedBuf, start: usize, end: Option<usize>) -> usize;
     fn common_prefix_from(&self, other: &impl ChunkedBuf, start: usize) -> usize;
     fn at(&self, pos: usize) -> u8;
     fn iter_chunks(&self, start: usize, end: usize) -> IterChunks<'_, Self>;
@@ -22,8 +23,16 @@ impl<T: ChunkedBuf> ChunkedBufExt for T {
     // TODO: this compiles to byte-by-byte comparison loop. Pretty good, but maybe we can do better
     // by comparing words or even SIMD. Profile.
     fn common_prefix_from(&self, other: &impl ChunkedBuf, start: usize) -> usize {
+        self.common_prefix_from_to(other, start, None)
+    }
+
+    fn common_prefix_from_to(&self, other: &impl ChunkedBuf, start: usize, end: Option<usize>) -> usize {
         let mut at = start;
-        let max_cmp = std::cmp::min(self.len(), other.len());
+        let mut max_cmp = std::cmp::min(self.len(), other.len());
+        if let Some(e) = end {
+            max_cmp = std::cmp::min(max_cmp, e);
+        }
+
         while at < max_cmp {
             let my_chunk = self.get_chunk(at);
             let other_chunk = other.get_chunk(at);
