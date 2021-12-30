@@ -76,7 +76,6 @@ impl Replay {
         let wait = self
             .writer_connection_count
             .wait_until_empty_for(self.time_with_zero_writers_to_end_replay);
-        // We don't have to return when there are no writers, just when we shouldn't accept more.
         cancellable(wait, &self.replay_timeout_token).await;
     }
 
