@@ -47,6 +47,7 @@ General info
 ------------
 
 The server, as a whole, interacts with the world in three ways:
+
 * It accepts connections on a TCP port,
 * It communicates with the database,
 * It saves replays to a directory.
