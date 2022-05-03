@@ -77,7 +77,7 @@ mod test {
         config::test::default_config,
         database::database::test::mock_database,
         server::connection::test::test_connection,
-        util::test::{get_file, setup_logging, sleep_s},
+        util::test::{get_file, setup_logging, sleep_ms},
     };
     use async_stream::stream;
     use futures::future::join_all;
@@ -110,7 +110,6 @@ mod test {
     #[tokio::test]
     async fn test_server_single_empty_connection() {
         setup_logging();
-        tokio::time::pause();
 
         let (c, _reader, _writer) = test_connection();
         let mut conf = default_config();
@@ -118,15 +117,15 @@ mod test {
         let token = CancellationToken::new();
         let replay_dir = test_directory();
 
-        conf.server.connection_accept_timeout_s = Duration::from_secs(20);
+        conf.server.connection_accept_timeout_s = Duration::from_millis(10);
 
         let server = Server::new(Arc::new(conf), token.clone(), stream! { yield c; }, db, replay_dir).run();
         let mut ended_too_early = true;
 
         let wait = async {
-            sleep_s(19).await;
+            sleep_ms(5).await;
             ended_too_early = false;
-            sleep_s(2).await;
+            sleep_ms(10).await;
         };
 
         select! {
