@@ -53,7 +53,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
             None => log::info!("Server shutting down"),
         }
 
-        runner.shutdown();
+        let _ = tokio::task::spawn_blocking(|| runner.shutdown()).await;
     }
 }
 
