@@ -1,135 +1,131 @@
 {
   "db": "MySQL",
   "00bfa6e7da567a5ffb0ab1599e9bbdbf20e4599e68d4817821494f0d02721883": {
-    "query": "\n            SELECT\n                `login`.`login` AS login,\n                `game_player_stats`.`team` AS team\n            FROM `game_stats`\n            INNER JOIN `game_player_stats`\n              ON `game_player_stats`.`gameId` = `game_stats`.`id`\n            INNER JOIN `login`\n              ON `login`.id = `game_player_stats`.`playerId`\n            WHERE `game_stats`.`id` = ? AND `game_player_stats`.`AI` = 0\n            ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "login",
+          "ordinal": 0,
           "type_info": {
-            "type": "VarString",
+            "char_set": 224,
             "flags": {
               "bits": 4101
             },
-            "char_set": 224,
-            "max_size": 80
+            "max_size": 80,
+            "type": "VarString"
           }
         },
         {
-          "ordinal": 1,
           "name": "team",
+          "ordinal": 1,
           "type_info": {
-            "type": "Tiny",
+            "char_set": 63,
             "flags": {
               "bits": 4097
             },
-            "char_set": 63,
-            "max_size": 3
+            "max_size": 3,
+            "type": "Tiny"
           }
         }
       ],
-      "parameters": {
-        "Right": 1
-      },
       "nullable": [
         false,
         false
-      ]
-    }
-  },
-  "a4d5d7b80187c055338ab192e20d946f456c32009312e458da1410c2e41dc6dc": {
-    "query": "\n            SELECT\n                `game_stats`.`startTime` AS start_time,\n                `game_stats`.`endTime` AS end_time,\n                `game_stats`.`gameType` AS game_type,\n                `login`.`login` AS host,\n                `game_stats`.`gameName` AS game_name,\n                `game_featuredMods`.`gamemod` AS game_mod,\n                `table_map`.`filename` AS file_name\n            FROM `game_stats`\n            INNER JOIN `login`\n              ON `login`.id = `game_stats`.`host`\n            INNER JOIN  `game_featuredMods`\n              ON `game_stats`.`gameMod` = `game_featuredMods`.`id`\n            LEFT JOIN `table_map`\n              ON `game_stats`.`mapId` = `table_map`.`id`\n            WHERE `game_stats`.`id` = ?\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "start_time",
-          "type_info": {
-            "type": "Timestamp",
-            "flags": {
-              "bits": 1161
-            },
-            "char_set": 63,
-            "max_size": 19
-          }
-        },
-        {
-          "ordinal": 1,
-          "name": "end_time",
-          "type_info": {
-            "type": "Timestamp",
-            "flags": {
-              "bits": 136
-            },
-            "char_set": 63,
-            "max_size": 19
-          }
-        },
-        {
-          "ordinal": 2,
-          "name": "game_type",
-          "type_info": {
-            "type": "String",
-            "flags": {
-              "bits": 4361
-            },
-            "char_set": 224,
-            "max_size": 4
-          }
-        },
-        {
-          "ordinal": 3,
-          "name": "host",
-          "type_info": {
-            "type": "VarString",
-            "flags": {
-              "bits": 4101
-            },
-            "char_set": 224,
-            "max_size": 80
-          }
-        },
-        {
-          "ordinal": 4,
-          "name": "game_name",
-          "type_info": {
-            "type": "VarString",
-            "flags": {
-              "bits": 4105
-            },
-            "char_set": 224,
-            "max_size": 512
-          }
-        },
-        {
-          "ordinal": 5,
-          "name": "game_mod",
-          "type_info": {
-            "type": "VarString",
-            "flags": {
-              "bits": 4
-            },
-            "char_set": 224,
-            "max_size": 200
-          }
-        },
-        {
-          "ordinal": 6,
-          "name": "file_name",
-          "type_info": {
-            "type": "VarString",
-            "flags": {
-              "bits": 4100
-            },
-            "char_set": 224,
-            "max_size": 800
-          }
-        }
       ],
       "parameters": {
         "Right": 1
-      },
+      }
+    },
+    "query": "\n            SELECT\n                `login`.`login` AS login,\n                `game_player_stats`.`team` AS team\n            FROM `game_stats`\n            INNER JOIN `game_player_stats`\n              ON `game_player_stats`.`gameId` = `game_stats`.`id`\n            INNER JOIN `login`\n              ON `login`.id = `game_player_stats`.`playerId`\n            WHERE `game_stats`.`id` = ? AND `game_player_stats`.`AI` = 0\n            "
+  },
+  "84083717c119dd0b2c28afabbd4776c786c870898012fbc48cc8aefe1a9aa7d2": {
+    "describe": {
+      "columns": [
+        {
+          "name": "start_time",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 1193
+            },
+            "max_size": 19,
+            "type": "Timestamp"
+          }
+        },
+        {
+          "name": "end_time",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 168
+            },
+            "max_size": 19,
+            "type": "Timestamp"
+          }
+        },
+        {
+          "name": "game_type",
+          "ordinal": 2,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4361
+            },
+            "max_size": 4,
+            "type": "String"
+          }
+        },
+        {
+          "name": "host",
+          "ordinal": 3,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4101
+            },
+            "max_size": 80,
+            "type": "VarString"
+          }
+        },
+        {
+          "name": "game_name",
+          "ordinal": 4,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4105
+            },
+            "max_size": 512,
+            "type": "VarString"
+          }
+        },
+        {
+          "name": "game_mod",
+          "ordinal": 5,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4
+            },
+            "max_size": 200,
+            "type": "VarString"
+          }
+        },
+        {
+          "name": "file_name",
+          "ordinal": 6,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4100
+            },
+            "max_size": 800,
+            "type": "VarString"
+          }
+        }
+      ],
       "nullable": [
         false,
         true,
@@ -138,32 +134,36 @@
         false,
         true,
         true
-      ]
-    }
-  },
-  "b1316c72620a90243c773583a8579ee6a295335dc23759fd83f0f65cf6dfc485": {
-    "query": "\n           SELECT COUNT(*) AS count FROM `game_player_stats`\n           WHERE `game_player_stats`.`gameId` = ?\n           ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": {
-            "type": "LongLong",
-            "flags": {
-              "bits": 129
-            },
-            "char_set": 63,
-            "max_size": 21
-          }
-        }
       ],
       "parameters": {
         "Right": 1
-      },
+      }
+    },
+    "query": "\n            SELECT\n                `game_stats`.`startTime` AS start_time,\n                `game_stats`.`endTime` AS end_time,\n                `game_stats`.`gameType` AS game_type,\n                `login`.`login` AS host,\n                `game_stats`.`gameName` AS game_name,\n                `game_featuredMods`.`gamemod` AS game_mod,\n                `map_version`.`filename` AS file_name\n            FROM `game_stats`\n            INNER JOIN `login`\n              ON `login`.id = `game_stats`.`host`\n            INNER JOIN  `game_featuredMods`\n              ON `game_stats`.`gameMod` = `game_featuredMods`.`id`\n            LEFT JOIN `map_version`\n              ON `game_stats`.`mapId` = `map_version`.`id`\n            WHERE `game_stats`.`id` = ?\n            "
+  },
+  "b1316c72620a90243c773583a8579ee6a295335dc23759fd83f0f65cf6dfc485": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 21,
+            "type": "LongLong"
+          }
+        }
+      ],
       "nullable": [
         false
-      ]
-    }
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n           SELECT COUNT(*) AS count FROM `game_player_stats`\n           WHERE `game_player_stats`.`gameId` = ?\n           "
   }
 }

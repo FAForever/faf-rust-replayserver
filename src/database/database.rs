@@ -79,7 +79,6 @@ impl Database {
     }
 
     pub async fn get_game_stat_row(&self, id: u64) -> Result<GameStatRow, SaveError> {
-        // TODO is table_map obsolete? Gotta ask.
         Ok(sqlx::query_as!(
             GameStatRow,
             "
@@ -90,14 +89,14 @@ impl Database {
                 `login`.`login` AS host,
                 `game_stats`.`gameName` AS game_name,
                 `game_featuredMods`.`gamemod` AS game_mod,
-                `table_map`.`filename` AS file_name
+                `map_version`.`filename` AS file_name
             FROM `game_stats`
             INNER JOIN `login`
               ON `login`.id = `game_stats`.`host`
             INNER JOIN  `game_featuredMods`
               ON `game_stats`.`gameMod` = `game_featuredMods`.`id`
-            LEFT JOIN `table_map`
-              ON `game_stats`.`mapId` = `table_map`.`id`
+            LEFT JOIN `map_version`
+              ON `game_stats`.`mapId` = `map_version`.`id`
             WHERE `game_stats`.`id` = ?
             ",
             id
