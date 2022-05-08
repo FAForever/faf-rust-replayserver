@@ -20,6 +20,10 @@ impl ConnectionError {
         }
         return false;
     }
+
+    pub fn is_no_data(&self) -> bool {
+        matches!(self, ConnectionError::NoData)
+    }
 }
 
 // Little shortcut for less typing,

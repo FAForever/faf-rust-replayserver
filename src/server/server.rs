@@ -41,6 +41,11 @@ impl<C: Stream<Item = Connection>> Server<C> {
         let accept_connections = self.connections.for_each_concurrent(None, |mut c| async {
             match read_initial_header(&mut c, initial_timeout).await {
                 Err(e) => {
+                    // Ignore connections with no data. Anyone who joins then leaves a lobby is one
+                    // such connection, for example.
+                    if e.is_no_data() {
+                        return;
+                    }
                     log::info!("Could not accept connection: {}", e);
                     metrics::inc_served_conns(Some(e));
                 }
