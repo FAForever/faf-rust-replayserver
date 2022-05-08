@@ -83,6 +83,7 @@ impl InnerSettings {
         let db_pass_var = env::var("RS_DB_PASSWORD");
         Self::do_from_env(conf_var, db_pass_var).map(Arc::new)
     }
+
     fn do_from_env(
         conf_var: Result<String, VarError>,
         db_pass_var: Result<String, VarError>,
@@ -92,10 +93,11 @@ impl InnerSettings {
         })?;
         let db_password =
             db_pass_var.map_err(|_| ConfigError::NotFound("Database password was not provided".into()))?;
-        let mut c = Config::new();
-        c.set("database.password", db_password)?;
-        c.merge(File::with_name(&config_file[..]))?;
-        c.try_into()
+        let c = Config::builder()
+            .set_override("database.password", db_password)?
+            .add_source(File::with_name(&config_file[..]))
+            .build()?;
+        c.try_deserialize()
     }
 }
 

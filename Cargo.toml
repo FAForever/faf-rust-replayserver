@@ -27,7 +27,7 @@ required-features = ["process_tests"]
 [dependencies]
 async-compression = { version = "0.3.12", features = ["tokio", "zstd"] }
 async-stream = "0.3.3"
-config = { version = "0.11.0", features = ["yaml"] }
+config = { version = "0.13.1", features = ["yaml"] }
 env_logger = "0.9.0"
 faf-replay-parser = "0.5.2"
 futures = "0.3.21"
@@ -36,7 +36,7 @@ log = "0.4.17"
 prometheus_exporter = "0.8.4"
 rand = "0.8.5"
 serde = { version = "1.0.137", features = ["derive"] }
-serde_json = "1.0.80"
+serde_json = "1.0.81"
 signal-hook = "0.3.13"
 sqlx = { version = "0.5.13", features = ["runtime-tokio-native-tls", "mysql", "time", "offline"] }
 thiserror = "1.0.31"
