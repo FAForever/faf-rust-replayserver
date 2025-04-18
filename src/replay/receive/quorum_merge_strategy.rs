@@ -828,7 +828,7 @@ mod tests {
 
     // FIXME tweak so we can test small comparison cutoffs.
     fn simple_fuzzing_round() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut strat = QuorumMergeStrategy::new(2, 512);
         let count = 8;
         let chunk = 4;
@@ -854,7 +854,7 @@ mod tests {
             if final_datas.len() == count {
                 break;
             }
-            let idx = rng.gen_range(0..count);
+            let idx = rng.random_range(0..count);
             let (s, token, data) = streams.get_mut(idx).unwrap();
             if s.is_finished() {
                 continue;
@@ -863,14 +863,14 @@ mod tests {
             let mut modified = false;
             if rand::random() {
                 // Randomly advance data.
-                let mut amount = rng.gen_range(1..chunk + 1);
+                let mut amount = rng.random_range(1..chunk + 1);
                 let data_len = s.data_len();
                 amount = std::cmp::min(amount, replay_len - data_len);
 
                 let mut new_data = vec![0; amount];
-                if rng.gen_range(0..data_error_chance) == 0 {
+                if rng.random_range(0..data_error_chance) == 0 {
                     // Small chance to introduce a deviation.
-                    let err_at = rng.gen_range(0..amount);
+                    let err_at = rng.random_range(0..amount);
                     new_data[err_at] = 1;
                     log::debug!("Stream {} added an error at {}", idx, data_len + err_at);
                 }
@@ -880,7 +880,7 @@ mod tests {
             }
             if rand::random() {
                 // Randomly advance delayed data.
-                let amount = rng.gen_range(1..chunk + 1);
+                let amount = rng.random_range(1..chunk + 1);
                 let mut delayed = s.delayed_data_len();
                 delayed += amount;
                 if delayed <= s.data_len() {
@@ -894,7 +894,7 @@ mod tests {
             }
 
             // Small chance to end early.
-            if s.data_len() == replay_len || rng.gen_range(0..early_exit_chance) == 0 {
+            if s.data_len() == replay_len || rng.random_range(0..early_exit_chance) == 0 {
                 let data_len = s.data_len();
                 log::debug!("Stream {} ended at {}", idx, data_len);
                 let delayed_data_len = s.delayed_data_len();
