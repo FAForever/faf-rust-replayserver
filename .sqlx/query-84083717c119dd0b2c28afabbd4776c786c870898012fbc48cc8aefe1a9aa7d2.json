@@ -1,0 +1,84 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT\n                `game_stats`.`startTime` AS start_time,\n                `game_stats`.`endTime` AS end_time,\n                `game_stats`.`gameType` AS game_type,\n                `login`.`login` AS host,\n                `game_stats`.`gameName` AS game_name,\n                `game_featuredMods`.`gamemod` AS game_mod,\n                `map_version`.`filename` AS file_name\n            FROM `game_stats`\n            INNER JOIN `login`\n              ON `login`.id = `game_stats`.`host`\n            INNER JOIN  `game_featuredMods`\n              ON `game_stats`.`gameMod` = `game_featuredMods`.`id`\n            LEFT JOIN `map_version`\n              ON `game_stats`.`mapId` = `map_version`.`id`\n            WHERE `game_stats`.`id` = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "start_time",
+        "type_info": {
+          "type": "Timestamp",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | BINARY | TIMESTAMP",
+          "max_size": 19
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "end_time",
+        "type_info": {
+          "type": "Timestamp",
+          "flags": "MULTIPLE_KEY | UNSIGNED | BINARY",
+          "max_size": 19
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "game_type",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | MULTIPLE_KEY | ENUM | NO_DEFAULT_VALUE",
+          "max_size": 4
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "host",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 80
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "game_name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 512
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "game_mod",
+        "type_info": {
+          "type": "VarString",
+          "flags": "UNIQUE_KEY",
+          "max_size": 200
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "file_name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 800
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "84083717c119dd0b2c28afabbd4776c786c870898012fbc48cc8aefe1a9aa7d2"
+}

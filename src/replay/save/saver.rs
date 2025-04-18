@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{writer::write_replay_file, ReplayJsonHeader, SavedReplayDirectory};
-use faf_replay_parser::scfa;
+use faf_replay_parser::{self, SCFA};
 
 pub type ReplaySaver = Arc<InnerReplaySaver>;
 
@@ -35,7 +35,7 @@ impl InnerReplaySaver {
     }
 
     fn get_ticks(&self, mut data: impl Read, id: u64) -> Option<u32> {
-        let ticks = scfa::parser::parse_body_ticks(&mut data);
+        let ticks = faf_replay_parser::parser::parse_body_ticks::<SCFA>(&mut data);
         if let Err(e) = &ticks {
             log::info!("Failed to parse tick count for replay {}: {}", id, e);
         }

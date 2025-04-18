@@ -153,8 +153,8 @@ mod test {
         let q = Queries::new(mock_database());
         let mods = q.get_mod_versions("foo").await.unwrap();
         assert_eq!(mods.len(), 3);
-        assert_eq!(mods["50".into()], 3000);
-        assert_eq!(mods["60".into()], 3001);
-        assert_eq!(mods["70".into()], 3002);
+        assert_eq!(mods["50"], 3000);
+        assert_eq!(mods["60"], 3001);
+        assert_eq!(mods["70"], 3002);
     }
 }

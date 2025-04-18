@@ -28,7 +28,7 @@ impl Connection {
     pub fn new_from(reader: ReaderType, writer: WriterType) -> Self {
         let mut id = String::new();
         for _ in 0..12 {
-            id.push(rand::thread_rng().gen_range('a'..'z'));
+            id.push(rand::rng().random_range('a'..'z'));
         }
         let s = Self {
             reader,

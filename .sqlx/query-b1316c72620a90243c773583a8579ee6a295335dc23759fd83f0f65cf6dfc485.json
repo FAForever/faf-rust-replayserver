@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "\n           SELECT COUNT(*) AS count FROM `game_player_stats`\n           WHERE `game_player_stats`.`gameId` = ?\n           ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "max_size": 21
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b1316c72620a90243c773583a8579ee6a295335dc23759fd83f0f65cf6dfc485"
+}
