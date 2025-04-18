@@ -1,0 +1,34 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT\n                `login`.`login` AS login,\n                `game_player_stats`.`team` AS team\n            FROM `game_stats`\n            INNER JOIN `game_player_stats`\n              ON `game_player_stats`.`gameId` = `game_stats`.`id`\n            INNER JOIN `login`\n              ON `login`.id = `game_player_stats`.`playerId`\n            WHERE `game_stats`.`id` = ? AND `game_player_stats`.`AI` = 0\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "login",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 80
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "team",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 3
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "00bfa6e7da567a5ffb0ab1599e9bbdbf20e4599e68d4817821494f0d02721883"
+}

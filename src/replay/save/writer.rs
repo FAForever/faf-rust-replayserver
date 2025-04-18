@@ -11,7 +11,7 @@ pub async fn write_replay_file(
 ) -> std::io::Result<()> {
     to.write_all(serde_json::to_string(&json_header)?.as_bytes()).await?;
     to.write_all("\n".as_bytes()).await?;
-    let clevel = async_compression::Level::Precise(compression_level);
+    let clevel = async_compression::Level::Precise(compression_level as i32);
     let mut encoder = ZstdEncoder::with_quality(to, clevel);
     tokio::io::copy(&mut MReplayReader::new(replay), &mut encoder).await?;
     encoder.shutdown().await?;
