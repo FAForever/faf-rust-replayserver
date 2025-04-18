@@ -10,12 +10,16 @@ values (1,    'user1', 'user1@example.com', SHA2('pass1', 256), '2000-01-01 00:0
        (4,    'user4', 'user4@example.com', SHA2('pass4', 256), '2000-04-04 00:00:00'),
        (5,    'user5', 'user5@example.com', SHA2('pass5', 256), '2000-05-05 00:00:00');
 
+insert into license
+       (id, name, short_name, license_text, active, revocable, redistributable, modifiable)
+values (1, 'foo', 'foo', 'foo',  1, 1, 1, 1);
+
 insert into map
-       (id, display_name, map_type,         battle_type, author)
-values (11, 'SCMP_001',   'FFA',            'skirmish',  1),
-       (12, 'SCMP_002',   'Astro 20 NR',    'skirmish',  2),
-       (13, 'SCMP_003',   'LateNightCanis', 'skirmish',  3),
-       (14, 'SCMP_004',   'FFA',            'skirmish',  4);
+       (id, display_name, map_type,         battle_type, author, license)
+values (11, 'SCMP_001',   'FFA',            'skirmish',  1, 1),
+       (12, 'SCMP_002',   'Astro 20 NR',    'skirmish',  2, 1),
+       (13, 'SCMP_003',   'LateNightCanis', 'skirmish',  3, 1),
+       (14, 'SCMP_004',   'FFA',            'skirmish',  4, 1);
 
 insert into map_version
        (id, description, max_players, width, height, version, filename,                  hidden, map_id)
