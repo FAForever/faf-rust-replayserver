@@ -7,17 +7,11 @@ rm -rf ./*.profraw
 rm -rf ./coverage_run/debug/deps/*.gcda
 rm -rf ./coverage_run/debug/deps/*.gcno
 
-export RUSTFLAGS="-Zinstrument-coverage"
+export RUSTC_BOOTSTRAP=1
+export RUSTFLAGS="-Cinstrument-coverage"
 
-env CARGO_TARGET_DIR=./coverage_build cargo build
-env CARGO_TARGET_DIR=./coverage_build LLVM_PROFILE_FILE=default.profraw cargo test $@
-
-export CARGO_INCREMENTAL=0
-export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
-export RUSTDOCFLAGS="-Cpanic=abort"
-
-env CARGO_TARGET_DIR=./coverage_run cargo build
-env CARGO_TARGET_DIR=./coverage_run cargo test $@
+env CARGO_TARGET_DIR=coverage_run cargo build
+env CARGO_TARGET_DIR=coverage_run LLVM_PROFILE_FILE="coverage_run/default-%p-%m.profraw" cargo test
 
 grcov . --ignore "src/process_test" --ignore "src/util/process.rs" \
-	--binary-path ./coverage_run/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" -o ./coverage
+	--binary-path ./coverage_run/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" -o ./coverage "$@"
