@@ -1,6 +1,6 @@
 [package]
 name = "faf-rust-replayserver"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Igor Kotrasinski <i.kotrasinsk@gmail.com>"]
 edition = "2018"
 
