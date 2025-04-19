@@ -48,7 +48,7 @@ General info
 
 The server, as a whole, interacts with the world in three ways:
 
-* It accepts connections on a TCP port,
+* It accepts connections on TCP ports: one for raw sockets, one for websockets,
 * It communicates with the database,
 * It saves replays to a directory.
 
@@ -61,8 +61,8 @@ Architecture of a Replay
 ------------------------
 
 The most complicated part of the server is the Replay itself. Seen from
-outside, it's given connections, saves a replay at some point, then ends. Under
-the hood, it looks something like this:
+outside, it receives connections, saves a replay at some point, then ends.
+Under the hood, it looks something like this:
 
 .. figure:: ./diagrams/replay.png
 
@@ -93,7 +93,7 @@ Rationale
 **Q:** Why is the server using its own thread pool instead of using Tokio's
 multithreaded runtime?
 
-**A:** Two reasons.
+**A:** Three reasons.
 
 First, writer and merged replays are mutably shared by a few structs. It's
 easier to reason about them when we're in a single thread, since every block
@@ -104,3 +104,6 @@ can be done.
 Second, because we have these mutably shared items, we'd have to place them
 behind mutexes, and these mutexes would be accessed really often. Call it
 premature optimization, I just don't like it.
+
+Third, dividing our workflow is trivial. We just distribute replays among
+worker threads based on their ID.

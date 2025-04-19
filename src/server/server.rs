@@ -10,7 +10,7 @@ use crate::util::timeout::cancellable;
 use crate::{accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver};
 use crate::{metrics, replay::save::SavedReplayDirectory};
 use futures::{Stream, StreamExt};
-use tokio_stream::{StreamExt as _, StreamMap};
+use tokio_stream::StreamMap;
 use tokio_util::sync::CancellationToken;
 
 struct Server<C: Stream<Item = Connection>> {

@@ -1,5 +1,4 @@
 server:
-        port: 15000
         websocket_port: 15001
         prometheus_port: 8001
         worker_threads: 8

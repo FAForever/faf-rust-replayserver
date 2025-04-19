@@ -118,7 +118,7 @@ pub mod test {
         InnerSettings {
             server: ServerSettings {
                 port: Some(15000),
-                websocket_port: None,
+                websocket_port: Some(15001),
                 prometheus_port: 8001,
                 worker_threads: 8,
                 connection_accept_timeout_s: Duration::from_secs(7200),
@@ -152,6 +152,33 @@ pub mod test {
         let password = String::from("banana"); // File does not have a password entry
         let conf = InnerSettings::do_from_env(Ok(conf_file), Ok(password)).unwrap();
         assert_eq!(conf, default_config());
+    }
+
+    #[test]
+    fn test_example_config_optional_websocket_port() {
+        let conf_file = get_file_path("test_configs/optional_websocket_port.yml");
+        let password = String::from("banana"); // File does not have a password entry
+        let conf = InnerSettings::do_from_env(Ok(conf_file), Ok(password)).unwrap();
+        let mut def = default_config();
+        def.server.websocket_port = None;
+        assert_eq!(conf, def);
+    }
+
+    #[test]
+    fn test_example_config_optional_tcp_port() {
+        let conf_file = get_file_path("test_configs/optional_tcp_port.yml");
+        let password = String::from("banana"); // File does not have a password entry
+        let conf = InnerSettings::do_from_env(Ok(conf_file), Ok(password)).unwrap();
+        let mut def = default_config();
+        def.server.port = None;
+        assert_eq!(conf, def);
+    }
+
+    #[test]
+    fn test_example_config_at_least_one_port_needs_to_be_set() {
+        let conf_file = get_file_path("test_configs/invalid_no_ports.yml");
+        let password = String::from("banana"); // File does not have a password entry
+        InnerSettings::do_from_env(Ok(conf_file), Ok(password)).expect_err("Not defining any connection ports should be an error");
     }
 
     #[test]
