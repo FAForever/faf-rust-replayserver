@@ -1,4 +1,4 @@
-FROM rust:1.56.1 AS builder
+FROM rust:1.85.1 AS builder
 
 WORKDIR /server
 ADD . /server
