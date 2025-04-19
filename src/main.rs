@@ -16,9 +16,11 @@ async fn do_run_server() {
         Ok(o) => o,
     };
 
+    let port_str = |v: Option<u16>| v.map(|e| format!("{}", e)).unwrap_or("None".into());
     log::info!(
-        "Listening on port {}, prometheus server started on port {}.",
-        config.server.port,
+        "TCP socket port: {}\nWebsocket port: {}\nPrometheus port: {}",
+        port_str(config.server.port),
+        port_str(config.server.websocket_port),
         config.server.prometheus_port
     );
     if !start_prometheus_server(&config) {
