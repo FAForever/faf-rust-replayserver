@@ -30,7 +30,8 @@ mod float_to_duration {
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct ServerSettings {
-    pub port: u16,
+    pub port: Option<u16>,
+    pub websocket_port: Option<u16>,
     pub prometheus_port: u16,
     pub worker_threads: u32,
     #[serde(with = "float_to_duration")]
@@ -97,7 +98,11 @@ impl InnerSettings {
             .set_override("database.password", db_password)?
             .add_source(File::with_name(&config_file[..]))
             .build()?;
-        c.try_deserialize()
+        let ret: Self = c.try_deserialize()?;
+        if ret.server.port.is_none() && ret.server.websocket_port.is_none() {
+            return Err(ConfigError::Message("At least one of port, websocket_port must be set in server configuration.".into()));
+        }
+        Ok(ret)
     }
 }
 
@@ -110,7 +115,8 @@ pub mod test {
     pub fn default_config() -> InnerSettings {
         InnerSettings {
             server: ServerSettings {
-                port: 15000,
+                port: Some(15000),
+                websocket_port: None,
                 prometheus_port: 8001,
                 worker_threads: 8,
                 connection_accept_timeout_s: Duration::from_secs(7200),

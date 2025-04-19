@@ -1,11 +1,16 @@
+use std::pin::Pin;
+
 use super::connection::Connection;
 use crate::accept::header::read_initial_header;
+use crate::accept::producer::websocket_listen;
+use crate::config::ServerSettings;
 use crate::database::database::Database;
 use crate::replay::runner::ReplayRunner;
 use crate::util::timeout::cancellable;
 use crate::{accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver};
 use crate::{metrics, replay::save::SavedReplayDirectory};
-use futures::{stream::StreamExt, Stream};
+use futures::{StreamExt, Stream};
+use tokio_stream::{StreamExt as _, StreamMap};
 use tokio_util::sync::CancellationToken;
 
 struct Server<C: Stream<Item = Connection>> {
@@ -62,14 +67,27 @@ impl<C: Stream<Item = Connection>> Server<C> {
     }
 }
 
+async fn collect_server_connections(config: &ServerSettings) -> impl Stream<Item = Connection> {
+    let mut all_connections: StreamMap<u32, Pin<Box<dyn Stream<Item = Connection>>>> = StreamMap::new();
+    // Constructor of config guarantees at least one port is not None
+    if let Some(p) = config.port {
+        all_connections.insert(0, Box::pin(tcp_listen(format!("0.0.0.0:{}", p)).await));
+    }
+    if let Some(p) = config.websocket_port {
+        all_connections.insert(1, Box::pin(websocket_listen(format!("0.0.0.0:{}", p)).await));
+    }
+    let all_connections_ignore_idx = tokio_stream::StreamExt::map(all_connections, |(_, v)| v);
+    return all_connections_ignore_idx
+}
+
 async fn server_with_real_deps(
     config: Settings,
     shutdown_token: CancellationToken,
 ) -> Server<impl Stream<Item = Connection>> {
-    let connections = tcp_listen(format!("0.0.0.0:{}", config.server.port)).await;
+    let all_connections = collect_server_connections(&config.server).await;
     let db = Database::new(&config.database);
     let dir = SavedReplayDirectory::new(config.storage.vault_path.as_ref());
-    Server::new(config, shutdown_token, connections, db, dir)
+    Server::new(config, shutdown_token, all_connections, db, dir)
 }
 
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
