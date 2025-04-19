@@ -10,7 +10,11 @@ Running extra tests
 -------------------
 
 To run database query unit tests, do the following:
-* Setup a local database from faf-stack. See [here](https://github.com/FAForever/db).
+* Setup a local FAF database. The compose.yaml file will do it for you, like so:
+  ```
+  docker compose up -d --quiet-pull
+  ```
+  TODO: Move this file to a shared location.
 * Clear the local database and load test data:
   ```
   ./test/clear_and_populate_db.sh <DB arguments to mysql>
@@ -32,11 +36,11 @@ Sqlx compile-time checks
 ------------------------
 
 Database queries are checked for correctness at compile time. You'll need to
-run FAF database from faf-stack and set DATABASE_URL env var to
+setup a local FAF database like above and set DATABASE_URL env var to
 "mysql://root:banana@127.0.0.1:3306/faf" for compilation to work.
 
 Results of compile-time checking are saved to sqlx-data.json, which lets us
-compile on CI without setting up faf-stack. If you're changing DB queries, run the following command:
+compile on CI without setting up the DB. If you're changing DB queries, run the following command:
 
 ```
 env DATABASE_URL="mysql://root:banana@127.0.0.1:3306/faf" cargo sqlx prepare -- --lib
