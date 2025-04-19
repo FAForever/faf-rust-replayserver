@@ -240,7 +240,7 @@ pub mod test {
         let expected_stats = GameStatRow {
             start_time: dt(date!(2010 - 01 - 01), time!(00:00:00)),
             end_time: Some(dt(date!(2010 - 01 - 01), time!(01:00:00))),
-            game_type: "0".into(),
+            game_type: "DEMORALIZATION".into(),
             host: "user1".into(),
             game_name: "2v2 Game".into(),
             game_mod: Some("faf".into()),
@@ -432,7 +432,7 @@ pub mod test {
         GameStatRow {
             start_time: dt(date!(2010 - 01 - 01), time!(00:00:00)),
             end_time: Some(dt(date!(2010 - 01 - 01), time!(01:00:00))),
-            game_type: "0".into(),
+            game_type: "DEMORALIZATION".into(),
             host: "user1".into(),
             game_name: "2v2 Game".into(),
             game_mod: Some("faf".into()),
