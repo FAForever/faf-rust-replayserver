@@ -27,10 +27,10 @@ fn map_message_error_to_io_error(e: Error) -> std::io::Error {
     match e {
         Error::AlreadyClosed => other_e("Websocket already closed"),
         Error::CannotResolveHost => other_e("Websocket cannot resolve host"),
-        Error::Protocol(protocol_error) => other_e(format!("Websocket protocol error: {protocol_error}")),
-        Error::PayloadTooLong { len, max_len } => other_e(format!("Websocket payload too long: {len} > {max_len}")),
+        Error::Protocol(protocol_error) => other_e(format!("Websocket protocol error: {}", protocol_error)),
+        Error::PayloadTooLong { len, max_len } => other_e(format!("Websocket payload too long: {} > {}", len, max_len)),
         Error::Io(error) => error,
-        Error::Upgrade(error) => other_e(format!("Websocket upgrade error: {error}")),
+        Error::Upgrade(error) => other_e(format!("Websocket upgrade error: {}", error)),
         _ => other_e("Websocket unknown error"),
     }
 }
