@@ -1,0 +1,33 @@
+services:
+  # Set up the faf db
+  faf-db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: faf
+      MARIADB_ROOT_PASSWORD: banana
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "3306:3306"
+
+  faf-db-migrations:
+    image: faforever/faf-db-migrations:v136
+    command: migrate
+    environment:
+      FLYWAY_URL: jdbc:mysql://faf-db/faf?useSSL=false
+      FLYWAY_USER: root
+      FLYWAY_PASSWORD: banana
+      FLYWAY_DATABASE: faf
+    depends_on:
+      faf-db:
+        condition: service_healthy
+
+  wait-for-migrations:
+    image: alpine
+    command: ["sh", "-c", "echo Migrations done."]
+    depends_on:
+      faf-db-migrations:
+        condition: service_completed_successfully

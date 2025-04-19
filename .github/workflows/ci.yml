@@ -18,20 +18,8 @@ jobs:
               with:
                   toolchain: stable
             - uses: Swatinem/rust-cache@v1
-
-            # Setup faf-stack
-            - name: "Checkout faf-stack"
-              uses: actions/checkout@v2
-              with:
-                  repository: FAForever/faf-stack
-                  ref: v24.1.8
-                  path: faf-stack
-            - name: "Initialize faf-stack db"
-              run: |
-                cd faf-stack
-                cp -r config.template config
-                cp -r .env.template .env
-                ./scripts/init-db.sh
+            - name: "Initialize faf  db"
+              run: docker compose up -d --quiet-pull
             - run: ./test/clear_and_populate_db.sh -h 127.0.0.1 -P $DB_PORT --user=root --password=banana faf
 
             - uses: actions-rs/cargo@v1
