@@ -9,7 +9,7 @@ use crate::replay::runner::ReplayRunner;
 use crate::util::timeout::cancellable;
 use crate::{accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver};
 use crate::{metrics, replay::save::SavedReplayDirectory};
-use futures::{StreamExt, Stream};
+use futures::{Stream, StreamExt};
 use tokio_stream::{StreamExt as _, StreamMap};
 use tokio_util::sync::CancellationToken;
 
@@ -77,7 +77,7 @@ async fn collect_server_connections(config: &ServerSettings) -> impl Stream<Item
         all_connections.insert(1, Box::pin(websocket_listen(format!("0.0.0.0:{}", p)).await));
     }
     let all_connections_ignore_idx = tokio_stream::StreamExt::map(all_connections, |(_, v)| v);
-    return all_connections_ignore_idx
+    return all_connections_ignore_idx;
 }
 
 async fn server_with_real_deps(

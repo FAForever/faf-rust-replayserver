@@ -1,12 +1,18 @@
-use futures::{Sink, Stream, StreamExt, SinkExt};
-use tokio::{io::{AsyncBufRead, AsyncWrite}, net::TcpStream};
-use tokio_util::{bytes::Bytes, io::{CopyToBytes, SinkWriter, StreamReader}};
+use futures::{Sink, SinkExt, Stream, StreamExt};
+use tokio::{
+    io::{AsyncBufRead, AsyncWrite},
+    net::TcpStream,
+};
+use tokio_util::{
+    bytes::Bytes,
+    io::{CopyToBytes, SinkWriter, StreamReader},
+};
 use tokio_websockets::{Error, Message, ServerBuilder, WebSocketStream};
 
 use super::connection::{ReaderType, WriterType};
 
-trait WebsocketSink: Sink<Message, Error=Error> {}
-impl<T: Sink<Message, Error=Error>> WebsocketSink for T {}
+trait WebsocketSink: Sink<Message, Error = Error> {}
+impl<T: Sink<Message, Error = Error>> WebsocketSink for T {}
 
 trait WebsocketStream: Stream<Item = Result<Message, Error>> {}
 impl<T: Stream<Item = Result<Message, Error>>> WebsocketStream for T {}
@@ -36,14 +42,17 @@ fn map_message_error_to_io_error(e: Error) -> std::io::Error {
 }
 
 fn map_websocket_sink_to_bytes(sink: impl WebsocketSink) -> impl for<'a> Sink<&'a [u8], Error = std::io::Error> {
-    let bytes_sink = sink.with(async |b| Ok(Message::binary(b))).sink_map_err(map_message_error_to_io_error);
+    let bytes_sink = sink
+        .with(async |b| Ok(Message::binary(b)))
+        .sink_map_err(map_message_error_to_io_error);
     CopyToBytes::new(bytes_sink)
 }
 
 fn map_websocket_stream_to_bytes(stream: impl WebsocketStream) -> impl Stream<Item = Result<Bytes, std::io::Error>> {
-    stream.map(|i| i.map_err(map_message_error_to_io_error).map(|mes| {
-        mes.into_payload().into()
-    }))
+    stream.map(|i| {
+        i.map_err(map_message_error_to_io_error)
+            .map(|mes| mes.into_payload().into())
+    })
 }
 
 fn make_websocket_sink_a_stream(sink: impl WebsocketSink) -> impl AsyncWrite {

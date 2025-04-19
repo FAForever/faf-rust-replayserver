@@ -100,7 +100,9 @@ impl InnerSettings {
             .build()?;
         let ret: Self = c.try_deserialize()?;
         if ret.server.port.is_none() && ret.server.websocket_port.is_none() {
-            return Err(ConfigError::Message("At least one of port, websocket_port must be set in server configuration.".into()));
+            return Err(ConfigError::Message(
+                "At least one of port, websocket_port must be set in server configuration.".into(),
+            ));
         }
         Ok(ret)
     }

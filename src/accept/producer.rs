@@ -24,15 +24,13 @@ pub async fn websocket_listen(addr: String) -> impl Stream<Item = Connection> {
                 log::info!("Failed to accept connection: {}", e);
                 None
             }
-            Ok(s) => {
-                match make_split_websocket_from_tcp(s).await {
-                    Err(e) => {
-                        log::info!("Failed to create websocket: {}", e);
-                        None
-                    }
-                    Ok((r, w)) => Some(Connection::new_from(r, w))
+            Ok(s) => match make_split_websocket_from_tcp(s).await {
+                Err(e) => {
+                    log::info!("Failed to create websocket: {}", e);
+                    None
                 }
-            }
+                Ok((r, w)) => Some(Connection::new_from(r, w)),
+            },
         }
     })
 }
