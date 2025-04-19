@@ -48,8 +48,11 @@ Coverage
 --------
 
 To do code coverage, first configure grcov, as described at
-https://github.com/mozilla/grcov. One this is done, run `test/run_coverage.sh`.
+https://github.com/mozilla/grcov. Once this is done, run `test/run_coverage.sh`.
 Generated coverage is available under ./coverage.
+
+If you're getting an error "We couldn't find llvm-profdata", then pass
+`--llvm-path=<path to directory with llvm-profdata>` to the script.
 
 TODOs
 -----
