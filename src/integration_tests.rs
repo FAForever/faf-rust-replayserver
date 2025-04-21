@@ -110,21 +110,21 @@ mod test {
             };
             reader_data
         };
-
         let reader_data = tokio::time::timeout(Duration::from_secs(2), run()).await.unwrap();
-
         compare_bufs(reader_data, sent_replay);
 
         let mut replay_path: PathBuf = replay_dir.path().to_owned();
-        log::debug!("Path {}", replay_path.to_str().unwrap());
-        for item in replay_path.read_dir().unwrap() {
-            log::debug!("Item {}", item.unwrap().path().to_str().unwrap());
-        }
         replay_path.push("0");
         replay_path.push("0");
         replay_path.push("0");
         replay_path.push("20");
         replay_path.push("2000.fafreplay");
-        let _ = std::fs::File::open(&replay_path).unwrap();
+        let saved_replay = std::fs::read(&replay_path).unwrap();
+        // This file was copied from this test and manually verified to be correct.
+        // Zstd is deterministic for the same data + params + version, let's rely on that.
+        let reference_replay = get_file("integration/game_2000.fafreplay");
+        compare_bufs(saved_replay, reference_replay);
+
+        // TODO: verify stats saved to the database.
     }
 }

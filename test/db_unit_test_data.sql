@@ -75,7 +75,7 @@ values (1000, '2010-01-01 00:00:00', '2010-01-01 01:00:00', '2v2 Game',         
        (1080, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with AI only',           'DEMORALIZATION',   31,      1,    21,    0),
        (1090, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with no mod files',      'DEMORALIZATION',   34,      1,    21,    0),
        (1100, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with null mod!',         'DEMORALIZATION',   35,      1,    21,    0),
-       (2000, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game for integration test 1', 'DEMORALIZATION',   35,      1,    21,    0);
+       (2000, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game for integration test 1', 'DEMORALIZATION',   31,      1,    21,    0);
 
 insert into game_player_stats
        (id,   gameId, playerId, AI, faction, color, team, place, mean, deviation)  -- all not nullable
