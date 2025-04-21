@@ -63,7 +63,7 @@ impl InnerReplaySaver {
             }
             Ok(r) => r,
         };
-        let target_file = match self.save_dir.touch_and_return_file(id).await {
+        let (target_file, target_path) = match self.save_dir.touch_and_return_file(id).await {
             Err(e) => {
                 log::warn!("Failed to create file for replay {}: {}", id, e);
                 return false;
@@ -75,6 +75,7 @@ impl InnerReplaySaver {
             return false;
         }
         metrics::SAVED_REPLAYS.inc();
+        log::debug!("Saved replay {} at {}", id, target_path.to_str().unwrap_or("<unknown>"));
         return true;
     }
 

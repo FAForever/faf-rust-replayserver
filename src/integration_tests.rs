@@ -6,7 +6,7 @@ mod test {
     // * Database. Hard, making a separate instance for every test is a bother.
     //   Just use one database and be careful not to step on other tests' toes.
 
-    use std::{sync::Arc, time::Duration};
+    use std::{path::PathBuf, sync::Arc, time::Duration};
 
     use rand::Rng;
     use tokio::{io::{AsyncReadExt, AsyncWriteExt}, join, net::TcpStream, select};
@@ -114,5 +114,17 @@ mod test {
         let reader_data = tokio::time::timeout(Duration::from_secs(2), run()).await.unwrap();
 
         compare_bufs(reader_data, sent_replay);
+
+        let mut replay_path: PathBuf = replay_dir.path().to_owned();
+        log::debug!("Path {}", replay_path.to_str().unwrap());
+        for item in replay_path.read_dir().unwrap() {
+            log::debug!("Item {}", item.unwrap().path().to_str().unwrap());
+        }
+        replay_path.push("0");
+        replay_path.push("0");
+        replay_path.push("0");
+        replay_path.push("20");
+        replay_path.push("2000.fafreplay");
+        let _ = std::fs::File::open(&replay_path).unwrap();
     }
 }
