@@ -12,7 +12,7 @@ mod test {
     use tokio::{io::{AsyncReadExt, AsyncWriteExt}, join, net::TcpStream, select};
     use tokio_util::sync::CancellationToken;
 
-    use crate::{config::test::default_config, server::server::server_with_real_deps, util::test::{get_file, setup_logging, sleep_ms}};
+    use crate::{config::test::default_config, server::server::server_with_real_deps, util::test::{compare_bufs, get_file, setup_logging, sleep_ms}};
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
     #[tokio::test(flavor = "multi_thread")]
@@ -50,8 +50,7 @@ mod test {
         tokio::time::sleep(Duration::from_millis(rand::rng().random_range(1..10))).await;
     }
 
-    async fn tcp_writer(port: u16, header: &[u8], replay_name: &str) {
-        let file = get_file(replay_name);
+    async fn tcp_writer(port: u16, header: &[u8], file: Vec<u8>) {
         let mut tcp = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
         random_sleep().await;
         tcp.write_all(header).await.unwrap();
@@ -64,7 +63,8 @@ mod test {
 
     async fn tcp_reader(port: u16, header: &[u8]) -> Vec<u8> {
         let mut tcp = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
-        random_sleep().await;
+        // Wait for the writer to create a replay
+        tokio::time::sleep(Duration::from_millis(30)).await;
         tcp.write_all(header).await.unwrap();
         random_sleep().await;
 
@@ -92,7 +92,8 @@ mod test {
         let token = CancellationToken::new();
         let (server, port_info) = server_with_real_deps(Arc::new(config), token.child_token()).await;
 
-        let replay_writer = tcp_writer(port_info.tcp.unwrap(), b"P/2000/foo\0", "example");
+        let sent_replay = get_file("example");
+        let replay_writer = tcp_writer(port_info.tcp.unwrap(), b"P/2000/foo\0", sent_replay.clone());
         let replay_reader = tcp_reader(port_info.tcp.unwrap(), b"G/2000/foo\0");
 
         let exit_server = async move || {
@@ -110,6 +111,8 @@ mod test {
             reader_data
         };
 
-        let _ = tokio::time::timeout(Duration::from_secs(2), run()).await.unwrap();
+        let reader_data = tokio::time::timeout(Duration::from_secs(2), run()).await.unwrap();
+
+        compare_bufs(reader_data, sent_replay);
     }
 }
