@@ -13,7 +13,7 @@ use futures::{Stream, StreamExt};
 use tokio_stream::StreamMap;
 use tokio_util::sync::CancellationToken;
 
-struct Server<C: Stream<Item = Connection>> {
+pub struct Server<C: Stream<Item = Connection>> {
     config: Settings,
     shutdown_token: CancellationToken,
     connections: C,
@@ -67,31 +67,43 @@ impl<C: Stream<Item = Connection>> Server<C> {
     }
 }
 
-async fn collect_server_connections(config: &ServerSettings) -> impl Stream<Item = Connection> {
-    let mut all_connections: StreamMap<u32, Pin<Box<dyn Stream<Item = Connection>>>> = StreamMap::new();
-    // Constructor of config guarantees at least one port is not None
-    if let Some(p) = config.port {
-        all_connections.insert(0, Box::pin(tcp_listen(format!("0.0.0.0:{}", p)).await));
-    }
-    if let Some(p) = config.websocket_port {
-        all_connections.insert(1, Box::pin(websocket_listen(format!("0.0.0.0:{}", p)).await));
-    }
-    let all_connections_ignore_idx = tokio_stream::StreamExt::map(all_connections, |(_, v)| v);
-    return all_connections_ignore_idx;
+#[derive(Default)]
+pub struct PortInfo {
+    tcp: Option<u16>,
+    websocket: Option<u16>,
 }
 
-async fn server_with_real_deps(
+async fn collect_server_connections(config: &ServerSettings) -> (impl Stream<Item = Connection>, PortInfo) {
+    let mut all_connections: StreamMap<u32, Pin<Box<dyn Stream<Item = Connection>>>> = StreamMap::new();
+    let mut port_info: PortInfo = Default::default();
+    // Constructor of config guarantees at least one port is not None
+    if let Some(p) = config.port {
+        let (stream, port) = tcp_listen(format!("0.0.0.0:{}", p)).await;
+        port_info.tcp = Some(port);
+        all_connections.insert(0, Box::pin(stream));
+    }
+    if let Some(p) = config.websocket_port {
+        let (stream, port) = websocket_listen(format!("0.0.0.0:{}", p)).await;
+        port_info.websocket = Some(port);
+        all_connections.insert(1, Box::pin(stream));
+    }
+    let all_connections_ignore_idx = tokio_stream::StreamExt::map(all_connections, |(_, v)| v);
+    return (all_connections_ignore_idx, port_info);
+}
+
+pub async fn server_with_real_deps(
     config: Settings,
     shutdown_token: CancellationToken,
-) -> Server<impl Stream<Item = Connection>> {
-    let all_connections = collect_server_connections(&config.server).await;
+) -> (Server<impl Stream<Item = Connection>>, PortInfo) {
+    let (all_connections, port_info) = collect_server_connections(&config.server).await;
     let db = Database::new(&config.database);
     let dir = SavedReplayDirectory::new(config.storage.vault_path.as_ref());
-    Server::new(config, shutdown_token, all_connections, db, dir)
+    (Server::new(config, shutdown_token, all_connections, db, dir), port_info)
 }
 
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
-    server_with_real_deps(config, shutdown_token).await.run().await;
+    let (server, _) = server_with_real_deps(config, shutdown_token).await;
+    server.run().await;
 }
 
 #[cfg(test)]
