@@ -70,7 +70,7 @@ pub struct ReplaySettings {
 
 pub type Settings = Arc<InnerSettings>;
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct InnerSettings {
     pub server: ServerSettings,
     pub database: DatabaseSettings,

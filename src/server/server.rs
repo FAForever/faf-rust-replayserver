@@ -38,7 +38,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
         }
     }
 
-    async fn run(self) {
+    pub async fn run(self) {
         let saver = InnerReplaySaver::new(self.db, self.dir, &self.config);
         let runner = ReplayRunner::new(self.config.clone(), self.shutdown_token.clone(), saver);
 
