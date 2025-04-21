@@ -63,18 +63,19 @@ values (56, 44,     1000,    'foo.nx2', '2cd7784fb131ea4955e992cfee8ca9b8', 0),
        (58, 44,     1002,    'foo.nx2', '2cd7784fb131ea4955e992cfee8ca9b8', 0);
 
 insert into game_stats
-       (id,   startTime,             endTime,               gameName,                  gameType,           gameMod, host, mapId, validity)
-values (1000, '2010-01-01 00:00:00', '2010-01-01 01:00:00', '2v2 Game',                'DEMORALIZATION',   31,      1,    21,    0),
-       (1010, '2010-01-02 00:00:00', '2010-01-02 01:00:00', '1 vs ai game',            'DOMINATION',       31,      2,    22,    0),
-       (1020, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Ladder Game',             'ERADICATION',      32,      3,    22,    0),
-       (1030, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game on versioned map 1', 'SANDBOX',          31,      4,    24,    0),
-       (1040, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game on versioned map 2', 'SANDBOX',          33,      5,    26,    0),
-       (1050, '2010-01-03 00:00:00', NULL,                  'Game with no end time',   'DEMORALIZATION',   31,      1,    21,    0),
-       (1060, '2010-01-03 00:00:00', NULL,                  'Game with max nulls',     'DEMORALIZATION',   31,      1,    NULL,  0),
-       (1070, '2010-01-03 00:00:00', NULL,                  'Game with no players',    'DEMORALIZATION',   31,      1,    21,    0),
-       (1080, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with AI only',       'DEMORALIZATION',   31,      1,    21,    0),
-       (1090, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with no mod files',  'DEMORALIZATION',   34,      1,    21,    0),
-       (1100, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with null mod!',     'DEMORALIZATION',   35,      1,    21,    0);
+       (id,   startTime,             endTime,               gameName,                      gameType,           gameMod, host, mapId, validity)
+values (1000, '2010-01-01 00:00:00', '2010-01-01 01:00:00', '2v2 Game',                    'DEMORALIZATION',   31,      1,    21,    0),
+       (1010, '2010-01-02 00:00:00', '2010-01-02 01:00:00', '1 vs ai game',                'DOMINATION',       31,      2,    22,    0),
+       (1020, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Ladder Game',                 'ERADICATION',      32,      3,    22,    0),
+       (1030, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game on versioned map 1',     'SANDBOX',          31,      4,    24,    0),
+       (1040, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game on versioned map 2',     'SANDBOX',          33,      5,    26,    0),
+       (1050, '2010-01-03 00:00:00', NULL,                  'Game with no end time',       'DEMORALIZATION',   31,      1,    21,    0),
+       (1060, '2010-01-03 00:00:00', NULL,                  'Game with max nulls',         'DEMORALIZATION',   31,      1,    NULL,  0),
+       (1070, '2010-01-03 00:00:00', NULL,                  'Game with no players',        'DEMORALIZATION',   31,      1,    21,    0),
+       (1080, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with AI only',           'DEMORALIZATION',   31,      1,    21,    0),
+       (1090, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with no mod files',      'DEMORALIZATION',   34,      1,    21,    0),
+       (1100, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game with null mod!',         'DEMORALIZATION',   35,      1,    21,    0);
+       (2000, '2010-01-03 00:00:00', '2010-01-03 01:00:00', 'Game for integration test 1', 'DEMORALIZATION',   35,      1,    21,    0);
 
 insert into game_player_stats
        (id,   gameId, playerId, AI, faction, color, team, place, mean, deviation)  -- all not nullable
@@ -93,3 +94,4 @@ values (1001, 1000,   1,        0,  0,       1,     1,    1,     1500, 500),
        (1051, 1050,   1,        0,  0,       1,     1,    1,     1500, 500),
        (1052, 1050,   2,        0,  1,       2,     2,    2,     1000, 0),
        (1081, 1080,   2,        1,  1,       2,     2,    2,     1000, 0);
+       (2000, 2000,   1,        0,  0,       1,     1,    1,     1500, 500);

@@ -69,8 +69,8 @@ impl<C: Stream<Item = Connection>> Server<C> {
 
 #[derive(Default)]
 pub struct PortInfo {
-    tcp: Option<u16>,
-    websocket: Option<u16>,
+    pub tcp: Option<u16>,
+    pub websocket: Option<u16>,
 }
 
 async fn collect_server_connections(config: &ServerSettings) -> (impl Stream<Item = Connection>, PortInfo) {

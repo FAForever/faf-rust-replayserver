@@ -1,11 +1,18 @@
 #[cfg(test)]
 mod test {
+    // Three external pieces we test against:
+    // * Replay save directory. Easy, we just make a temporary one.
+    // * Ports. Relatively easy, we pass 0 and receive the actual port.
+    // * Database. Hard, making a separate instance for every test is a bother.
+    //   Just use one database and be careful not to step on other tests' toes.
+
     use std::{sync::Arc, time::Duration};
 
-    use tokio::select;
+    use rand::Rng;
+    use tokio::{io::{AsyncReadExt, AsyncWriteExt}, join, net::TcpStream, select};
     use tokio_util::sync::CancellationToken;
 
-    use crate::{config::test::default_config, server::server::server_with_real_deps, util::test::{setup_logging, sleep_ms}};
+    use crate::{config::test::default_config, server::server::server_with_real_deps, util::test::{get_file, setup_logging, sleep_ms}};
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
     #[tokio::test(flavor = "multi_thread")]
@@ -13,7 +20,6 @@ mod test {
         setup_logging();
 
         let replay_dir = tempfile::tempdir().unwrap();
-
         let mut config = default_config();
         config.server.port = Some(0);
         config.server.websocket_port = None;
@@ -23,7 +29,6 @@ mod test {
         config.server.connection_accept_timeout_s = Duration::from_millis(10);
 
         let token = CancellationToken::new();
-
         let (server, _) = server_with_real_deps(Arc::new(config), token.child_token()).await;
         let mut ended_too_early = true;
 
@@ -39,5 +44,72 @@ mod test {
             _ = wait => panic!("Server should have quit after cancelling token"),
         }
         assert!(!ended_too_early);
+    }
+
+    async fn random_sleep() {
+        tokio::time::sleep(Duration::from_millis(rand::rng().random_range(1..10))).await;
+    }
+
+    async fn tcp_writer(port: u16, header: &[u8], replay_name: &str) {
+        let file = get_file(replay_name);
+        let mut tcp = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+        random_sleep().await;
+        tcp.write_all(header).await.unwrap();
+        random_sleep().await;
+        for data in file.chunks(1000) {
+                tcp.write_all(data).await.unwrap();
+                random_sleep().await;
+        }
+    }
+
+    async fn tcp_reader(port: u16, header: &[u8]) -> Vec<u8> {
+        let mut tcp = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+        random_sleep().await;
+        tcp.write_all(header).await.unwrap();
+        random_sleep().await;
+
+        let mut output: Vec<u8> = Default::default();
+        tcp.read_to_end(&mut output).await.unwrap();
+        output
+    }
+
+    #[cfg_attr(not(feature = "local_db_tests"), ignore)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn integration_test_server_one_writer_one_reader() {
+        // Game ID in db: 2000
+
+        setup_logging();
+
+        let replay_dir = tempfile::tempdir().unwrap();
+        let mut config = default_config();
+        config.server.port = Some(0);
+        config.server.websocket_port = None;
+        config.database.host = std::env::var("DB_HOST").unwrap();
+        config.database.port = str::parse::<u16>(&std::env::var("DB_PORT").unwrap()).unwrap();
+        config.storage.vault_path = replay_dir.path().to_str().unwrap().into();
+        config.server.connection_accept_timeout_s = Duration::from_millis(50);
+
+        let token = CancellationToken::new();
+        let (server, port_info) = server_with_real_deps(Arc::new(config), token.child_token()).await;
+
+        let replay_writer = tcp_writer(port_info.tcp.unwrap(), b"P/2000/foo\0", "example");
+        let replay_reader = tcp_reader(port_info.tcp.unwrap(), b"G/2000/foo\0");
+
+        let exit_server = async move || {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            token.cancel();
+        };
+
+        let run = async move || {
+            let (_, _, reader_data, _) = join! {
+               server.run(),
+               exit_server(),
+               replay_reader,
+               replay_writer,
+            };
+            reader_data
+        };
+
+        let _ = tokio::time::timeout(Duration::from_secs(2), run()).await.unwrap();
     }
 }
