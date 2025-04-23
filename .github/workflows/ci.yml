@@ -34,7 +34,7 @@ jobs:
             - name: Generate code coverage
               run: cargo llvm-cov --features local_db_tests --lcov --output-path lcov.info --ignore-filename-regex '.*rustlib.*'
             - name: Report coverage
-              uses: codecov/codecov-action@v4
+              uses: codecov/codecov-action@v5
               with:
                 token: ${{ secrets.CODECOV_TOKEN }}
                 files: lcov.info
