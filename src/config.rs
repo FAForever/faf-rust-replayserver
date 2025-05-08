@@ -30,7 +30,8 @@ mod float_to_duration {
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct ServerSettings {
-    pub port: u16,
+    pub port: Option<u16>,
+    pub websocket_port: Option<u16>,
     pub prometheus_port: u16,
     pub worker_threads: u32,
     #[serde(with = "float_to_duration")]
@@ -69,7 +70,7 @@ pub struct ReplaySettings {
 
 pub type Settings = Arc<InnerSettings>;
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct InnerSettings {
     pub server: ServerSettings,
     pub database: DatabaseSettings,
@@ -97,7 +98,13 @@ impl InnerSettings {
             .set_override("database.password", db_password)?
             .add_source(File::with_name(&config_file[..]))
             .build()?;
-        c.try_deserialize()
+        let ret: Self = c.try_deserialize()?;
+        if ret.server.port.is_none() && ret.server.websocket_port.is_none() {
+            return Err(ConfigError::Message(
+                "At least one of port, websocket_port must be set in server configuration.".into(),
+            ));
+        }
+        Ok(ret)
     }
 }
 
@@ -110,7 +117,8 @@ pub mod test {
     pub fn default_config() -> InnerSettings {
         InnerSettings {
             server: ServerSettings {
-                port: 15000,
+                port: Some(15000),
+                websocket_port: Some(15001),
                 prometheus_port: 8001,
                 worker_threads: 8,
                 connection_accept_timeout_s: Duration::from_secs(7200),
@@ -144,6 +152,33 @@ pub mod test {
         let password = String::from("banana"); // File does not have a password entry
         let conf = InnerSettings::do_from_env(Ok(conf_file), Ok(password)).unwrap();
         assert_eq!(conf, default_config());
+    }
+
+    #[test]
+    fn test_example_config_optional_websocket_port() {
+        let conf_file = get_file_path("test_configs/optional_websocket_port.yml");
+        let password = String::from("banana"); // File does not have a password entry
+        let conf = InnerSettings::do_from_env(Ok(conf_file), Ok(password)).unwrap();
+        let mut def = default_config();
+        def.server.websocket_port = None;
+        assert_eq!(conf, def);
+    }
+
+    #[test]
+    fn test_example_config_optional_tcp_port() {
+        let conf_file = get_file_path("test_configs/optional_tcp_port.yml");
+        let password = String::from("banana"); // File does not have a password entry
+        let conf = InnerSettings::do_from_env(Ok(conf_file), Ok(password)).unwrap();
+        let mut def = default_config();
+        def.server.port = None;
+        assert_eq!(conf, def);
+    }
+
+    #[test]
+    fn test_example_config_at_least_one_port_needs_to_be_set() {
+        let conf_file = get_file_path("test_configs/invalid_no_ports.yml");
+        let password = String::from("banana"); // File does not have a password entry
+        InnerSettings::do_from_env(Ok(conf_file), Ok(password)).expect_err("Not defining any connection ports should be an error");
     }
 
     #[test]

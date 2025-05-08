@@ -51,12 +51,19 @@ In order to regenerate the file.
 Coverage
 --------
 
-To do code coverage, first configure grcov, as described at
-https://github.com/mozilla/grcov. Once this is done, run `test/run_coverage.sh`.
+To do code coverage, first install lcov (from your distribution) and llvm-cov:
+```
+cargo install cargo-llvm-cov
+```
+Once this is done, run `test/run_coverage.sh`.
 Generated coverage is available under ./coverage.
 
-If you're getting an error "We couldn't find llvm-profdata", then pass
-`--llvm-path=<path to directory with llvm-profdata>` to the script.
+If the script is complaining about "failed to find llvm-tools-preview", you can
+give it paths to your llvm installation, like so:
+```
+export LLVM_COV=<path to llvm-cov>
+export LLVM_PROFDATA=<path to llvm-profdata>
+```
 
 TODOs
 -----

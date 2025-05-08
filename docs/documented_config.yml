@@ -1,8 +1,15 @@
 # All time or duration arguments accept floating point numbers for sub-second
 # precision.
 server:
-        # The port on which the server accepts FA connections.
+        # Ports on which the server listens for connections. One of these keys
+        # (but not both!) can be skipped to not listen for a given connection
+        # type.
+        #
+        # The port on which the server accepts FA connections (raw TCP).
         port: 15000
+        # The port on which the server accepts FA connections (websocket).
+        websocket_port: 15001
+
         # The port on which the server exposes Prometheus metrics as HTTP.
         prometheus_port: 8001
         # The number of worker threads that handle reading / merging / writing

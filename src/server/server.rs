@@ -1,14 +1,19 @@
+use std::pin::Pin;
+
 use super::connection::Connection;
 use crate::accept::header::read_initial_header;
+use crate::accept::producer::websocket_listen;
+use crate::config::ServerSettings;
 use crate::database::database::Database;
 use crate::replay::runner::ReplayRunner;
 use crate::util::timeout::cancellable;
 use crate::{accept::producer::tcp_listen, config::Settings, replay::save::InnerReplaySaver};
 use crate::{metrics, replay::save::SavedReplayDirectory};
-use futures::{stream::StreamExt, Stream};
+use futures::{Stream, StreamExt};
+use tokio_stream::StreamMap;
 use tokio_util::sync::CancellationToken;
 
-struct Server<C: Stream<Item = Connection>> {
+pub struct Server<C: Stream<Item = Connection>> {
     config: Settings,
     shutdown_token: CancellationToken,
     connections: C,
@@ -33,7 +38,7 @@ impl<C: Stream<Item = Connection>> Server<C> {
         }
     }
 
-    async fn run(self) {
+    pub async fn run(self) {
         let saver = InnerReplaySaver::new(self.db, self.dir, &self.config);
         let runner = ReplayRunner::new(self.config.clone(), self.shutdown_token.clone(), saver);
 
@@ -62,18 +67,43 @@ impl<C: Stream<Item = Connection>> Server<C> {
     }
 }
 
-async fn server_with_real_deps(
+#[derive(Default)]
+pub struct PortInfo {
+    pub tcp: Option<u16>,
+    pub websocket: Option<u16>,
+}
+
+async fn collect_server_connections(config: &ServerSettings) -> (impl Stream<Item = Connection>, PortInfo) {
+    let mut all_connections: StreamMap<u32, Pin<Box<dyn Stream<Item = Connection>>>> = StreamMap::new();
+    let mut port_info: PortInfo = Default::default();
+    // Constructor of config guarantees at least one port is not None
+    if let Some(p) = config.port {
+        let (stream, port) = tcp_listen(format!("0.0.0.0:{}", p)).await;
+        port_info.tcp = Some(port);
+        all_connections.insert(0, Box::pin(stream));
+    }
+    if let Some(p) = config.websocket_port {
+        let (stream, port) = websocket_listen(format!("0.0.0.0:{}", p)).await;
+        port_info.websocket = Some(port);
+        all_connections.insert(1, Box::pin(stream));
+    }
+    let all_connections_ignore_idx = tokio_stream::StreamExt::map(all_connections, |(_, v)| v);
+    return (all_connections_ignore_idx, port_info);
+}
+
+pub async fn server_with_real_deps(
     config: Settings,
     shutdown_token: CancellationToken,
-) -> Server<impl Stream<Item = Connection>> {
-    let connections = tcp_listen(format!("0.0.0.0:{}", config.server.port)).await;
+) -> (Server<impl Stream<Item = Connection>>, PortInfo) {
+    let (all_connections, port_info) = collect_server_connections(&config.server).await;
     let db = Database::new(&config.database);
     let dir = SavedReplayDirectory::new(config.storage.vault_path.as_ref());
-    Server::new(config, shutdown_token, connections, db, dir)
+    (Server::new(config, shutdown_token, all_connections, db, dir), port_info)
 }
 
 pub async fn run_server(config: Settings, shutdown_token: CancellationToken) {
-    server_with_real_deps(config, shutdown_token).await.run().await;
+    let (server, _) = server_with_real_deps(config, shutdown_token).await;
+    server.run().await;
 }
 
 #[cfg(test)]

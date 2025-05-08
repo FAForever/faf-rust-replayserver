@@ -43,6 +43,7 @@ thiserror = "2.0.12"
 time = { version = "0.3.41", features = ["std"] }
 tokio-stream = { version = "0.1.17", features = ["net"] }
 tokio-util = "0.7.14"
+tokio-websockets = { version = "0.11.4", features = ["server", "openssl"] }
 weak-table = "0.3.2"
 
 [dependencies.tokio]
@@ -52,3 +53,5 @@ features = ["sync", "net", "io-util", "rt", "macros", "test-util", "time", "rt-m
 [dev-dependencies]
 faux = "0.1.12"
 tempfile = "3.19.1"
+http = "1.3.1"
+tokio-websockets = { version = "0.11.4", features = ["client", "rand", "server", "openssl"] }

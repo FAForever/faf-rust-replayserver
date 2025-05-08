@@ -7,6 +7,10 @@ use tokio_util::sync::CancellationToken;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// Here we do all things that are necessarily global. That is:
+// * Loading configuration (because it's needed for Prometheus),
+// * Prometheus, which we could make non-global with some effort, but I don't think it's worth it,
+// * Signal handlers.
 async fn do_run_server() {
     let config = match InnerSettings::from_env() {
         Err(e) => {
@@ -16,9 +20,11 @@ async fn do_run_server() {
         Ok(o) => o,
     };
 
+    let port_str = |v: Option<u16>| v.map(|e| format!("{}", e)).unwrap_or("None".into());
     log::info!(
-        "Listening on port {}, prometheus server started on port {}.",
-        config.server.port,
+        "TCP socket port: {}\nWebsocket port: {}\nPrometheus port: {}",
+        port_str(config.server.port),
+        port_str(config.server.websocket_port),
         config.server.prometheus_port
     );
     if !start_prometheus_server(&config) {

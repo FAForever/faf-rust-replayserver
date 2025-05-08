@@ -1,11 +1,11 @@
 use sqlx::types::time::OffsetDateTime;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::error::SaveError;
 
 use super::database::Database;
 
-pub type GameTeams = HashMap<i8, Vec<String>>;
+pub type GameTeams = BTreeMap<i8, Vec<String>>;
 pub struct GameStats {
     pub featured_mod: Option<String>,
     pub game_type: String,
@@ -16,7 +16,7 @@ pub struct GameStats {
     pub mapname: String,
     pub num_players: i64,
 }
-pub type ModVersions = HashMap<String, i32>;
+pub type ModVersions = BTreeMap<String, i32>;
 
 pub struct Queries {
     db: Database,
@@ -69,7 +69,7 @@ impl Queries {
     }
 
     pub async fn get_mod_versions(&self, game_mod: &str) -> Result<ModVersions, SaveError> {
-        let mut ret = HashMap::new();
+        let mut ret = BTreeMap::new();
         let mods = self.db.get_mod_version_list(game_mod).await?;
         for m in mods.into_iter() {
             ret.insert(m.file_id.to_string(), m.version);
