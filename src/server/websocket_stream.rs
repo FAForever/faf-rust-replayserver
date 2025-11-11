@@ -66,7 +66,7 @@ fn make_websocket_stream_a_stream(stream: impl WebsocketStream) -> impl AsyncBuf
 pub(crate) async fn make_split_websocket_from_tcp(stream: TcpStream) -> Result<(ReaderType, WriterType), Error> {
     let ws = make_websocket(stream).await?;
     let (rw, rr) = split_websocket(ws);
-    let r = Box::new(make_websocket_stream_a_stream(rr));
-    let w = Box::new(make_websocket_sink_a_stream(rw));
+    let r = Box::pin(make_websocket_stream_a_stream(rr));
+    let w = Box::pin(make_websocket_sink_a_stream(rw));
     Ok((r, w))
 }

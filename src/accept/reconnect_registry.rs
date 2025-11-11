@@ -3,10 +3,7 @@ use tokio::time::{Duration, Instant};
 
 use rand::RngCore;
 
-#[derive(PartialEq, Eq, Hash, Clone)]
-pub struct ReconnectToken {
-    pub data: [u8; 16]
-}
+use super::reconnect_header::ReconnectToken;
 
 impl ReconnectToken {
     pub fn random() -> Self {

@@ -31,7 +31,7 @@ pub async fn websocket_listen(addr: String) -> (impl Stream<Item = Connection>, 
                     log::info!("Failed to create websocket: {}", e);
                     None
                 }
-                Ok((r, w)) => Some(Connection::new_from(r, w)),
+                Ok((r, w)) => Some(Connection::new_from_split(r, w)),
             },
         }
     }), port)

@@ -1,5 +1,5 @@
 use rand::Rng;
-use std::fmt::Display;
+use std::{fmt::Display, pin::Pin};
 
 use crate::{
     accept::header::{ConnectionHeader, ConnectionType},
@@ -7,12 +7,18 @@ use crate::{
 };
 use tokio::{io::AsyncBufRead, io::AsyncBufReadExt, io::AsyncRead, io::AsyncWrite, io::BufReader, net::TcpStream};
 
-pub type ReaderType = Box<dyn AsyncBufRead + Send>;
-pub type WriterType = Box<dyn AsyncWrite + Send>;
+use super::bufreadwrite::BufReadWrite;
+
+pub trait AsyncRw: AsyncBufRead + AsyncWrite + Send {}
+impl<T: AsyncBufRead + AsyncWrite + Send> AsyncRw for T {}
+
+pub type ReaderType = Pin<Box<dyn AsyncBufRead + Send>>;
+pub type WriterType = Pin<Box<dyn AsyncWrite + Send>>;
+
+pub type RwType = Pin<Box<dyn AsyncRw>>;
 
 pub struct Connection {
-    reader: ReaderType,
-    writer: WriterType,
+    rw: RwType,
     header: Option<ConnectionHeader>,
     id: String,
 }
@@ -20,19 +26,22 @@ pub struct Connection {
 impl Connection {
     pub fn new(stream: TcpStream) -> Self {
         let (r, w) = stream.into_split();
-        let reader = Box::new(BufReader::new(r));
-        let writer = Box::new(w);
-        Self::new_from(reader, writer)
+        let reader = Box::pin(BufReader::new(r));
+        let writer = Box::pin(w);
+        Self::new_from_split(reader, writer)
     }
 
-    pub fn new_from(reader: ReaderType, writer: WriterType) -> Self {
+    pub fn new_from_split(reader: ReaderType, writer: WriterType) -> Self {
+        Self::new_from(Box::pin(BufReadWrite::new(reader, writer)))
+    }
+
+    pub fn new_from(rw: RwType) -> Self {
         let mut id = String::new();
         for _ in 0..12 {
             id.push(rand::rng().random_range('a'..'z'));
         }
         let s = Self {
-            reader,
-            writer,
+            rw,
             header: None,
             id,
         };
@@ -68,11 +77,8 @@ impl Connection {
         self.header.clone().unwrap()
     }
 
-    fn get_buf_reader(&mut self) -> &mut dyn AsyncBufRead {
-        &mut *self.reader
-    }
-    fn get_writer(&mut self) -> &mut dyn AsyncWrite {
-        &mut *self.writer
+    fn get_rw(&mut self) -> &mut RwType {
+        &mut self.rw
     }
 }
 
@@ -109,7 +115,7 @@ impl AsyncRead for Connection {
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
-        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_buf_reader()) };
+        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_rw()) };
         AsyncRead::poll_read(r, cx, buf)
     }
 }
@@ -119,12 +125,12 @@ impl AsyncBufRead for Connection {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<std::io::Result<&[u8]>> {
-        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_buf_reader()) };
+        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_rw()) };
         AsyncBufRead::poll_fill_buf(r, cx)
     }
 
     fn consume(self: std::pin::Pin<&mut Self>, amt: usize) {
-        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_buf_reader()) };
+        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_rw()) };
         AsyncBufRead::consume(r, amt)
     }
 }
@@ -135,7 +141,7 @@ impl AsyncWrite for Connection {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_writer()) };
+        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_rw()) };
         AsyncWrite::poll_write(r, cx, buf)
     }
 
@@ -143,7 +149,7 @@ impl AsyncWrite for Connection {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
-        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_writer()) };
+        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_rw()) };
         AsyncWrite::poll_flush(r, cx)
     }
 
@@ -151,7 +157,7 @@ impl AsyncWrite for Connection {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
-        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_writer()) };
+        let r = unsafe { std::pin::Pin::new_unchecked(self.get_unchecked_mut().get_rw()) };
         AsyncWrite::poll_shutdown(r, cx)
     }
 }
@@ -251,7 +257,7 @@ pub mod test {
         // As long as they're larger than the largest possible read, everything seems OK.
         let (reader, conn_writer) = tokio::io::duplex(10240);
         let (conn_reader, writer) = tokio::io::duplex(10240);
-        let c = Connection::new_from(Box::new(BufReader::new(conn_reader)), Box::new(conn_writer));
+        let c = Connection::new_from_split(Box::pin(BufReader::new(conn_reader)), Box::pin(conn_writer));
         (c, reader, writer)
     }
 }
