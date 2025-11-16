@@ -49,4 +49,4 @@ still be provided. If the server finds the corresponding writer, it will respond
 with the following string: ``client_writer_token/<decimal number string>\0``.
 The returned number indicates the replay offset (same as in ``read_offset``)
 from which the client should resume writing. If the server does not find the
-corresponding reader, it will close the connection.
+corresponding writer, it will close the connection.
