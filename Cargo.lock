@@ -596,6 +596,7 @@ version = "0.3.3"
 dependencies = [
  "async-compression",
  "async-stream",
+ "base64 0.22.1",
  "config",
  "env_logger",
  "faf-replay-parser",

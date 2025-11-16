@@ -54,7 +54,7 @@ impl<V> ReconnectRegistry<V> {
             return
         }
         let cd = self.cleanup_duration;
-        self.items.retain(|_, v| now - v.age < 2 * cd);
+        self.items.retain(|_, v| now - v.age < cd * 2);
         self.last_cleanup = now;
     }
 

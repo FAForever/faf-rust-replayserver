@@ -13,6 +13,7 @@ faf-rust-replayserver documentation
    Introduction <introduction>
    Usage <usage>
    Architecture <architecture>
+   Extra headers <extra_headers>
 
 Indices and tables
 ==================
