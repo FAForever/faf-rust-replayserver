@@ -52,9 +52,9 @@ fn map_websocket_stream_to_bytes(stream: impl WebsocketStream) -> impl Stream<It
     stream.map(|i| {
         i.map_err(map_message_error_to_io_error)
             .and_then(|mes| {
-                if let Some((e, mes)) = mes.as_close() {
-                    if e != CloseCode::NORMAL_CLOSURE {
-                        Err(std::io::Error::other(mes))
+                if let Some((code, reason)) = mes.as_close() {
+                    if code != CloseCode::NORMAL_CLOSURE {
+                        Err(std::io::Error::other(reason))
                     } else {
                         Ok(Bytes::new())
                     }
