@@ -58,6 +58,8 @@ fn map_websocket_stream_to_bytes(stream: impl WebsocketStream) -> impl Stream<It
                     } else {
                         Ok(Bytes::new())
                     }
+                } else if mes.is_ping() || mes.is_pong() {
+                    Ok(Bytes::new())
                 } else {
                     Ok(mes.into_payload().into())
                 }

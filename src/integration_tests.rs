@@ -100,6 +100,9 @@ mod test {
                 client.send(Message::binary(data.to_owned())).await.unwrap();
                 random_sleep().await;
         }
+        // Add a ping and pong we should ignore for good measure.
+        client.send(Message::ping("foo")).await.unwrap();
+        client.send(Message::pong("bar")).await.unwrap();
         client.send(Message::close(Some(CloseCode::NORMAL_CLOSURE), "")).await.unwrap();
     }
 
