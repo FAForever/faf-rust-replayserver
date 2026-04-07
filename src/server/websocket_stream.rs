@@ -7,7 +7,7 @@ use tokio_util::{
     bytes::Bytes,
     io::{CopyToBytes, SinkWriter, StreamReader},
 };
-use tokio_websockets::{Error, Message, ServerBuilder, WebSocketStream};
+use tokio_websockets::{CloseCode, Error, Message, ServerBuilder, WebSocketStream};
 
 use super::connection::{ReaderType, WriterType};
 
@@ -51,7 +51,19 @@ fn map_websocket_sink_to_bytes(sink: impl WebsocketSink) -> impl for<'a> Sink<&'
 fn map_websocket_stream_to_bytes(stream: impl WebsocketStream) -> impl Stream<Item = Result<Bytes, std::io::Error>> {
     stream.map(|i| {
         i.map_err(map_message_error_to_io_error)
-            .map(|mes| mes.into_payload().into())
+            .and_then(|mes| {
+                if let Some((code, reason)) = mes.as_close() {
+                    if code != CloseCode::NORMAL_CLOSURE {
+                        Err(std::io::Error::other(reason))
+                    } else {
+                        Ok(Bytes::new())
+                    }
+                } else if mes.is_ping() || mes.is_pong() {
+                    Ok(Bytes::new())
+                } else {
+                    Ok(mes.into_payload().into())
+                }
+            })
     })
 }
 
