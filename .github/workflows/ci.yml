@@ -13,7 +13,7 @@ jobs:
             DB_PORT: 3306
             DATABASE_URL: "mysql://root:banana@127.0.0.1:3306/faf"
         steps:
-            - uses: actions/checkout@v2
+            - uses: actions/checkout@v6
             - uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
@@ -34,7 +34,7 @@ jobs:
             - name: Generate code coverage
               run: cargo llvm-cov --features local_db_tests --lcov --output-path lcov.info --ignore-filename-regex '.*rustlib.*'
             - name: Report coverage
-              uses: codecov/codecov-action@v5
+              uses: codecov/codecov-action@v7
               with:
                 token: ${{ secrets.CODECOV_TOKEN }}
                 files: lcov.info
