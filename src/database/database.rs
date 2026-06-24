@@ -24,7 +24,7 @@ pub struct GameStatRow {
     pub host: String,
     pub game_name: String,
     pub game_mod: Option<String>,
-    pub file_name: Option<String>,
+    pub folder_name: Option<String>,
 }
 
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
@@ -89,7 +89,7 @@ impl Database {
                 `login`.`login` AS host,
                 `game_stats`.`gameName` AS game_name,
                 `game_featuredMods`.`gamemod` AS game_mod,
-                `map_version`.`filename` AS file_name
+                `map_version`.`folder_name` AS folder_name
             FROM `game_stats`
             INNER JOIN `login`
               ON `login`.id = `game_stats`.`host`
@@ -244,7 +244,7 @@ pub mod test {
             host: "user1".into(),
             game_name: "2v2 Game".into(),
             game_mod: Some("faf".into()),
-            file_name: Some("maps/scmp_001.zip".into()),
+            folder_name: Some("scmp_001".into()),
         };
         assert_eq!(stats, expected_stats);
 
@@ -295,7 +295,7 @@ pub mod test {
     async fn test_db_game_on_old_map_version() {
         let db = get_db();
         let stats = db.get_game_stat_row(1030).await.unwrap();
-        assert_eq!(stats.file_name.unwrap(), "maps/scmp_003.zip".to_string());
+        assert_eq!(stats.folder_name.unwrap(), "scmp_003".to_string());
     }
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
@@ -303,7 +303,7 @@ pub mod test {
     async fn test_db_game_on_new_map_version() {
         let db = get_db();
         let stats = db.get_game_stat_row(1040).await.unwrap();
-        assert_eq!(stats.file_name.unwrap(), "maps/scmp_003.v0003.zip".to_string());
+        assert_eq!(stats.folder_name.unwrap(), "scmp_003.v0003".to_string());
     }
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
@@ -320,7 +320,7 @@ pub mod test {
         let db = get_db();
         let stats = db.get_game_stat_row(1060).await.unwrap();
         assert!(stats.end_time.is_none());
-        assert!(stats.file_name.is_none());
+        assert!(stats.folder_name.is_none());
     }
 
     #[cfg_attr(not(feature = "local_db_tests"), ignore)]
@@ -436,7 +436,7 @@ pub mod test {
             host: "user1".into(),
             game_name: "2v2 Game".into(),
             game_mod: Some("faf".into()),
-            file_name: Some("maps/scmp_001.zip".into()),
+            folder_name: Some("scmp_001".into()),
         }
     }
 
