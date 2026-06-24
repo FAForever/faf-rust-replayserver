@@ -37,24 +37,14 @@ impl Queries {
         Ok(res)
     }
 
-    fn unmangle_map_name(name: Option<String>) -> String {
-        // Mapname looks like this: maps/<stuff>.zip
-        // Previous two servers extracted the stuff with path.splitext(path.basename(...)).
-        // Rust unix path handling is ugly and it really won't ever be anything else than this
-        // (see MapService in API), so we just trim manually.
-        name.and_then(|f| f.rsplitn(2, '.').last().map(String::from))
-            .and_then(|f| f.rsplitn(2, '/').next().map(String::from))
-            .unwrap_or_else(|| "None".into())
-    }
-
     pub async fn get_game_stats(&self, id: u64) -> Result<GameStats, SaveError> {
         let stats = self.db.get_game_stat_row(id).await?;
         let player_count = self.db.get_player_count(id).await?;
 
-        if stats.file_name.is_none() {
+        if stats.folder_name.is_none() {
             log::info!("Map name for replay {} is missing! Saving anyway.", id);
         }
-        let mapname = Self::unmangle_map_name(stats.file_name);
+        let mapname = stats.folder_name.unwrap_or_else(|| "None".into());
 
         Ok(GameStats {
             featured_mod: stats.game_mod,
@@ -134,7 +124,7 @@ mod test {
             host: "user1".into(),
             game_name: "2v2 Game".into(),
             game_mod: Some("faf".into()),
-            file_name: None,
+            folder_name: None,
         };
         faux::when!(mdb.get_game_stat_row).then(move |_| Ok(null_stats()));
         faux::when!(mdb.get_player_count).then(|_| Ok(4));
