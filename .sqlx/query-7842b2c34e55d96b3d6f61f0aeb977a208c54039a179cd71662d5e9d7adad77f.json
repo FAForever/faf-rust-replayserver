@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                `game_stats`.`startTime` AS start_time,\n                `game_stats`.`endTime` AS end_time,\n                `game_stats`.`gameType` AS game_type,\n                `login`.`login` AS host,\n                `game_stats`.`gameName` AS game_name,\n                `game_featuredMods`.`gamemod` AS game_mod,\n                `map_version`.`filename` AS file_name\n            FROM `game_stats`\n            INNER JOIN `login`\n              ON `login`.id = `game_stats`.`host`\n            INNER JOIN  `game_featuredMods`\n              ON `game_stats`.`gameMod` = `game_featuredMods`.`id`\n            LEFT JOIN `map_version`\n              ON `game_stats`.`mapId` = `map_version`.`id`\n            WHERE `game_stats`.`id` = ?\n            ",
+  "query": "\n            SELECT\n                `game_stats`.`startTime` AS start_time,\n                `game_stats`.`endTime` AS end_time,\n                `game_stats`.`gameType` AS game_type,\n                `login`.`login` AS host,\n                `game_stats`.`gameName` AS game_name,\n                `game_featuredMods`.`gamemod` AS game_mod,\n                `map_version`.`folder_name` AS folder_name\n            FROM `game_stats`\n            INNER JOIN `login`\n              ON `login`.id = `game_stats`.`host`\n            INNER JOIN  `game_featuredMods`\n              ON `game_stats`.`gameMod` = `game_featuredMods`.`id`\n            LEFT JOIN `map_version`\n              ON `game_stats`.`mapId` = `map_version`.`id`\n            WHERE `game_stats`.`id` = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,7 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | MULTIPLE_KEY | ENUM | NO_DEFAULT_VALUE",
-          "max_size": 4
+          "max_size": 56
         }
       },
       {
@@ -59,7 +59,7 @@
       },
       {
         "ordinal": 6,
-        "name": "file_name",
+        "name": "folder_name",
         "type_info": {
           "type": "VarString",
           "flags": "UNIQUE_KEY | NO_DEFAULT_VALUE",
@@ -80,5 +80,5 @@
       true
     ]
   },
-  "hash": "84083717c119dd0b2c28afabbd4776c786c870898012fbc48cc8aefe1a9aa7d2"
+  "hash": "7842b2c34e55d96b3d6f61f0aeb977a208c54039a179cd71662d5e9d7adad77f"
 }
