@@ -22,13 +22,13 @@ values (11, 'SCMP_001',   'FFA',            'skirmish',  1, 1),
        (14, 'SCMP_004',   'FFA',            'skirmish',  4, 1);
 
 insert into map_version
-       (id, description, max_players, width, height, version, filename,                  hidden, map_id)
-values (21, 'SCMP 001',  8,           1024,  1024,   1,       'maps/scmp_001.zip',       0,      11),
-       (22, 'SCMP 002',  8,           1024,  1024,   1,       'maps/scmp_002.zip',       0,      12),
-       (23, NULL,        8,           1024,  1024,   1,       'maps/scmp_000.zip',       0,      14),
-       (24, 'SCMP 003',  8,           1024,  1024,   1,       'maps/scmp_003.zip',       0,      13),
-       (25, 'SCMP 003',  8,           512,   512,    2,       'maps/scmp_003.v0002.zip', 0,      13),
-       (26, 'SCMP 003',  8,           512,   512,    3,       'maps/scmp_003.v0003.zip', 0,      13);
+       (id, description, max_players, width, height, version, folder_name,      hidden, map_id)
+values (21, 'SCMP 001',  8,           1024,  1024,   1,       'scmp_001',       0,      11),
+       (22, 'SCMP 002',  8,           1024,  1024,   1,       'scmp_002',       0,      12),
+       (23, NULL,        8,           1024,  1024,   1,       'scmp_000',       0,      14),
+       (24, 'SCMP 003',  8,           1024,  1024,   1,       'scmp_003',       0,      13),
+       (25, 'SCMP 003',  8,           512,   512,    2,       'scmp_003.v0002', 0,      13),
+       (26, 'SCMP 003',  8,           512,   512,    3,       'scmp_003.v0003', 0,      13);
 
 insert into game_featuredMods
        (id,   gamemod,       name,           description,  publish, git_url,       git_branch, file_extension, allow_override)
